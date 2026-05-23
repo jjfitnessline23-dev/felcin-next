@@ -163,7 +163,6 @@ export default function UserProfilePage() {
               { href: "/podcasts", icon: "podcasts", label: "Podcasts", sub: "Audio shows coming soon", dot: false },
               { href: "/reels", icon: "play_circle", label: "Reels", sub: "Short videos", dot: false },
               { href: "/stories", icon: "auto_stories", label: "Stories", sub: "24-hour stories", dot: false },
-              { href: "/profile-settings", icon: "settings", label: "Settings", sub: "Edit profile & account", dot: false },
             ].map((item, i, arr) => (
               <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)}
                 className="flex items-center gap-3 px-4 py-3.5 transition-colors"

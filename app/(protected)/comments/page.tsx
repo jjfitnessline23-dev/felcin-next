@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, increment, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -109,6 +109,12 @@ export default function CommentsPage() {
     setSending(false);
   };
 
+  const videoRef = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    el.muted = true;
+    el.play().catch(() => {});
+  }, []);
+
   const mediaType = resolveMediaType(post?.contentType, post?.mimeType, post?.mediaUrl);
   const displayName = authorData?.name || post?.authorName || "User";
   const photo = authorData?.photo || post?.authorPhoto || "";
@@ -148,7 +154,7 @@ export default function CommentsPage() {
             {post.mediaUrl && (
               <div style={{ background: "#000" }}>
                 {mediaType === "video" ? (
-                  <video src={post.mediaUrl} controls playsInline className="w-full object-contain" style={{ maxHeight: 380, display: "block" }} />
+                  <video ref={videoRef} src={post.mediaUrl} autoPlay muted controls playsInline className="w-full object-contain" style={{ maxHeight: 380, display: "block" }} />
                 ) : (
                   <img src={post.mediaUrl} alt="" className="w-full object-contain" style={{ maxHeight: 380 }} />
                 )}
@@ -201,7 +207,7 @@ export default function CommentsPage() {
 
       {/* Comment input */}
       <div className="fixed bottom-0 left-0 right-0 px-4 py-3 lg:relative lg:bottom-auto"
-        style={{ background: "rgba(9,9,9,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        style={{ background: "rgba(9,9,9,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", zIndex: 60, paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
         <div className="flex items-center gap-3 max-w-xl mx-auto">
           {user?.photoURL ? (
             <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
