@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection, query, where, getDocs,
-  doc, getDoc, setDoc, deleteDoc, onSnapshot,
+  doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -46,6 +46,8 @@ export default function UserProfilePage() {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blocking, setBlocking] = useState(false);
   const isSelf = user?.uid === uid;
 
   useEffect(() => {
@@ -86,6 +88,7 @@ export default function UserProfilePage() {
     }).catch(() => {});
 
     if (user && user.uid !== uid) {
+      getDoc(doc(db, "users", user.uid, "blocked", uid)).then((s) => setBlocked(s.exists()));
       const ref = doc(db, "users", uid, "followers", user.uid);
       return onSnapshot(ref, (snap) => setFollowing(snap.exists()));
     }
@@ -96,6 +99,27 @@ export default function UserProfilePage() {
     const ref = doc(db, "users", uid, "followers", user.uid);
     if (following) await deleteDoc(ref);
     else await setDoc(ref, { followerId: user.uid, createdAt: new Date() });
+  };
+
+  const handleBlock = async () => {
+    if (!user || blocking) return;
+    setBlocking(true);
+    const ref = doc(db, "users", user.uid, "blocked", uid);
+    if (blocked) {
+      await deleteDoc(ref).catch(() => {});
+      setBlocked(false);
+    } else {
+      await setDoc(ref, { blockedAt: serverTimestamp() }).catch(() => {});
+      await addDoc(collection(db, "reports"), {
+        type: "block",
+        blockedUid: uid,
+        blockerId: user.uid,
+        createdAt: serverTimestamp(),
+        status: "pending",
+      }).catch(() => {});
+      setBlocked(true);
+    }
+    setBlocking(false);
   };
 
   const shareProfile = () => {
@@ -218,6 +242,12 @@ export default function UserProfilePage() {
               style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f2f2f2" }}>chat</span>
             </Link>
+            <button onClick={handleBlock} disabled={blocking}
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-none cursor-pointer"
+              style={{ background: blocked ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.08)", border: blocked ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(255,255,255,0.14)" }}
+              title={blocked ? "Unblock user" : "Block user"}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: blocked ? "#f87171" : "#f2f2f2" }}>block</span>
+            </button>
           </>
         )}
       </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
-  getDoc, setDoc, deleteDoc, serverTimestamp,
+  getDoc, setDoc, deleteDoc, serverTimestamp, addDoc, collection,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -53,6 +53,8 @@ export default function PostCard({ post }: { post: Post }) {
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [dotMenu, setDotMenu] = useState(false);
+  const [reportModal, setReportModal] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
 
   useEffect(() => {
     setLiked(post.likedBy?.includes(user?.uid || "") ?? false);
@@ -112,6 +114,22 @@ export default function PostCard({ post }: { post: Post }) {
     const url = `${window.location.origin}/comments?postId=${post.id}`;
     await navigator.clipboard.writeText(url).catch(() => {});
     setDotMenu(false);
+  };
+
+  const handleReport = async (reason: string) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, "reports"), {
+        type: "post",
+        postId: post.id,
+        authorId: post.authorId,
+        reporterId: user.uid,
+        reason,
+        createdAt: serverTimestamp(),
+        status: "pending",
+      });
+    } catch {}
+    setReportDone(true);
   };
 
   return (
@@ -246,7 +264,7 @@ export default function PostCard({ post }: { post: Post }) {
           {[
             { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); } },
             { icon: "link", label: "Copy link", action: copyLink },
-            { icon: "flag", label: "Report", action: () => setDotMenu(false) },
+            { icon: "flag", label: "Report", action: () => { setDotMenu(false); setReportModal(true); setReportDone(false); } },
           ].map((item) => (
             <button key={item.label} onClick={item.action}
               className="flex items-center gap-4 w-full px-5 py-4 border-none cursor-pointer"
@@ -260,6 +278,48 @@ export default function PostCard({ post }: { post: Post }) {
             style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.08)", color: "#555" }}>
             Cancel
           </button>
+        </div>
+      </>
+    )}
+
+    {/* Report modal */}
+    {reportModal && (
+      <>
+        <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setReportModal(false)} />
+        <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl overflow-hidden"
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)" }}>
+          <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1" style={{ background: "rgba(255,255,255,0.15)" }} />
+          <div className="px-5 py-3">
+            <h3 className="font-bold text-base" style={{ color: "#f2f2f2" }}>Report Post</h3>
+            <p className="text-xs mt-0.5" style={{ color: "#555" }}>Why are you reporting this post?</p>
+          </div>
+          {reportDone ? (
+            <div className="px-5 py-6 text-center">
+              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#4ade80", display: "block", marginBottom: 8 }}>check_circle</span>
+              <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>Report submitted</p>
+              <p className="text-xs mt-1" style={{ color: "#555" }}>We'll review this within 24 hours.</p>
+              <button onClick={() => setReportModal(false)}
+                className="mt-4 px-6 py-2 rounded-full text-sm font-semibold border-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.08)", color: "#f2f2f2" }}>
+                Close
+              </button>
+            </div>
+          ) : (
+            <>
+              {["Spam", "Nudity or sexual content", "Hate speech or discrimination", "Violence or dangerous content", "Harassment or bullying", "Other"].map((reason, i, arr) => (
+                <button key={reason} onClick={() => handleReport(reason)}
+                  className="flex items-center w-full px-5 py-3.5 border-none cursor-pointer text-left"
+                  style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.05)", color: "#f2f2f2" }}>
+                  <span className="text-sm font-medium">{reason}</span>
+                </button>
+              ))}
+              <button onClick={() => setReportModal(false)}
+                className="flex items-center justify-center w-full py-4 border-none cursor-pointer font-semibold text-sm"
+                style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.08)", color: "#555" }}>
+                Cancel
+              </button>
+            </>
+          )}
         </div>
       </>
     )}

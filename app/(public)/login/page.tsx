@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   useEffect(() => {
     if (!loading && user && canAccessApp(user)) {
@@ -136,11 +137,27 @@ export default function LoginPage() {
                 style={{ background: "#111", border: "1px solid #333", color: "#f1f1f1", fontSize: 16 }}
               />
             )}
+            {mode === "signup" && (
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-0.5 shrink-0"
+                  style={{ width: 16, height: 16, accentColor: "#fff" }}
+                />
+                <span className="text-xs leading-relaxed" style={{ color: "#888" }}>
+                  I agree to Felcin's{" "}
+                  <a href="/privacy" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Terms & Privacy Policy</a>.
+                  I understand that objectionable content and abusive behavior are not tolerated and may result in account removal.
+                </span>
+              </label>
+            )}
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || (mode === "signup" && !agreedToTerms)}
               className="w-full py-3 rounded-xl font-bold text-sm text-white cursor-pointer border-none"
-              style={{ background: busy ? "rgba(255,255,255,0.12)" : "#fff", color: busy ? "#888" : "#000", opacity: 1 }}
+              style={{ background: (busy || (mode === "signup" && !agreedToTerms)) ? "rgba(255,255,255,0.12)" : "#fff", color: (busy || (mode === "signup" && !agreedToTerms)) ? "#888" : "#000", opacity: 1 }}
             >
               {busy ? "Please wait…" : mode === "login" ? "Sign In" : mode === "signup" ? "Create Account" : "Send Reset Email"}
             </button>
