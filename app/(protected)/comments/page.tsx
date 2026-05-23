@@ -36,6 +36,8 @@ function timeAgo(s: number) {
 export default function CommentsPage() {
   const searchParams = useSearchParams();
   const postId = searchParams.get("postId") || "";
+  const isReel = searchParams.get("type") === "reel";
+  const col = isReel ? "reels" : "posts";
   const { user } = useAuth();
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
@@ -49,14 +51,14 @@ export default function CommentsPage() {
 
   useEffect(() => {
     if (!postId) return;
-    const postRef = doc(db, "posts", postId);
+    const postRef = doc(db, col, postId);
     getDoc(postRef).then(async (snap) => {
       if (!snap.exists()) { router.replace("/"); return; }
       const p = snap.data() as Post;
       setPost(p);
 
-      // Track view and auto-delete if limit reached
-      if (p.maxViews != null) {
+      // Track view and auto-delete if limit reached (posts only)
+      if (!isReel && p.maxViews != null) {
         const newCount = (p.viewCount ?? 0) + 1;
         if (newCount >= p.maxViews) {
           await deleteDoc(postRef);
@@ -83,28 +85,28 @@ export default function CommentsPage() {
         } catch {}
       }
     }).catch(() => router.replace("/"));
-    const q = query(collection(db, "posts", postId, "comments"), orderBy("createdAt", "asc"));
+    const q = query(collection(db, col, postId, "comments"), orderBy("createdAt", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setComments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Comment, "id">) })));
       clearTimeout(scrollTimer.current);
       scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
     });
     return () => { unsub(); clearTimeout(scrollTimer.current); };
-  }, [postId, router]);
+  }, [postId, col, isReel, router]);
 
   const sendComment = async () => {
     if (!text.trim() || !user || sending) return;
     setSending(true);
     const t = text.trim(); setText("");
     try {
-      await addDoc(collection(db, "posts", postId, "comments"), {
+      await addDoc(collection(db, col, postId, "comments"), {
         authorId: user.uid,
         authorName: user.displayName || user.email || "User",
         authorPhoto: user.photoURL || "",
         text: t,
         createdAt: serverTimestamp(),
       });
-      await updateDoc(doc(db, "posts", postId), { comments: increment(1) });
+      await updateDoc(doc(db, col, postId), { comments: increment(1) });
     } catch {}
     setSending(false);
   };

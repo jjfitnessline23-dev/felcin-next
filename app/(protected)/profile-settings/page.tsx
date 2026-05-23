@@ -32,7 +32,7 @@ export default function ProfileSettingsPage() {
         setPhotoURL(d.photoURL || user.photoURL || "");
         setBadge(d.badge || "");
       }
-    });
+    }).catch(() => {});
   }, [user]);
 
   const handlePhoto = async (f: File) => {

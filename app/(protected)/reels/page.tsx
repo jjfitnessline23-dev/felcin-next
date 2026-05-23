@@ -122,7 +122,7 @@ export default function ReelsPage() {
                   </div>
                   <span className="text-xs font-semibold text-white">{reel.likes || 0}</span>
                 </div>
-                <Link href={`/comments?postId=${reel.id}`}>
+                <Link href={`/comments?postId=${reel.id}&type=reel`}>
                   <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
                     <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>chat_bubble</span>
                   </div>
