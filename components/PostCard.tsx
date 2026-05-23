@@ -188,7 +188,7 @@ export default function PostCard({ post }: { post: Post }) {
           <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
             {mediaType === "video" ? (
               <>
-                <video src={post.mediaUrl} className="w-full h-full object-cover" muted loop playsInline
+                <video src={post.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline
                   onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
                   onMouseLeave={(e) => (e.currentTarget as HTMLVideoElement).pause()} />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

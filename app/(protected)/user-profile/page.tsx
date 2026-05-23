@@ -212,24 +212,25 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* ── Row: spacer for avatar + action buttons on right ── */}
-      {/* Height = 40px (avatar extends below banner) + 8px gap = 48px */}
-      <div className="flex items-end justify-end gap-2 px-4" style={{ height: 52 }}>
-        {isSelf ? (
-          <>
-            <Link href="/profile-settings"
-              className="px-4 py-2 rounded-full text-sm font-semibold"
-              style={{ background: "rgba(255,255,255,0.08)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.14)" }}>
-              Edit Profile
-            </Link>
-            <button onClick={shareProfile}
-              className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer shrink-0"
-              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f2f2f2" }}>ios_share</span>
-            </button>
-          </>
-        ) : (
-          <>
+      {/* ── Row: avatar spacer + stats + action buttons ── */}
+      <div className="flex items-end px-4 pb-2 gap-3" style={{ height: 60 }}>
+        <div style={{ width: 96, flexShrink: 0 }} />
+        <div className="flex gap-5 flex-1">
+          <div className="text-center">
+            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{posts.length}</div>
+            <div className="text-xs" style={{ color: "#555" }}>Posts</div>
+          </div>
+          <div className="text-center">
+            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followersCount ?? 0}</div>
+            <div className="text-xs" style={{ color: "#555" }}>Followers</div>
+          </div>
+          <div className="text-center">
+            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followingCount ?? 0}</div>
+            <div className="text-xs" style={{ color: "#555" }}>Following</div>
+          </div>
+        </div>
+        {!isSelf && (
+          <div className="flex items-center gap-2">
             <button onClick={toggleFollow}
               className="px-5 py-2 rounded-full text-sm font-semibold border-none cursor-pointer transition-all"
               style={following
@@ -248,7 +249,7 @@ export default function UserProfilePage() {
               title={blocked ? "Unblock user" : "Block user"}>
               <span className="material-symbols-outlined" style={{ fontSize: 18, color: blocked ? "#f87171" : "#f2f2f2" }}>block</span>
             </button>
-          </>
+          </div>
         )}
       </div>
 
@@ -270,37 +271,29 @@ export default function UserProfilePage() {
           </a>
         )}
 
-        {/* Stats */}
-        <div className="flex gap-7 mt-4">
-          <div>
-            <div className="font-bold text-base" style={{ color: "#f2f2f2" }}>{posts.length}</div>
-            <div className="text-xs" style={{ color: "#555" }}>Posts</div>
-          </div>
-          <div>
-            <div className="font-bold text-base" style={{ color: "#f2f2f2" }}>{profile.followersCount ?? 0}</div>
-            <div className="text-xs" style={{ color: "#555" }}>Followers</div>
-          </div>
-          <div>
-            <div className="font-bold text-base" style={{ color: "#f2f2f2" }}>{profile.followingCount ?? 0}</div>
-            <div className="text-xs" style={{ color: "#555" }}>Following</div>
-          </div>
-        </div>
-
-        {/* Dashboard + Settings pills — only for self */}
+        {/* Dashboard + Edit Profile + Share Profile — only for self */}
         {isSelf && (
-          <div className="flex gap-2 mt-4">
+          <div className="mt-4">
             <Link href="/dashboard"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.09)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>bar_chart</span>
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-semibold"
+              style={{ background: "rgba(255,255,255,0.06)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>bar_chart</span>
               Dashboard
             </Link>
-            <Link href="/profile-settings"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.09)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>settings</span>
-              Settings
-            </Link>
+            <div className="flex gap-2 mt-2">
+              <Link href="/profile-settings"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
+                style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                Edit Profile
+              </Link>
+              <button onClick={shareProfile}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>ios_share</span>
+                Share Profile
+              </button>
+            </div>
           </div>
         )}
       </div>
