@@ -32,7 +32,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <div style={{ background: "#090909", minHeight: "100dvh" }}>
       <Sidebar />
-      <main className="lg:pl-60 pb-16 lg:pb-0 min-h-screen" style={{ overflowX: "hidden", width: "100%", paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <main className="lg:pl-60 pb-16 lg:pb-0 min-h-screen" style={{ width: "100%", paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className="w-full lg:max-w-[520px] lg:mx-auto">
           {children}
         </div>

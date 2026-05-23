@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
@@ -66,11 +66,17 @@ export default function PostCard({ post }: { post: Post }) {
     getDoc(doc(db, "users", user.uid, "bookmarks", post.id)).then((snap) => setBookmarked(snap.exists()));
   }, [user, post.id]);
 
-  const videoRef = useCallback((el: HTMLVideoElement | null) => {
-    if (!el) return;
-    el.muted = true;
-    el.play().catch(() => {});
-  }, []);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !post.mediaUrl) return;
+    v.muted = true;
+    v.setAttribute("muted", "");
+    const play = () => v.play().catch(() => {});
+    v.addEventListener("loadedmetadata", play, { once: true });
+    v.load();
+    return () => v.removeEventListener("loadedmetadata", play);
+  }, [post.mediaUrl]);
 
   const mediaType = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
   const caption = post.caption || post.text || "";
@@ -253,9 +259,9 @@ export default function PostCard({ post }: { post: Post }) {
     {/* 3-dot bottom sheet */}
     {dotMenu && (
       <>
-        <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setDotMenu(false)} />
-        <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl overflow-hidden pb-safe"
-          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)" }}>
+        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.5)", zIndex: 65 }} onClick={() => setDotMenu(false)} />
+        <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden"
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 70 }}>
           <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-4" style={{ background: "rgba(255,255,255,0.15)" }} />
           {[
             { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); } },
@@ -281,9 +287,9 @@ export default function PostCard({ post }: { post: Post }) {
     {/* Report modal */}
     {reportModal && (
       <>
-        <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setReportModal(false)} />
-        <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl overflow-hidden"
-          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)" }}>
+        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.6)", zIndex: 65 }} onClick={() => setReportModal(false)} />
+        <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden"
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 70 }}>
           <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1" style={{ background: "rgba(255,255,255,0.15)" }} />
           <div className="px-5 py-3">
             <h3 className="font-bold text-base" style={{ color: "#f2f2f2" }}>Report Post</h3>
