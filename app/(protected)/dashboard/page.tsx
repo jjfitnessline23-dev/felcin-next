@@ -23,8 +23,7 @@ export default function DashboardPage() {
         comments: posts.reduce((s, p) => s + (p.comments || 0), 0),
         followers: followersSnap.size,
       });
-      setLoading(false);
-    });
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [user]);
 
   const cards = [
