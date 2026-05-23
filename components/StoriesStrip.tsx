@@ -150,7 +150,7 @@ export default function StoriesStrip() {
       </div>
 
       {activeGroup && current && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "#000" }}>
+        <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#000", zIndex: 65 }}>
           <div className="relative w-full h-full max-w-sm mx-auto flex flex-col">
             <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-3">
               {activeGroup.stories.map((_, i) => (

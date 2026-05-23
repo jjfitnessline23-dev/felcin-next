@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, increment, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -82,7 +82,7 @@ export default function CommentsPage() {
           }
         } catch {}
       }
-    });
+    }).catch(() => router.replace("/"));
     const q = query(collection(db, "posts", postId, "comments"), orderBy("createdAt", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setComments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Comment, "id">) })));
@@ -109,11 +109,17 @@ export default function CommentsPage() {
     setSending(false);
   };
 
-  const videoRef = useCallback((el: HTMLVideoElement | null) => {
-    if (!el) return;
-    el.muted = true;
-    el.play().catch(() => {});
-  }, []);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !post?.mediaUrl) return;
+    v.muted = true;
+    v.setAttribute("muted", "");
+    const play = () => v.play().catch(() => {});
+    v.addEventListener("loadedmetadata", play, { once: true });
+    v.load();
+    return () => v.removeEventListener("loadedmetadata", play);
+  }, [post?.mediaUrl]);
 
   const mediaType = resolveMediaType(post?.contentType, post?.mimeType, post?.mediaUrl);
   const displayName = authorData?.name || post?.authorName || "User";

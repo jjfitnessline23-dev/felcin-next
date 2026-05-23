@@ -24,7 +24,11 @@ export default function PrivateChatsPage() {
   const searchParams = useSearchParams();
   const withUid = searchParams.get("uid");
   const [chats, setChats] = useState<Chat[]>([]);
-  const [activeChat, setActiveChat] = useState<string | null>(withUid ? chatId(user?.uid || "", withUid) : null);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user && withUid && !activeChat) setActiveChat(chatId(user.uid, withUid));
+  }, [user, withUid, activeChat]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);

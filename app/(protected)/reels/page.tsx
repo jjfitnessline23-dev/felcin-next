@@ -77,9 +77,9 @@ export default function ReelsPage() {
           return (
             <div key={reel.id} className="snap-start relative flex-shrink-0" style={{ height: "100%", background: "#000" }}>
               <video
-                ref={(el) => { videoRefs.current[i] = el; }}
+                ref={(el) => { videoRefs.current[i] = el; if (el) el.muted = true; }}
                 src={reel.mediaUrl}
-                loop playsInline
+                loop playsInline muted
                 className="w-full h-full object-cover"
                 onClick={() => togglePlay(i)}
               />
