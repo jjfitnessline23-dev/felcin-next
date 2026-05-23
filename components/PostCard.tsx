@@ -184,32 +184,22 @@ export default function PostCard({ post }: { post: Post }) {
 
       {/* Media */}
       {post.mediaUrl && (
-        <Link href={`/comments?postId=${post.id}`}>
-          <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
-            {mediaType === "video" ? (
-              <>
-                <video src={post.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline
-                  onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
-                  onMouseLeave={(e) => (e.currentTarget as HTMLVideoElement).pause()} />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center"
-                    style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}>
-                    <span className="material-symbols-outlined text-white" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
-                  </div>
-                </div>
-              </>
-            ) : (
+        <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
+          {mediaType === "video" ? (
+            <video src={post.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+          ) : (
+            <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
               <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" />
-            )}
-            {viewsLeft !== null && (
-              <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full"
-                style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}>
-                <span className="material-symbols-outlined text-white" style={{ fontSize: 13 }}>visibility</span>
-                <span className="text-white text-xs font-semibold">{Math.max(0, viewsLeft)} left</span>
-              </div>
-            )}
-          </div>
-        </Link>
+            </Link>
+          )}
+          {viewsLeft !== null && (
+            <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full"
+              style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 13 }}>visibility</span>
+              <span className="text-white text-xs font-semibold">{Math.max(0, viewsLeft)} left</span>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Actions */}

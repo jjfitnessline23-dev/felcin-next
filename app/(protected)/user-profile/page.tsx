@@ -213,7 +213,7 @@ export default function UserProfilePage() {
       </div>
 
       {/* ── Row: avatar spacer + stats + action buttons ── */}
-      <div className="flex items-end px-4 pb-2 gap-3" style={{ height: 60 }}>
+      <div className="flex items-center px-4 gap-3" style={{ height: 44 }}>
         <div style={{ width: 96, flexShrink: 0 }} />
         <div className="flex gap-5 flex-1">
           <div className="text-center">
