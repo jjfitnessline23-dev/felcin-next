@@ -1,0 +1,310 @@
+/* ============================================
+   FELCIN DARK THEME  — Instagram/TikTok style
+   ============================================ */
+
+:root {
+  color-scheme: dark;
+  --dk-bg:       #000000;
+  --dk-surface:  #111111;
+  --dk-card:     #1a1a1a;
+  --dk-elevated: #222222;
+  --dk-border:   rgba(255,255,255,0.1);
+  --dk-text:     #f1f1f1;
+  --dk-muted:    #888888;
+  --dk-accent:   #18e0b0;
+  --dk-accent2:  #0faa84;
+  --dk-danger:   #ff4545;
+}
+
+/* ---- Base ---- */
+html, body {
+  background-color: var(--dk-bg) !important;
+  color: var(--dk-text) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Tailwind bg overrides ---- */
+.bg-white          { background-color: var(--dk-surface) !important; }
+.bg-slate-50       { background-color: var(--dk-bg)      !important; }
+.bg-slate-100      { background-color: var(--dk-card)    !important; }
+.bg-slate-200      { background-color: var(--dk-elevated)!important; }
+.bg-white\/95,
+.bg-slate-50\/95   { background-color: rgba(0,0,0,0.92)  !important; backdrop-filter: blur(12px); }
+
+/* ---- Tailwind text overrides ---- */
+.text-slate-900,
+.text-slate-800    { color: var(--dk-text)  !important; }
+.text-slate-700,
+.text-slate-600    { color: #c8c8c8          !important; }
+.text-slate-500    { color: var(--dk-muted) !important; }
+.text-slate-400    { color: #555555          !important; }
+
+/* ---- Tailwind border overrides ---- */
+.border-slate-200,
+.border-slate-100  { border-color: var(--dk-border) !important; }
+.divide-slate-200 > * + * { border-color: var(--dk-border) !important; }
+
+/* ---- Hover states ---- */
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-100:hover { background-color: rgba(255,255,255,0.05) !important; }
+.hover\:bg-slate-200:hover { background-color: rgba(255,255,255,0.08) !important; }
+
+/* ---- Teal accent ---- */
+.text-teal-700       { color: var(--dk-accent)  !important; }
+.bg-teal-700         { background-color: var(--dk-accent) !important; color: #000 !important; }
+.border-teal-500,
+.focus\:border-teal-500:focus { border-color: var(--dk-accent) !important; }
+.hover\:border-teal-600:hover { border-color: var(--dk-accent2) !important; }
+
+/* ---- Desktop sidebar ---- */
+aside, .rail {
+  background-color: #0a0a0a !important;
+  border-color: var(--dk-border) !important;
+}
+.nav-link {
+  color: #888 !important;
+  border-radius: 12px !important;
+  transition: background .15s, color .15s !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+}
+.nav-link:hover {
+  background-color: rgba(255,255,255,0.06) !important;
+  color: #f1f1f1 !important;
+}
+.nav-link.active {
+  background-color: rgba(255,255,255,0.08) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+.brand {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  color: #f1f1f1 !important;
+  letter-spacing: -0.5px !important;
+}
+
+/* ---- Mobile bottom nav ---- */
+nav.lg\:hidden,
+nav.fixed.bottom-0 {
+  background-color: #0a0a0a !important;
+  border-color: var(--dk-border) !important;
+}
+
+/* ---- Feed posts ---- */
+article.post {
+  background-color: #0f0f0f !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 20px !important;
+  margin-bottom: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+}
+.post-head         { border-bottom: 1px solid var(--dk-border) !important; }
+.post-actions      { border-top: 1px solid var(--dk-border) !important; }
+.post-stats        { color: var(--dk-muted) !important; }
+.post-comment-link { color: var(--dk-muted) !important; }
+.act               { color: var(--dk-muted) !important; }
+.act:hover         { color: var(--dk-text)  !important; background: rgba(255,255,255,0.05) !important; }
+.act.liked         { color: #ff4f6d !important; }
+.post-author-inline,
+.author            { color: var(--dk-text)  !important; }
+.post-text         { color: #d0d0d0 !important; }
+.author-meta       { color: var(--dk-muted) !important; }
+
+/* ---- Stories strip ---- */
+#stories-strip {
+  background: transparent !important;
+  min-height: 110px;
+}
+.story-ring {
+  border-color: var(--dk-accent) !important;
+}
+.story-name {
+  color: var(--dk-muted) !important;
+}
+
+/* ---- Explore / profile grid tiles ---- */
+.tile {
+  background-color: var(--dk-card) !important;
+  overflow: hidden;
+}
+.overlay {
+  background: linear-gradient(transparent, rgba(0,0,0,0.6)) !important;
+  color: #fff !important;
+}
+
+/* ---- Inputs & textareas ---- */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  background-color: var(--dk-card) !important;
+  color: var(--dk-text) !important;
+  border-color: var(--dk-border) !important;
+}
+input::placeholder,
+textarea::placeholder { color: #555 !important; }
+input:focus,
+textarea:focus {
+  border-color: var(--dk-accent) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(24,224,176,0.15) !important;
+}
+.bg-slate-100.border-transparent { background-color: var(--dk-card) !important; }
+
+/* ---- Buttons ---- */
+.btn-follow {
+  background-color: var(--dk-text) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+.btn-edit {
+  background-color: var(--dk-elevated) !important;
+  color: var(--dk-text) !important;
+  border: 1px solid var(--dk-border) !important;
+}
+button[style*="background:#0f766e"],
+button[style*="background: #0f766e"] {
+  background: var(--dk-accent) !important;
+  color: #000 !important;
+}
+
+/* ---- More menu (desktop) ---- */
+#more-menu {
+  background-color: var(--dk-card) !important;
+  border-color: var(--dk-border) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+}
+#more-menu a,
+#more-menu button {
+  color: var(--dk-text) !important;
+  border-color: var(--dk-border) !important;
+}
+#more-menu a:hover,
+#more-menu button:hover {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+
+/* ---- Modals ---- */
+#report-modal > div,
+#edit-post-modal > div,
+#end-confirm > div {
+  background-color: var(--dk-card) !important;
+  color: var(--dk-text) !important;
+}
+#report-modal button,
+#edit-post-modal button {
+  border-color: var(--dk-border) !important;
+  background-color: var(--dk-elevated) !important;
+  color: var(--dk-text) !important;
+}
+
+/* ---- Suggestions panel ---- */
+#suggestions-panel {
+  background-color: var(--dk-surface) !important;
+  border-color: var(--dk-border) !important;
+}
+.suggest-item { border-color: var(--dk-border) !important; }
+.sug-name     { color: var(--dk-text) !important; }
+.sug-meta     { color: var(--dk-muted) !important; }
+.sug-follow {
+  border: 1px solid var(--dk-border) !important;
+  background: transparent !important;
+  color: var(--dk-accent) !important;
+}
+
+/* ---- Profile page ---- */
+.profile-header   { border-color: rgba(255,255,255,0.08) !important; }
+.tab-bar          { border-color: rgba(255,255,255,0.08) !important; }
+.tab-bar a        { color: #555 !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .1em !important; padding-top: 14px !important; padding-bottom: 14px !important; }
+.tab-bar a.active { color: var(--dk-text) !important; border-color: var(--dk-text) !important; border-top-width: 1.5px !important; }
+.pro-dashboard    { background-color: #0f0f0f !important; border-color: rgba(255,255,255,0.08) !important; border-radius: 16px !important; }
+.bg-slate-50.rounded-lg { background-color: rgba(255,255,255,0.04) !important; border-radius: 12px !important; }
+#dash-reach,
+#dash-engaged,
+#dash-followers   { color: var(--dk-text) !important; font-size: 22px !important; font-weight: 800 !important; }
+.username          { font-weight: 700 !important; color: var(--dk-text) !important; font-size: 18px !important; }
+.stats-row         { color: var(--dk-text) !important; font-size: 14px !important; }
+.stats-row .font-semibold { font-weight: 800 !important; }
+
+/* ---- Nav avatar ---- */
+#nav-avatar {
+  background-color: var(--dk-elevated) !important;
+  color: var(--dk-text) !important;
+}
+#nav-name          { color: var(--dk-text) !important; }
+.text-xs.text-slate-400 { color: var(--dk-muted) !important; }
+
+/* ---- Comments page ---- */
+.post-detail    { background-color: var(--dk-surface) !important; border-color: var(--dk-border) !important; border-radius: 16px; overflow:hidden; margin-bottom:16px; }
+.post-header    { border-color: var(--dk-border) !important; }
+.post-body      { background-color: var(--dk-surface) !important; }
+.post-actions   { border-color: var(--dk-border) !important; background: var(--dk-surface) !important; }
+.post-stats     { color: var(--dk-muted) !important; background: var(--dk-surface) !important; }
+.comment-section{ border-color: var(--dk-border) !important; }
+.comment-form   { background: var(--dk-surface) !important; border-color: var(--dk-border) !important; }
+.comment-item   { border-color: var(--dk-border) !important; }
+.c-name a       { color: var(--dk-text) !important; }
+.c-text         { color: #d0d0d0 !important; }
+.c-time         { color: var(--dk-muted) !important; }
+.c-like-btn     { color: var(--dk-muted) !important; }
+.c-like-btn.liked { color: #ff4f6d !important; }
+
+/* ---- Notifications ---- */
+.item       { border-color: rgba(255,255,255,0.06) !important; background: #0f0f0f !important; transition: background .15s !important; }
+.item:hover { background: rgba(255,255,255,0.04) !important; }
+.item.unread{ background: rgba(24,224,176,0.05) !important; border-left: 3px solid var(--dk-accent) !important; }
+.item-text  { color: var(--dk-text) !important; }
+.item-time  { color: var(--dk-muted) !important; }
+.section-label { color: #555 !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .08em !important; text-transform: uppercase !important; padding: 16px 16px 8px !important; }
+.mark       { color: var(--dk-accent) !important; font-weight: 700 !important; }
+.head h1    { font-size: 22px !important; font-weight: 800 !important; letter-spacing: -0.3px !important; color: var(--dk-text) !important; }
+
+/* ---- Old CSS pages (felcin-redesign.css vars) ---- */
+body {
+  --bg:          #111111;
+  --bg-card:     #1a1a1a;
+  --bg-hover:    rgba(255,255,255,0.05);
+  --text:        #f1f1f1;
+  --muted:       #888888;
+  --border:      rgba(255,255,255,0.1);
+  --border-light:rgba(255,255,255,0.06);
+  --primary:     #18e0b0;
+  --err:         #ff4545;
+  --ok:          #18e0b0;
+  --radius:      12px;
+}
+.rail {
+  background-color: #0a0a0a !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+.brand { color: var(--dk-text) !important; }
+.head h1 { color: var(--dk-text) !important; }
+
+/* ---- Empty / loading states ---- */
+.empty-feed h2  { color: var(--dk-text)  !important; }
+.empty-feed p   { color: var(--dk-muted) !important; }
+.empty-feed a   { color: var(--dk-accent)!important; }
+.loading-spinner{ color: var(--dk-muted) !important; }
+.empty          { color: var(--dk-muted) !important; }
+
+/* ---- Explore pills ---- */
+.pill.is-active,
+.pill.active    { background-color: var(--dk-accent) !important; color: #000 !important; border-color: var(--dk-accent) !important; }
+.pill           { background-color: var(--dk-card) !important; color: var(--dk-text) !important; border-color: var(--dk-border) !important; }
+
+/* ---- Status toast ---- */
+.status-toast {
+  background-color: var(--dk-elevated) !important;
+  color: var(--dk-text) !important;
+  border: 1px solid var(--dk-border) !important;
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }

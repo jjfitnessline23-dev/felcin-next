@@ -1,0 +1,257 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  collection, query, orderBy, limit, getDocs, onSnapshot,
+  doc, getDoc, startAfter, QueryDocumentSnapshot, where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth";
+import PostCard from "@/components/PostCard";
+import Link from "next/link";
+import StoriesStrip from "@/components/StoriesStrip";
+
+interface Post {
+  id: string;
+  authorId: string;
+  isStory?: boolean;
+  authorName?: string;
+  authorPhoto?: string;
+  caption?: string;
+  text?: string;
+  mediaUrl?: string;
+  contentType?: string;
+  mimeType?: string;
+  likes?: number;
+  comments?: number;
+  likedBy?: string[];
+  createdAt?: { seconds: number } | null;
+  status?: string;
+  maxViews?: number | null;
+  viewCount?: number;
+}
+
+const PAGE_SIZE = 12;
+
+const authorCache = new Map<string, { name: string; photo: string }>();
+const AUTHOR_CACHE_MAX = 400;
+
+async function fetchProfile(uid: string): Promise<{ name: string; photo: string }> {
+  try {
+    const pub = await getDoc(doc(db, "users", uid, "public", "profile"));
+    if (pub.exists()) {
+      const d = pub.data();
+      return { name: d.displayName || d.username || "User", photo: d.photoURL || "" };
+    }
+    const root = await getDoc(doc(db, "users", uid));
+    if (root.exists()) {
+      const d = root.data();
+      return { name: d.displayName || d.username || "User", photo: d.photoURL || "" };
+    }
+  } catch {}
+  return { name: "User", photo: "" };
+}
+
+async function enrichWithAuthor(posts: Post[]): Promise<Post[]> {
+  const uncached = [...new Set(posts.map((p) => p.authorId).filter(Boolean))].filter(
+    (uid) => !authorCache.has(uid)
+  );
+  await Promise.all(
+    uncached.map(async (uid) => {
+      const profile = await fetchProfile(uid);
+      if (authorCache.size >= AUTHOR_CACHE_MAX) {
+        authorCache.delete(authorCache.keys().next().value!);
+      }
+      authorCache.set(uid, profile);
+    })
+  );
+  return posts.map((p) => ({
+    ...p,
+    authorName: authorCache.get(p.authorId)?.name || p.authorName || "User",
+    authorPhoto: authorCache.get(p.authorId)?.photo || p.authorPhoto || "",
+  }));
+}
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
+
+export default function HomePage() {
+  const { user } = useAuth();
+  const [tab, setTab] = useState<"foryou" | "following">("foryou");
+
+  // For You feed
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Following feed
+  const [followingPosts, setFollowingPosts] = useState<Post[]>([]);
+  const [followingLoading, setFollowingLoading] = useState(false);
+  const [followingIds, setFollowingIds] = useState<string[] | null>(null);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // For You: real-time first page
+  useEffect(() => {
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+    return onSnapshot(q, async (snap) => {
+      const raw: Post[] = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
+        .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
+      const enriched = await enrichWithAuthor(raw);
+      setPosts(enriched);
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setLoading(false);
+    });
+  }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!lastDoc || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const q = query(
+      collection(db, "posts"),
+      orderBy("createdAt", "desc"),
+      startAfter(lastDoc),
+      limit(PAGE_SIZE)
+    );
+    const snap = await getDocs(q);
+    const raw: Post[] = snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
+      .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
+    const enriched = await enrichWithAuthor(raw);
+    setPosts((prev) => {
+      const ids = new Set(prev.map((p) => p.id));
+      return [...prev, ...enriched.filter((p) => !ids.has(p.id))];
+    });
+    setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+    setHasMore(snap.docs.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }, [lastDoc, loadingMore, hasMore]);
+
+  // Infinite scroll
+  useEffect(() => {
+    if (tab !== "foryou") return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "300px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [tab, loadMore]);
+
+  // Following feed — load once when tab is first opened
+  useEffect(() => {
+    if (tab !== "following" || !user || followingIds !== null) return;
+    setFollowingLoading(true);
+    (async () => {
+      try {
+        const followSnap = await getDocs(collection(db, "users", user.uid, "following"));
+        const ids = followSnap.docs.map((d) => d.id);
+        setFollowingIds(ids);
+        if (ids.length === 0) { setFollowingLoading(false); return; }
+
+        const results = await Promise.all(
+          chunkArray(ids, 30).map((c) =>
+            getDocs(query(collection(db, "posts"), where("authorId", "in", c), limit(100)))
+          )
+        );
+        const raw: Post[] = results
+          .flatMap((s) => s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) })))
+          .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews))
+          .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        const enriched = await enrichWithAuthor(raw);
+        setFollowingPosts(enriched);
+      } catch {}
+      setFollowingLoading(false);
+    })();
+  }, [tab, user, followingIds]);
+
+  return (
+    <div className="max-w-xl mx-auto px-4 py-4">
+      {/* Header */}
+      <div className="flex items-center mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#1c1c1c" }}>
+            <img src="/static/logo-nav.png" alt="" width={16} height={16} />
+          </div>
+          <span className="font-bold text-xl tracking-tight" style={{ color: "#f2f2f2" }}>Felcin</span>
+        </div>
+      </div>
+
+
+      {/* Stories strip */}
+      <StoriesStrip />
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-5 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <button
+          onClick={() => setTab("foryou")}
+          className="flex-1 py-2 rounded-lg text-sm font-semibold border-none cursor-pointer transition-all"
+          style={tab === "foryou" ? { background: "#fff", color: "#000" } : { background: "transparent", color: "#555" }}
+        >
+          For You
+        </button>
+        <button
+          onClick={() => setTab("following")}
+          className="flex-1 py-2 rounded-lg text-sm font-semibold border-none cursor-pointer transition-all"
+          style={tab === "following" ? { background: "#fff", color: "#000" } : { background: "transparent", color: "#555" }}
+        >
+          Following
+        </button>
+      </div>
+
+      {/* For You */}
+      {tab === "foryou" && (
+        loading ? (
+          <div className="flex justify-center py-20"><div className="spinner" /></div>
+        ) : posts.length === 0 ? (
+          <div className="text-center py-20" style={{ color: "#888" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>photo_camera</span>
+            <p className="text-lg font-semibold" style={{ color: "#f1f1f1" }}>Nothing here yet</p>
+            <p className="text-sm mt-1">Be the first to share something!</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-5">
+              {posts.map((post) => <PostCard key={post.id} post={post} />)}
+            </div>
+            <div ref={sentinelRef} className="flex justify-center py-6">
+              {loadingMore && <div className="spinner" />}
+            </div>
+          </>
+        )
+      )}
+
+      {/* Following */}
+      {tab === "following" && (
+        followingLoading ? (
+          <div className="flex justify-center py-20"><div className="spinner" /></div>
+        ) : followingIds?.length === 0 ? (
+          <div className="text-center py-20" style={{ color: "#888" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>group</span>
+            <p className="text-lg font-semibold" style={{ color: "#f1f1f1" }}>Follow someone first</p>
+            <p className="text-sm mt-1">Explore creators and follow them to see their posts here.</p>
+          </div>
+        ) : followingPosts.length === 0 ? (
+          <div className="text-center py-20" style={{ color: "#888" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>photo_camera</span>
+            <p className="text-lg font-semibold" style={{ color: "#f1f1f1" }}>No posts yet</p>
+            <p className="text-sm mt-1">People you follow haven&apos;t posted yet.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {followingPosts.map((post) => <PostCard key={post.id} post={post} />)}
+          </div>
+        )
+      )}
+    </div>
+  );
+}

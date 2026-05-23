@@ -1,0 +1,16 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /upload-avatar.php
+Disallow: /upload-media.php
+Disallow: /send-welcome.php
+Disallow: /hostinger-upload-config.php
+Disallow: /uploads/
+Disallow: /functions/
+Disallow: /static/js/*.map
+Disallow: /static/css/*.map
+
+# Sitemaps
+Sitemap: https://felcin.com/sitemap.xml

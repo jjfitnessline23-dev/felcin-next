@@ -1,26 +1,135 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #090909;
+  --bg-soft: #0f0f0f;
+  --bg-card: #131313;
+  --bg-elevated: #1a1a1a;
+  --bg-hover: rgba(255,255,255,0.04);
+  --text: #f2f2f2;
+  --text-2: #999;
+  --muted: #555;
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.12);
+  --primary: #ffffff;
+  --primary-light: #e0e0e0;
+  --accent: #ffffff;
+  --accent-soft: rgba(255,255,255,0.08);
+  --danger: #ef4444;
+  --danger-soft: rgba(239,68,68,0.1);
+  --grad: #ffffff;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* { box-sizing: border-box; max-width: 100%; }
+img, video { max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+input, textarea, select, button { font-family: inherit; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* Nav link */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  transition: background 0.12s, color 0.12s;
+  cursor: pointer;
+}
+.nav-link:hover { background: rgba(255,255,255,0.05); color: #ccc; }
+.nav-link.active { background: rgba(255,255,255,0.08); color: #fff; font-weight: 600; }
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Pill buttons */
+.btn-pill {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.13s;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #666;
 }
+.btn-pill.is-active, .btn-pill:hover {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 28px; height: 28px;
+  border: 2.5px solid rgba(255,255,255,0.07);
+  border-top-color: rgba(255,255,255,0.8);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+/* Card */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+/* Input base */
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input-field:focus { border-color: rgba(255,255,255,0.25); }
+.input-field::placeholder { color: var(--muted); }
+
+/* Page transition fade-in */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+main { animation: pageFadeIn 0.18s ease-out both; }
+
+/* Icon button */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.12s;
+  color: #666;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.07); color: #ccc; }
