@@ -189,7 +189,7 @@ export default function UserProfilePage() {
       {/* ── Banner ── avatar sits inside using absolute, buttons row follows */}
       <div className="relative" style={{ height: 100, background: "#141414" }}>
         {/* Avatar anchored to bottom-left of banner */}
-        <div className="absolute" style={{ bottom: -40, left: 16 }}>
+        <div className="absolute" style={{ bottom: -58, left: 16 }}>
           <div className="relative inline-block">
             <div className="rounded-full" style={{ padding: 3, background: "#090909" }}>
               {profile.photoURL ? (
@@ -209,27 +209,27 @@ export default function UserProfilePage() {
               </div>
             )}
           </div>
+          <div className="font-semibold mt-2 truncate" style={{ color: "#aaa", fontSize: 10, letterSpacing: "0.04em", maxWidth: 84 }}>
+            {displayName}
+          </div>
         </div>
       </div>
 
-      {/* ── Row: avatar spacer + username/stats + action buttons ── */}
-      <div className="flex items-center px-4 gap-3" style={{ height: 56 }}>
+      {/* ── Row: avatar spacer + stats + action buttons ── */}
+      <div className="flex items-center px-4 gap-3" style={{ height: 72 }}>
         <div style={{ width: 96, flexShrink: 0 }} />
-        <div className="flex flex-col justify-center flex-1 gap-1">
-          <div className="font-semibold truncate" style={{ color: "#aaa", fontSize: 10, letterSpacing: "0.02em" }}>{displayName}</div>
-          <div className="flex gap-5">
-            <div className="text-center">
-              <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{posts.length}</div>
-              <div className="text-xs" style={{ color: "#555" }}>Posts</div>
-            </div>
-            <div className="text-center">
-              <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followersCount ?? 0}</div>
-              <div className="text-xs" style={{ color: "#555" }}>Followers</div>
-            </div>
-            <div className="text-center">
-              <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followingCount ?? 0}</div>
-              <div className="text-xs" style={{ color: "#555" }}>Following</div>
-            </div>
+        <div className="flex gap-5 flex-1">
+          <div className="text-center">
+            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{posts.length}</div>
+            <div className="text-xs" style={{ color: "#555" }}>Posts</div>
+          </div>
+          <div className="text-center">
+            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followersCount ?? 0}</div>
+            <div className="text-xs" style={{ color: "#555" }}>Followers</div>
+          </div>
+          <div className="text-center">
+            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followingCount ?? 0}</div>
+            <div className="text-xs" style={{ color: "#555" }}>Following</div>
           </div>
         </div>
         {!isSelf && (
@@ -257,9 +257,7 @@ export default function UserProfilePage() {
       </div>
 
       {/* ── Profile info ── */}
-      <div className="px-4 pt-2 pb-5">
-        <h1 className="text-lg font-bold leading-tight" style={{ color: "#f2f2f2" }}>{displayName}</h1>
-        {username && <p className="text-sm mt-0.5" style={{ color: "#555" }}>{username}</p>}
+      <div className="px-4 pt-1 pb-5">
         {profile.bio ? (
           <p className="text-sm leading-relaxed mt-2" style={{ color: "#999" }}>{profile.bio}</p>
         ) : isSelf ? (
