@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
@@ -65,6 +65,12 @@ export default function PostCard({ post }: { post: Post }) {
     if (!user) return;
     getDoc(doc(db, "users", user.uid, "bookmarks", post.id)).then((snap) => setBookmarked(snap.exists()));
   }, [user, post.id]);
+
+  const videoRef = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    el.muted = true;
+    el.play().catch(() => {});
+  }, []);
 
   const mediaType = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
   const caption = post.caption || post.text || "";
@@ -186,7 +192,7 @@ export default function PostCard({ post }: { post: Post }) {
       {post.mediaUrl && (
         <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
           {mediaType === "video" ? (
-            <video src={post.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+            <video ref={videoRef} src={post.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : (
             <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
               <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" />
