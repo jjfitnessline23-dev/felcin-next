@@ -6,7 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -29,6 +30,19 @@ export default function LoginPage() {
       router.replace("/");
     }
   }, [user, loading, router]);
+
+  // Handle Google redirect result on return
+  useEffect(() => {
+    setBusy(true);
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) router.replace("/");
+      else setBusy(false);
+    }).catch((err: unknown) => {
+      const code = (err as { code?: string }).code || "";
+      if (code) setError(`Sign-in error: ${code}`);
+      setBusy(false);
+    });
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,19 +89,12 @@ export default function LoginPage() {
   const handleGoogle = async () => {
     setError(""); setBusy(true);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      router.replace("/");
+      await signInWithRedirect(auth, new GoogleAuthProvider());
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
-      setError(
-        code === "auth/popup-closed-by-user" ? "Sign-in cancelled."
-        : code === "auth/popup-blocked" ? "Pop-up was blocked. Please allow pop-ups for this site."
-        : code === "auth/unauthorized-domain" ? "This domain is not authorized for Google sign-in. Contact support."
-        : code ? `Sign-in error: ${code}`
-        : (err as { message?: string }).message || "Google sign-in failed"
-      );
+      setError(code ? `Sign-in error: ${code}` : (err as { message?: string }).message || "Google sign-in failed");
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   return (
