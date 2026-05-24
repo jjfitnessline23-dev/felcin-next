@@ -113,10 +113,11 @@ input, textarea, select, button { font-family: inherit; }
 .input-field:focus { border-color: rgba(255,255,255,0.25); }
 .input-field::placeholder { color: var(--muted); }
 
-/* Page transition fade-in */
+/* Page transition fade-in — opacity only; transform would create a
+   stacking context on <main> and break all position:fixed children */
 @keyframes pageFadeIn {
-  from { opacity: 0; transform: translateY(3px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 main { animation: pageFadeIn 0.18s ease-out both; }
 
