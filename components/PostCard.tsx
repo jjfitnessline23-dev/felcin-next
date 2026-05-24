@@ -6,7 +6,7 @@ import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
   getDoc, setDoc, deleteDoc, serverTimestamp, addDoc, collection,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
 interface Post {
@@ -55,6 +55,10 @@ export default function PostCard({ post }: { post: Post }) {
   const [dotMenu, setDotMenu] = useState(false);
   const [reportModal, setReportModal] = useState(false);
   const [reportDone, setReportDone] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  const isOwner = user && OWNER_UIDS.includes(user.uid);
+  const canDelete = user && (user.uid === post.authorId || isOwner);
 
   useEffect(() => {
     setLiked(post.likedBy?.includes(user?.uid || "") ?? false);
@@ -70,27 +74,17 @@ export default function PostCard({ post }: { post: Post }) {
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !post.mediaUrl) return;
-
-    // Fix React muted prop bug — must set on DOM directly
     v.muted = true;
     v.setAttribute("muted", "");
-
-    const tryPlay = () => v.play().catch(() => {});
-
-    // Only play when the card is at least 50% visible; pause when scrolled away
     const obs = new IntersectionObserver(
-      ([entry]) => { entry.isIntersecting ? tryPlay() : v.pause(); },
-      { threshold: 0.5 }
+      ([entry]) => {
+        if (entry.isIntersecting) v.play().catch(() => {});
+        else v.pause();
+      },
+      { threshold: 0.25 }
     );
     obs.observe(v);
-
-    // Also play as soon as the browser has enough data
-    v.addEventListener("canplay", tryPlay, { once: true });
-
-    return () => {
-      obs.disconnect();
-      v.removeEventListener("canplay", tryPlay);
-    };
+    return () => { obs.disconnect(); v.pause(); };
   }, [post.mediaUrl]);
 
   const mediaType = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
@@ -159,6 +153,16 @@ export default function PostCard({ post }: { post: Post }) {
     setReportDone(true);
   };
 
+  const handleDelete = async () => {
+    if (!canDelete) return;
+    if (!confirm("Delete this post?")) return;
+    setDotMenu(false);
+    await deleteDoc(doc(db, "posts", post.id)).catch(() => {});
+    setDeleted(true);
+  };
+
+  if (deleted) return null;
+
   return (
     <>
     <article style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, overflow: "hidden" }}>
@@ -213,7 +217,7 @@ export default function PostCard({ post }: { post: Post }) {
       {post.mediaUrl && (
         <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
           {mediaType === "video" ? (
-            <video ref={videoRef} src={post.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+            <video ref={videoRef} src={post.mediaUrl} muted loop playsInline preload="auto" className="w-full h-full object-cover" />
           ) : (
             <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
               <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" />
@@ -279,14 +283,15 @@ export default function PostCard({ post }: { post: Post }) {
           style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 70 }}>
           <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-4" style={{ background: "rgba(255,255,255,0.15)" }} />
           {[
-            { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); } },
-            { icon: "link", label: "Copy link", action: copyLink },
-            { icon: "flag", label: "Report", action: () => { setDotMenu(false); setReportModal(true); setReportDone(false); } },
+            { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); }, danger: false },
+            { icon: "link", label: "Copy link", action: copyLink, danger: false },
+            ...(!canDelete ? [{ icon: "flag", label: "Report", action: () => { setDotMenu(false); setReportModal(true); setReportDone(false); }, danger: true }] : []),
+            ...(canDelete ? [{ icon: "delete", label: "Delete post", action: handleDelete, danger: true }] : []),
           ].map((item) => (
             <button key={item.label} onClick={item.action}
               className="flex items-center gap-4 w-full px-5 py-4 border-none cursor-pointer"
-              style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.05)", color: item.label === "Report" ? "#f87171" : "#f2f2f2" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 22, color: item.label === "Report" ? "#f87171" : "#aaa" }}>{item.icon}</span>
+              style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.05)", color: item.danger ? "#f87171" : "#f2f2f2" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 22, color: item.danger ? "#f87171" : "#aaa" }}>{item.icon}</span>
               <span className="text-sm font-semibold">{item.label}</span>
             </button>
           ))}

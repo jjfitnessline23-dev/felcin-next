@@ -37,8 +37,10 @@ export default function ReelsPage() {
         const v = entry.target as HTMLVideoElement;
         if (entry.isIntersecting) {
           currentRef.current = videoRefs.current.indexOf(v);
-          v.play().catch(() => {});
           setPaused(false);
+          const tryPlay = () => v.play().catch(() => {});
+          if (v.readyState >= 3) tryPlay();
+          else v.addEventListener("canplay", tryPlay, { once: true });
         } else {
           v.pause();
           v.currentTime = 0;
@@ -77,9 +79,9 @@ export default function ReelsPage() {
           return (
             <div key={reel.id} className="snap-start relative flex-shrink-0" style={{ height: "100%", background: "#000" }}>
               <video
-                ref={(el) => { videoRefs.current[i] = el; if (el) el.muted = true; }}
+                ref={(el) => { videoRefs.current[i] = el; if (el) { el.muted = true; el.setAttribute("muted", ""); } }}
                 src={reel.mediaUrl}
-                loop playsInline muted
+                loop playsInline muted preload="auto"
                 className="w-full h-full object-cover"
                 onClick={() => togglePlay(i)}
               />

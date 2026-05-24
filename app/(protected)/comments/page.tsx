@@ -141,7 +141,7 @@ export default function CommentsPage() {
         <h1 className="font-bold text-base" style={{ color: "#f2f2f2" }}>Post</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className="flex-1 overflow-y-auto pb-20">
         {/* Post preview */}
         {post && (
           <>
@@ -215,7 +215,7 @@ export default function CommentsPage() {
 
       {/* Comment input */}
       <div className="fixed bottom-0 left-0 right-0 px-4 py-3 lg:relative lg:bottom-auto"
-        style={{ background: "rgba(9,9,9,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", zIndex: 60, paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
+        style={{ background: "rgba(9,9,9,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", zIndex: 80, paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
         <div className="flex items-center gap-3 max-w-xl mx-auto">
           {user?.photoURL ? (
             <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />

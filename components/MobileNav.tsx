@@ -16,6 +16,8 @@ export default function MobileNav() {
   const pathname = usePathname();
   const unread = useUnreadCount();
 
+  if (pathname.startsWith("/comments") || pathname.startsWith("/private-chats")) return null;
+
   return (
     <nav
       className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
