@@ -77,8 +77,15 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {/* Legal links */}
+      <div className="px-4 pb-2 flex flex-wrap gap-x-3 gap-y-1">
+        <a href="/terms" target="_blank" className="text-xs" style={{ color: "#2a2a2a", textDecoration: "none" }}>Terms</a>
+        <a href="/privacy" target="_blank" className="text-xs" style={{ color: "#2a2a2a", textDecoration: "none" }}>Privacy</a>
+        <a href="/guidelines" target="_blank" className="text-xs" style={{ color: "#2a2a2a", textDecoration: "none" }}>Guidelines</a>
+      </div>
+
       {/* Profile footer */}
-      <div className="p-3 mt-auto" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="p-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="flex items-center gap-2 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
           <Link href="/profile" className="flex items-center gap-2.5 flex-1 min-w-0">
             {photoURL ? (

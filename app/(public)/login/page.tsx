@@ -148,7 +148,9 @@ export default function LoginPage() {
                 />
                 <span className="text-xs leading-relaxed" style={{ color: "#888" }}>
                   I agree to Felcin's{" "}
-                  <a href="/privacy" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Terms & Privacy Policy</a>.
+                  <a href="/terms" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Terms of Service</a>,{" "}
+                  <a href="/privacy" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Privacy Policy</a>, and{" "}
+                  <a href="/guidelines" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Community Guidelines</a>.
                   I understand that objectionable content and abusive behavior are not tolerated and may result in account removal.
                 </span>
               </label>
@@ -211,6 +213,14 @@ export default function LoginPage() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Policy footer */}
+        <div className="mt-6 flex items-center justify-center gap-4 flex-wrap">
+          <a href="/terms" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Terms</a>
+          <a href="/privacy" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Privacy</a>
+          <a href="/guidelines" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Guidelines</a>
+          <span className="text-xs" style={{ color: "#2a2a2a" }}>© {new Date().getFullYear()} Felcin</span>
         </div>
       </div>
     </div>

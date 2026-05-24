@@ -163,6 +163,13 @@ export default function ProfileSettingsPage() {
           style={{ background: "rgba(239,68,68,0.07)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>
           Sign out
         </button>
+
+        {/* Legal links */}
+        <div className="flex items-center justify-center gap-5 flex-wrap pt-2 pb-4">
+          <a href="/terms" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Terms of Service</a>
+          <a href="/privacy" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Privacy Policy</a>
+          <a href="/guidelines" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Community Guidelines</a>
+        </div>
       </div>
     </div>
   );
