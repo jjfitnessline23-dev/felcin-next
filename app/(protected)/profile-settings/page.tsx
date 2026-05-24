@@ -4,9 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function ProfileSettingsPage() {
   const { user, signOut } = useAuth();
@@ -67,6 +68,7 @@ export default function ProfileSettingsPage() {
 
   const handleSignOut = async () => { await signOut(); router.push("/login"); };
   const initial = (displayName || user?.email || "U").charAt(0).toUpperCase();
+  const isOwner = user && OWNER_UIDS.includes(user.uid);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
@@ -158,9 +160,18 @@ export default function ProfileSettingsPage() {
 
         <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
+        {isOwner && (
+          <Link href="/admin"
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold text-sm"
+            style={{ background: "rgba(239,68,68,0.07)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)", textDecoration: "none" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>admin_panel_settings</span>
+            Admin Panel
+          </Link>
+        )}
+
         <button onClick={handleSignOut}
           className="w-full py-3.5 rounded-xl font-semibold text-sm border-none cursor-pointer"
-          style={{ background: "rgba(239,68,68,0.07)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>
+          style={{ background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.08)" }}>
           Sign out
         </button>
 
