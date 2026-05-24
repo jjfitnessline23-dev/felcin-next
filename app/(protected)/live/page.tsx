@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 
@@ -41,7 +41,7 @@ export default function LivePage() {
     return <div className="flex justify-center py-32"><div className="spinner" /></div>;
   }
 
-  if (followers < 300) {
+  if (followers < 300 && !OWNER_UIDS.includes(user?.uid ?? "")) {
     return (
       <div className="max-w-xl mx-auto px-4 py-6 flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
         <div className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"

@@ -18,4 +18,4 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { app, auth, db, storage };
-export const OWNER_UIDS = ["GnpVhd5SRMQGxm0lExe5Ycd6btf2"];
+export const OWNER_UIDS = ["GnpVhd5SRMQGxm0lExe5Ycd6btf2", "FoQAHsSnbdeHayMSl85wR5EliYm1"];

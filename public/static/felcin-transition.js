@@ -16,11 +16,11 @@
     if(document.body&&!ov.parentNode)document.body.appendChild(ov);
   }
 
-  // Show black overlay before navigating away
+  // Show black overlay before navigating away, auto-hide for client-side (Next.js) navigation
   document.addEventListener('click',function(e){
     var a=e.target;
     while(a&&a.tagName!=='A')a=a.parentElement;
-    if(a&&a.href&&a.hostname===location.hostname&&!a.target&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey)show();
+    if(a&&a.href&&a.hostname===location.hostname&&!a.target&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey){show();setTimeout(hide,500);}
   },true);
 
   // Fade out overlay once page content is ready

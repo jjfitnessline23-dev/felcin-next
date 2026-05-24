@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithRedirect,
+  signInWithCredential,
   getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
@@ -28,7 +29,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Detect Capacitor native app — Google redirect doesn't work inside WebView
-    setIsNativeApp(!!(window as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative);
+    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
+    setIsNativeApp(!!(cap?.isNativePlatform?.() ?? cap?.isNative));
   }, []);
 
   useEffect(() => {
@@ -37,8 +39,10 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-  // Handle Google redirect result on return
+  // Handle Google redirect result on return (web only — native uses plugin)
   useEffect(() => {
+    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
+    if (cap?.isNativePlatform?.() ?? cap?.isNative) return;
     setBusy(true);
     getRedirectResult(auth).then((result) => {
       if (result?.user) router.replace("/");
@@ -95,7 +99,20 @@ export default function LoginPage() {
   const handleGoogle = async () => {
     setError(""); setBusy(true);
     try {
-      await signInWithRedirect(auth, new GoogleAuthProvider());
+      if (isNativeApp) {
+        // Native Google Sign-In via Capacitor Firebase Authentication plugin
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        if (!result.credential?.idToken) throw new Error("Google sign-in failed: no ID token returned");
+        const credential = GoogleAuthProvider.credential(
+          result.credential.idToken,
+          result.credential.accessToken ?? null
+        );
+        await signInWithCredential(auth, credential);
+        router.replace("/");
+      } else {
+        await signInWithRedirect(auth, new GoogleAuthProvider());
+      }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
       setError(code ? `Sign-in error: ${code}` : (err as { message?: string }).message || "Google sign-in failed");
@@ -178,7 +195,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {mode !== "reset" && !isNativeApp && (
+          {mode !== "reset" && (
             <>
               <div className="flex items-center gap-3 my-4">
                 <div className="flex-1 h-px" style={{ background: "#2a2a2a" }} />

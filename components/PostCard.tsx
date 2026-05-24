@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
@@ -56,6 +57,8 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const [reportModal, setReportModal] = useState(false);
   const [reportDone, setReportDone] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
   const canDelete = user && (user.uid === post.authorId || isOwner);
@@ -225,8 +228,8 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
             {timeStr && <div className="text-xs" style={{ color: "#444" }}>{timeStr}</div>}
           </div>
         </div>
-        <button onClick={() => setDotMenu(true)} className="icon-btn" style={{ width: 32, height: 32 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>more_horiz</span>
+        <button onClick={() => setDotMenu(true)} className="icon-btn" style={{ width: 24, height: 24 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>more_horiz</span>
         </button>
       </div>
 
@@ -293,11 +296,11 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
     </article>
 
     {/* 3-dot bottom sheet */}
-    {dotMenu && (
+    {dotMenu && mounted && createPortal(
       <>
-        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.5)", zIndex: 65 }} onClick={() => setDotMenu(false)} />
+        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.5)", zIndex: 9998 }} onClick={() => setDotMenu(false)} />
         <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden"
-          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 70 }}>
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 9999 }}>
           <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-4" style={{ background: "rgba(255,255,255,0.15)" }} />
           {[
             { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); }, danger: false },
@@ -321,15 +324,16 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
             Cancel
           </button>
         </div>
-      </>
+      </>,
+      document.body
     )}
 
     {/* Report modal */}
-    {reportModal && (
+    {reportModal && mounted && createPortal(
       <>
-        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.6)", zIndex: 65 }} onClick={() => setReportModal(false)} />
+        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.6)", zIndex: 9998 }} onClick={() => setReportModal(false)} />
         <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden"
-          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 70 }}>
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 9999 }}>
           <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-1" style={{ background: "rgba(255,255,255,0.15)" }} />
           <div className="px-5 py-3">
             <h3 className="font-bold text-base" style={{ color: "#f2f2f2" }}>Report Post</h3>
@@ -363,7 +367,8 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
             </>
           )}
         </div>
-      </>
+      </>,
+      document.body
     )}
     </>
   );
