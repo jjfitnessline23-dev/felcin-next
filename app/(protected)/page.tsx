@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   collection, query, orderBy, limit, getDocs, onSnapshot,
-  doc, getDoc, startAfter, QueryDocumentSnapshot, where,
+  doc, getDoc, startAfter, QueryDocumentSnapshot, where, setDoc, deleteDoc, addDoc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -81,6 +81,14 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 export default function HomePage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
+  const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user) return;
+    getDocs(collection(db, "users", user.uid, "blocked")).then((snap) => {
+      setBlockedUids(new Set(snap.docs.map((d) => d.id)));
+    }).catch(() => {});
+  }, [user]);
 
   // For You feed
   const [posts, setPosts] = useState<Post[]>([]);
@@ -221,7 +229,9 @@ export default function HomePage() {
         ) : (
           <>
             <div className="flex flex-col gap-5">
-              {posts.map((post) => <PostCard key={post.id} post={post} />)}
+              {posts.filter((p) => !blockedUids.has(p.authorId)).map((post) => (
+                <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
+              ))}
             </div>
             <div ref={sentinelRef} className="flex justify-center py-6">
               {loadingMore && <div className="spinner" />}
@@ -248,7 +258,9 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="flex flex-col gap-5">
-            {followingPosts.map((post) => <PostCard key={post.id} post={post} />)}
+            {followingPosts.filter((p) => !blockedUids.has(p.authorId)).map((post) => (
+              <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
+            ))}
           </div>
         )
       )}

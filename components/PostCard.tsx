@@ -45,7 +45,7 @@ function timeAgo(seconds: number): string {
   return Math.floor(diff / 86400) + "d";
 }
 
-export default function PostCard({ post }: { post: Post }) {
+export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid: string) => void }) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(post.likedBy?.includes(user?.uid || "") ?? false);
   const [likeCount, setLikeCount] = useState(post.likes ?? 0);
@@ -158,6 +158,23 @@ export default function PostCard({ post }: { post: Post }) {
     if (!confirm("Delete this post?")) return;
     setDotMenu(false);
     await deleteDoc(doc(db, "posts", post.id)).catch(() => {});
+    setDeleted(true);
+  };
+
+  const handleBlock = async () => {
+    if (!user || user.uid === post.authorId) return;
+    setDotMenu(false);
+    const ref = doc(db, "users", user.uid, "blocked", post.authorId);
+    await setDoc(ref, { blockedAt: new Date() }).catch(() => {});
+    await addDoc(collection(db, "reports"), {
+      type: "block",
+      blockedUid: post.authorId,
+      blockerId: user.uid,
+      postId: post.id,
+      createdAt: serverTimestamp(),
+      status: "pending",
+    }).catch(() => {});
+    onBlock?.(post.authorId);
     setDeleted(true);
   };
 
@@ -285,7 +302,10 @@ export default function PostCard({ post }: { post: Post }) {
           {[
             { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); }, danger: false },
             { icon: "link", label: "Copy link", action: copyLink, danger: false },
-            ...(!canDelete ? [{ icon: "flag", label: "Report", action: () => { setDotMenu(false); setReportModal(true); setReportDone(false); }, danger: true }] : []),
+            ...(!canDelete && user?.uid !== post.authorId ? [
+              { icon: "flag", label: "Report", action: () => { setDotMenu(false); setReportModal(true); setReportDone(false); }, danger: true },
+              { icon: "block", label: "Block user", action: handleBlock, danger: true },
+            ] : []),
             ...(canDelete ? [{ icon: "delete", label: "Delete post", action: handleDelete, danger: true }] : []),
           ].map((item) => (
             <button key={item.label} onClick={item.action}
