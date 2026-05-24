@@ -24,6 +24,12 @@ export default function LoginPage() {
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isNativeApp, setIsNativeApp] = useState(false);
+
+  useEffect(() => {
+    // Detect Capacitor native app — Google redirect doesn't work inside WebView
+    setIsNativeApp(!!(window as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative);
+  }, []);
 
   useEffect(() => {
     if (!loading && user && canAccessApp(user)) {
@@ -172,7 +178,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {mode !== "reset" && (
+          {mode !== "reset" && !isNativeApp && (
             <>
               <div className="flex items-center gap-3 my-4">
                 <div className="flex-1 h-px" style={{ background: "#2a2a2a" }} />
