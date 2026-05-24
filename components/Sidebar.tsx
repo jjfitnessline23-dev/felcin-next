@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { OWNER_UIDS } from "@/lib/firebase";
 
 const links = [
   { href: "/", icon: "home", label: "Home" },
@@ -32,6 +33,7 @@ export default function Sidebar() {
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Profile";
   const photoURL = user?.photoURL;
   const initial = displayName.charAt(0).toUpperCase();
+  const isOwner = user && OWNER_UIDS.includes(user.uid);
 
   return (
     <aside
@@ -75,6 +77,15 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin link — owner only */}
+        {isOwner && (
+          <Link href="/admin" className={`nav-link${pathname.startsWith("/admin") ? " active" : ""}`}
+            style={{ marginTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 19, color: "#ef4444" }}>admin_panel_settings</span>
+            <span style={{ color: "#ef4444" }}>Admin</span>
+          </Link>
+        )}
       </nav>
 
       {/* Legal links */}
