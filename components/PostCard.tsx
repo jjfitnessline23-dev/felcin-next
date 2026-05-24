@@ -70,12 +70,27 @@ export default function PostCard({ post }: { post: Post }) {
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !post.mediaUrl) return;
+
+    // Fix React muted prop bug — must set on DOM directly
     v.muted = true;
     v.setAttribute("muted", "");
-    const play = () => v.play().catch(() => {});
-    v.addEventListener("loadedmetadata", play, { once: true });
-    v.load();
-    return () => v.removeEventListener("loadedmetadata", play);
+
+    const tryPlay = () => v.play().catch(() => {});
+
+    // Only play when the card is at least 50% visible; pause when scrolled away
+    const obs = new IntersectionObserver(
+      ([entry]) => { entry.isIntersecting ? tryPlay() : v.pause(); },
+      { threshold: 0.5 }
+    );
+    obs.observe(v);
+
+    // Also play as soon as the browser has enough data
+    v.addEventListener("canplay", tryPlay, { once: true });
+
+    return () => {
+      obs.disconnect();
+      v.removeEventListener("canplay", tryPlay);
+    };
   }, [post.mediaUrl]);
 
   const mediaType = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);

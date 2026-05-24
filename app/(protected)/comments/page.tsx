@@ -117,10 +117,10 @@ export default function CommentsPage() {
     if (!v || !post?.mediaUrl) return;
     v.muted = true;
     v.setAttribute("muted", "");
-    const play = () => v.play().catch(() => {});
-    v.addEventListener("loadedmetadata", play, { once: true });
-    v.load();
-    return () => v.removeEventListener("loadedmetadata", play);
+    const tryPlay = () => v.play().catch(() => {});
+    v.addEventListener("canplay", tryPlay, { once: true });
+    tryPlay();
+    return () => v.removeEventListener("canplay", tryPlay);
   }, [post?.mediaUrl]);
 
   const mediaType = resolveMediaType(post?.contentType, post?.mimeType, post?.mediaUrl);
