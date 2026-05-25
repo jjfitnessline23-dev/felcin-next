@@ -104,7 +104,7 @@ export default function StreamViewerPage() {
     // Remove param from URL first to prevent duplicate writes
     router.replace(`/live/${streamId}`);
 
-    fetch(`/gift-verify.php?session_id=${encodeURIComponent(sessionId)}`)
+    fetch(`/api/gift-verify?session_id=${encodeURIComponent(sessionId)}`)
       .then((r) => r.json())
       .then(async (data) => {
         if (!data.ok) return;
@@ -168,7 +168,7 @@ export default function StreamViewerPage() {
     setSending(gift.id);
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/gift-checkout.php", {
+      const res = await fetch("/api/gift-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
