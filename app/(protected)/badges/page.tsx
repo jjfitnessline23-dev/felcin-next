@@ -1,5 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db, OWNER_UIDS } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth";
+
 const BADGES = [
   {
     id: "verified",
@@ -134,6 +139,34 @@ const BADGES = [
 ];
 
 export default function BadgesPage() {
+  const { user } = useAuth();
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "features")).then((snap) => {
+      setEnabled(snap.exists() ? (snap.data().badgesEnabled ?? true) : true);
+    }).catch(() => setEnabled(true));
+  }, []);
+
+  const isOwner = user && OWNER_UIDS.includes(user.uid);
+
+  if (enabled === null) {
+    return <div className="flex justify-center py-32"><div className="spinner" /></div>;
+  }
+
+  if (!enabled && !isOwner) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-6 flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
+        <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 38, color: "#333", fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+        </div>
+        <h1 className="text-xl font-bold text-center mb-2" style={{ color: "#f2f2f2" }}>Badges Unavailable</h1>
+        <p className="text-sm text-center" style={{ color: "#555" }}>Creator badges are temporarily disabled. Check back soon.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-xl mx-auto px-4 py-6">
       <div className="mb-8">

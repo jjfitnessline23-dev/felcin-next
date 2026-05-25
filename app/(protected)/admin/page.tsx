@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, limit, getDocs, doc, deleteDoc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, doc, deleteDoc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
@@ -11,7 +11,7 @@ interface Reel { id: string; authorId: string; caption?: string; mediaUrl?: stri
 interface UserRecord { id: string; displayName?: string; email?: string; photoURL?: string; badge?: string; createdAt?: { seconds: number }; }
 interface Report { id: string; postId?: string; reelId?: string; authorId?: string; reporterId?: string; reason?: string; status?: string; type?: string; createdAt?: { seconds: number }; }
 
-type Tab = "overview" | "posts" | "reels" | "users" | "reports";
+type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "settings";
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -22,6 +22,8 @@ export default function AdminPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
+  const [badgesEnabled, setBadgesEnabled] = useState<boolean | null>(null);
+  const [togglingBadges, setTogglingBadges] = useState(false);
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
 
@@ -33,11 +35,13 @@ export default function AdminPage() {
       getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(100))),
       getDocs(query(collection(db, "users"), limit(200))),
       getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(200))),
-    ]).then(([postsSnap, reelsSnap, usersSnap, reportsSnap]) => {
+      getDoc(doc(db, "config", "features")),
+    ]).then(([postsSnap, reelsSnap, usersSnap, reportsSnap, featuresSnap]) => {
       setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) })));
       setReels(reelsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })));
       setUsers(usersSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserRecord, "id">) })));
       setReports(reportsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Report, "id">) })));
+      setBadgesEnabled(featuresSnap.exists() ? (featuresSnap.data().badgesEnabled ?? true) : true);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [isOwner, authLoading, router]);
@@ -66,12 +70,24 @@ export default function AdminPage() {
 
   const pendingReports = reports.filter((r) => r.status !== "reviewed");
 
+  const toggleBadges = async () => {
+    if (togglingBadges || badgesEnabled === null) return;
+    setTogglingBadges(true);
+    const next = !badgesEnabled;
+    try {
+      await setDoc(doc(db, "config", "features"), { badgesEnabled: next }, { merge: true });
+      setBadgesEnabled(next);
+    } catch {}
+    setTogglingBadges(false);
+  };
+
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: "overview", label: "Overview", icon: "dashboard" },
     { key: "posts", label: "Posts", icon: "image" },
     { key: "reels", label: "Reels", icon: "play_circle" },
     { key: "users", label: "Users", icon: "group" },
     { key: "reports", label: "Reports", icon: "flag" },
+    { key: "settings", label: "Settings", icon: "settings" },
   ];
 
   return (
@@ -244,6 +260,39 @@ export default function AdminPage() {
           </div>
           <p style={{ color: "#555" }}>No reports yet</p>
         </div>
+      ) : tab === "settings" ? (
+        /* ── Settings ── */
+        <div className="flex flex-col gap-3">
+          <p className="text-xs mb-1" style={{ color: "#444" }}>Feature toggles — changes take effect immediately for all users</p>
+
+          {/* Creator Badges toggle */}
+          <div className="flex items-center gap-4 p-5 rounded-2xl"
+            style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: badgesEnabled ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${badgesEnabled ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.07)"}` }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 22, color: badgesEnabled ? "#a78bfa" : "#444", fontVariationSettings: "'FILL' 1" }}>
+                workspace_premium
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Creator Badges</p>
+              <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                {badgesEnabled ? "Visible to all users on the Badges page" : "Hidden — users cannot see or purchase badges"}
+              </p>
+            </div>
+            <button
+              onClick={toggleBadges}
+              disabled={togglingBadges || badgesEnabled === null}
+              className="relative inline-block shrink-0 cursor-pointer border-none bg-transparent"
+              style={{ width: 44, height: 24 }}>
+              <span className="absolute inset-0 rounded-full transition-colors duration-200"
+                style={{ background: badgesEnabled ? "#a78bfa" : "#2a2a2a" }} />
+              <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
+                style={{ transform: badgesEnabled ? "translateX(20px)" : "translateX(0)" }} />
+            </button>
+          </div>
+        </div>
+
       ) : (
         /* ── Reports ── */
         <div className="flex flex-col gap-2">
