@@ -13,6 +13,8 @@ const links = [
   { href: "/reels", icon: "play_circle", label: "Reels" },
   { href: "/live", icon: "live_tv", label: "Live" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },
+  { href: "/ghost", icon: "sprint", label: "Ghost Workouts" },
+  { href: "/challenges", icon: "link", label: "Challenges" },
   { href: "/private-chats", icon: "chat", label: "Messages" },
   { href: "/notifications", icon: "notifications", label: "Notifications" },
   { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
-  collection, doc, getDoc, addDoc, updateDoc, onSnapshot,
-  query, orderBy, limit, serverTimestamp,
+  collection, doc, getDoc, addDoc, updateDoc, onSnapshot, setDoc,
+  query, orderBy, limit, serverTimestamp, increment,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -44,6 +44,8 @@ interface GiftEvent {
   badgeId?: string; giftType: string; giftEmoji: string; ts: number;
 }
 interface FlyingGift { key: string; emoji: string; x: number; }
+interface RaceDoc { active: boolean; exerciseName: string; repTarget?: number; }
+interface RaceScore { uid: string; userName: string; userPhoto?: string; reps: number; }
 
 export default function StreamViewerPage() {
   const params = useParams();
@@ -63,6 +65,21 @@ export default function StreamViewerPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [endingStream, setEndingStream] = useState(false);
   const [togglingPrivacy, setTogglingPrivacy] = useState(false);
+
+  // Race state
+  const [race, setRace] = useState<RaceDoc | null>(null);
+  const [raceScores, setRaceScores] = useState<RaceScore[]>([]);
+  const [myReps, setMyReps] = useState(0);
+  const [setupRaceName, setSetupRaceName] = useState("");
+  const [setupRaceTarget, setSetupRaceTarget] = useState("");
+  const [showRaceSetup, setShowRaceSetup] = useState(false);
+  const [startingRace, setStartingRace] = useState(false);
+  const repTapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Pulse state
+  const [pulseTotal, setPulseTotal] = useState(0);
+  const [pulsing, setPulsing] = useState(false);
+  const pulseScale = useRef(1);
 
   // Subscribe to stream in real-time so privacy changes reflect live
   useEffect(() => {
@@ -123,6 +140,32 @@ export default function StreamViewerPage() {
     });
   }, [streamId]);
 
+  // Race listener
+  useEffect(() => {
+    if (!streamId) return;
+    return onSnapshot(doc(db, "streams", streamId, "race", "current"), (snap) => {
+      if (snap.exists()) setRace(snap.data() as RaceDoc);
+      else setRace(null);
+    });
+  }, [streamId]);
+
+  // Race scores listener
+  useEffect(() => {
+    if (!streamId || !race?.active) return;
+    const q = query(collection(db, "streams", streamId, "raceScores"), orderBy("reps", "desc"), limit(20));
+    return onSnapshot(q, (snap) => {
+      setRaceScores(snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Omit<RaceScore, "uid">) })));
+    });
+  }, [streamId, race?.active]);
+
+  // Pulse listener
+  useEffect(() => {
+    if (!streamId) return;
+    return onSnapshot(doc(db, "streams", streamId, "pulse", "current"), (snap) => {
+      if (snap.exists()) setPulseTotal(snap.data().totalTaps ?? 0);
+    });
+  }, [streamId]);
+
   // After Stripe gift payment
   useEffect(() => {
     const sessionId = searchParams.get("gift_session_id");
@@ -162,6 +205,45 @@ export default function StreamViewerPage() {
     const x = 10 + Math.random() * 75;
     setFlying((prev) => [...prev, { key, emoji, x }]);
     setTimeout(() => setFlying((prev) => prev.filter((f) => f.key !== key)), 2200);
+  }
+
+  async function startRace() {
+    if (!setupRaceName.trim() || startingRace) return;
+    setStartingRace(true);
+    await setDoc(doc(db, "streams", streamId, "race", "current"), {
+      active: true, exerciseName: setupRaceName.trim(),
+      repTarget: Number(setupRaceTarget) || null, startedAt: serverTimestamp(),
+    }).catch(() => {});
+    setShowRaceSetup(false); setSetupRaceName(""); setSetupRaceTarget("");
+    setStartingRace(false);
+  }
+
+  async function endRace() {
+    await updateDoc(doc(db, "streams", streamId, "race", "current"), { active: false }).catch(() => {});
+    setMyReps(0);
+  }
+
+  async function tapRep() {
+    if (!user || !race?.active) return;
+    const newReps = myReps + 1;
+    setMyReps(newReps);
+    if (repTapRef.current) clearTimeout(repTapRef.current);
+    repTapRef.current = setTimeout(async () => {
+      await setDoc(doc(db, "streams", streamId, "raceScores", user.uid), {
+        userName: user.displayName || "User",
+        userPhoto: user.photoURL || null,
+        reps: newReps,
+      }, { merge: true }).catch(() => {});
+    }, 400);
+  }
+
+  async function sendPulse() {
+    if (!user || pulsing) return;
+    setPulsing(true);
+    await setDoc(doc(db, "streams", streamId, "pulse", "current"), {
+      totalTaps: increment(1),
+    }, { merge: true }).catch(() => {});
+    setTimeout(() => setPulsing(false), 600);
   }
 
   async function endStream() {
@@ -387,7 +469,7 @@ export default function StreamViewerPage() {
 
       {/* Recent gifts */}
       {gifts.length > 0 && (
-        <div className="rounded-2xl p-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="rounded-2xl p-4 mb-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
           <p className="text-xs font-semibold mb-3" style={{ color: "#666" }}>RECENT GIFTS</p>
           <div className="flex flex-col gap-3">
             {gifts.slice(0, 10).map((g) => {
@@ -417,6 +499,164 @@ export default function StreamViewerPage() {
           </div>
         </div>
       )}
+
+      {/* ── LIVE WORKOUT RACE ── */}
+      {isHost && !race?.active && (
+        <div className="rounded-2xl p-4 mb-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Live Workout Race</p>
+              <p className="text-xs mt-0.5" style={{ color: "#555" }}>Viewers race you — real-time rep leaderboard</p>
+            </div>
+            <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#555", fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
+          </div>
+          {showRaceSetup ? (
+            <div className="flex flex-col gap-2">
+              <input type="text" placeholder="Exercise (e.g. Push-ups)" value={setupRaceName}
+                onChange={(e) => setSetupRaceName(e.target.value)} maxLength={40}
+                className="w-full px-3 py-2.5 rounded-xl outline-none text-sm"
+                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "#f2f2f2" }} />
+              <input type="number" placeholder="Rep target (optional)" value={setupRaceTarget}
+                onChange={(e) => setSetupRaceTarget(e.target.value)} min={1} max={999}
+                className="w-full px-3 py-2.5 rounded-xl outline-none text-sm"
+                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "#f2f2f2" }} />
+              <div className="flex gap-2">
+                <button onClick={() => setShowRaceSetup(false)}
+                  className="flex-1 py-2.5 rounded-xl text-sm border-none cursor-pointer"
+                  style={{ background: "rgba(255,255,255,0.04)", color: "#555" }}>Cancel</button>
+                <button onClick={startRace} disabled={!setupRaceName.trim() || startingRace}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
+                  style={{ background: (!setupRaceName.trim() || startingRace) ? "rgba(255,255,255,0.08)" : "#f2f2f2", color: (!setupRaceName.trim() || startingRace) ? "#444" : "#000" }}>
+                  {startingRace ? "Starting…" : "Start Race"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowRaceSetup(true)}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer flex items-center justify-center gap-2"
+              style={{ background: "rgba(255,255,255,0.06)", color: "#f2f2f2" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>flag</span>
+              Start a Race
+            </button>
+          )}
+        </div>
+      )}
+
+      {race?.active && (
+        <div className="rounded-2xl p-4 mb-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.12)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ background: "#f2f2f2", animation: "pulse 1s infinite" }} />
+              <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>RACE LIVE</p>
+            </div>
+            {isHost && (
+              <button onClick={endRace} className="text-xs px-3 py-1 rounded-full border-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.06)", color: "#666" }}>End Race</button>
+            )}
+          </div>
+          <p className="text-xs mb-3" style={{ color: "#555" }}>{race.exerciseName}{race.repTarget ? ` — ${race.repTarget} rep target` : ""}</p>
+
+          {/* Viewer rep counter */}
+          {!isHost && (
+            <button onClick={tapRep}
+              className="w-full py-5 rounded-2xl text-center border-none cursor-pointer mb-3"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", transition: "transform 0.05s", transform: "scale(1)" }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>
+              <p className="text-5xl font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{myReps}</p>
+              <p className="text-xs mt-1" style={{ color: "#555" }}>TAP TO REP</p>
+            </button>
+          )}
+
+          {/* Leaderboard */}
+          {raceScores.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-bold mb-1" style={{ color: "#444" }}>LEADERBOARD</p>
+              {raceScores.slice(0, 5).map((s, i) => {
+                const sinit = (s.userName || "U").charAt(0).toUpperCase();
+                const isMe = user?.uid === s.uid;
+                return (
+                  <div key={s.uid} className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+                    style={{ background: isMe ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)" }}>
+                    <span className="text-xs font-bold w-4 text-center" style={{ color: i === 0 ? "#f2f2f2" : "#444" }}>
+                      {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                    </span>
+                    {s.userPhoto
+                      ? <img src={s.userPhoto} alt="" className="rounded-full object-cover" style={{ width: 24, height: 24 }} />
+                      : <div className="rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ width: 24, height: 24, background: "#222", color: "#aaa" }}>{sinit}</div>}
+                    <span className="flex-1 text-sm" style={{ color: isMe ? "#f2f2f2" : "#888" }}>{isMe ? "You" : s.userName}</span>
+                    <span className="text-sm font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{s.reps}</span>
+                    {race.repTarget && (
+                      <span className="text-xs" style={{ color: "#444" }}>/ {race.repTarget}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SYNC PULSE ── */}
+      <div className="rounded-2xl p-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Sync Pulse</p>
+            <p className="text-xs mt-0.5" style={{ color: "#555" }}>Tap to send energy to the stream</p>
+          </div>
+          <div className="text-xs font-bold px-2.5 py-1 rounded-full"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#555" }}>
+            {pulseTotal.toLocaleString()} pulses
+          </div>
+        </div>
+
+        {/* Pulse ring visualization */}
+        <div className="flex justify-center mb-4">
+          <div className="relative flex items-center justify-center"
+            style={{ width: 100, height: 100 }}>
+            <div className="absolute inset-0 rounded-full"
+              style={{
+                background: pulseTotal > 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+                border: `2px solid ${pulsing ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+                transition: "border-color 0.2s, transform 0.15s",
+                transform: pulsing ? "scale(1.12)" : "scale(1)",
+              }} />
+            <div className="absolute rounded-full"
+              style={{
+                inset: 12,
+                background: pulsing ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                border: `2px solid ${pulsing ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.05)"}`,
+                transition: "background 0.2s, border-color 0.2s, transform 0.15s",
+                transform: pulsing ? "scale(1.1)" : "scale(1)",
+              }} />
+            <span className="material-symbols-outlined relative"
+              style={{ fontSize: 32, color: pulsing ? "#f2f2f2" : "#444", transition: "color 0.2s", fontVariationSettings: "'FILL' 1" }}>
+              favorite
+            </span>
+          </div>
+        </div>
+
+        {!isHost && (
+          <button onClick={sendPulse} disabled={pulsing}
+            className="w-full py-3 rounded-xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
+            style={{
+              background: pulsing ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.06)",
+              color: pulsing ? "#888" : "#f2f2f2",
+              border: "1px solid rgba(255,255,255,0.08)",
+              transition: "background 0.15s, transform 0.1s",
+              transform: pulsing ? "scale(0.97)" : "scale(1)",
+            }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>favorite</span>
+            {pulsing ? "Pulse sent!" : "Send Pulse"}
+          </button>
+        )}
+        {isHost && (
+          <p className="text-center text-xs" style={{ color: "#444" }}>
+            Your viewers are sending you energy
+          </p>
+        )}
+      </div>
     </div>
   );
 }
