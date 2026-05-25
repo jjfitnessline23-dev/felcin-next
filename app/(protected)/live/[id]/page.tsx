@@ -32,9 +32,12 @@ const BADGE_LABELS: Record<string, { label: string; color: string }> = {
   elite:         { label: "Elite",         color: "#be185d" },
 };
 
+type Privacy = "public" | "followers";
+
 interface Stream {
   id: string; hostId: string; hostName?: string;
   hostPhoto?: string; title?: string; viewerCount?: number;
+  privacy?: Privacy;
 }
 interface GiftEvent {
   id: string; senderId: string; senderName: string; senderPhoto?: string;
@@ -54,17 +57,41 @@ export default function StreamViewerPage() {
   const [flying, setFlying] = useState<FlyingGift[]>([]);
   const [sending, setSending] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
   const [userBadge, setUserBadge] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
   const [endingStream, setEndingStream] = useState(false);
+  const [togglingPrivacy, setTogglingPrivacy] = useState(false);
 
+  // Subscribe to stream in real-time so privacy changes reflect live
   useEffect(() => {
     if (!streamId) return;
-    getDoc(doc(db, "streams", streamId)).then((snap) => {
-      if (snap.exists()) setStream({ id: snap.id, ...(snap.data() as Omit<Stream, "id">) });
+    return onSnapshot(doc(db, "streams", streamId), (snap) => {
+      if (snap.exists()) {
+        setStream({ id: snap.id, ...(snap.data() as Omit<Stream, "id">) });
+      } else {
+        setStream(null);
+      }
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }, () => setLoading(false));
   }, [streamId]);
+
+  // Check access once stream and user are loaded
+  useEffect(() => {
+    if (!stream || !user) return;
+    const isHost = user.uid === stream.hostId;
+    if (isHost || stream.privacy !== "followers") {
+      setHasAccess(true);
+      setAccessChecked(true);
+      return;
+    }
+    // Check if viewer follows the host
+    getDoc(doc(db, "users", stream.hostId, "followers", user.uid)).then((snap) => {
+      setHasAccess(snap.exists());
+      setAccessChecked(true);
+    }).catch(() => { setHasAccess(false); setAccessChecked(true); });
+  }, [stream, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -96,47 +123,32 @@ export default function StreamViewerPage() {
     });
   }, [streamId]);
 
-  // After successful Stripe payment, verify and write gift to Firestore
+  // After Stripe gift payment
   useEffect(() => {
     const sessionId = searchParams.get("gift_session_id");
     if (!sessionId || !user) return;
-
-    // Remove param from URL first to prevent duplicate writes
     router.replace(`/live/${streamId}`);
-
     fetch(`/api/gift-verify?session_id=${encodeURIComponent(sessionId)}`)
       .then((r) => r.json())
       .then(async (data) => {
         if (!data.ok) return;
         await addDoc(collection(db, "streams", streamId, "gifts"), {
-          senderId: user.uid,
-          senderName: user.displayName || "User",
-          senderPhoto: user.photoURL ?? null,
-          badgeId: userBadge ?? null,
-          giftType: data.giftType,
-          giftEmoji: data.giftEmoji,
-          priceUsd: data.priceUsd,
-          creatorShareUsd: data.creatorShareUsd,
-          sessionId: data.sessionId,
-          timestamp: serverTimestamp(),
+          senderId: user.uid, senderName: user.displayName || "User",
+          senderPhoto: user.photoURL ?? null, badgeId: userBadge ?? null,
+          giftType: data.giftType, giftEmoji: data.giftEmoji,
+          priceUsd: data.priceUsd, creatorShareUsd: data.creatorShareUsd,
+          sessionId: data.sessionId, timestamp: serverTimestamp(),
         });
-        // Record creator's pending earnings
         if (data.hostId && data.creatorShareUsd > 0) {
           await addDoc(collection(db, "users", data.hostId, "earnings"), {
-            type: "gift",
-            fromUid: user.uid,
-            giftType: data.giftType,
-            giftEmoji: data.giftEmoji,
-            streamId,
-            amountUsd: data.creatorShareUsd,
-            sessionId: data.sessionId,
-            timestamp: serverTimestamp(),
+            type: "gift", fromUid: user.uid, giftType: data.giftType,
+            giftEmoji: data.giftEmoji, streamId, amountUsd: data.creatorShareUsd,
+            sessionId: data.sessionId, timestamp: serverTimestamp(),
           });
         }
         showToast(`${data.giftEmoji} Gift sent!`);
         triggerFly(data.giftEmoji);
-      })
-      .catch(() => {});
+      }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -158,9 +170,15 @@ export default function StreamViewerPage() {
     try {
       await updateDoc(doc(db, "streams", streamId), { status: "ended" });
       router.push("/live");
-    } catch {
-      setEndingStream(false);
-    }
+    } catch { setEndingStream(false); }
+  }
+
+  async function togglePrivacy() {
+    if (!stream || togglingPrivacy) return;
+    setTogglingPrivacy(true);
+    const next: Privacy = stream.privacy === "followers" ? "public" : "followers";
+    await updateDoc(doc(db, "streams", streamId), { privacy: next }).catch(() => {});
+    setTogglingPrivacy(false);
   }
 
   async function sendGift(gift: typeof GIFTS[0]) {
@@ -169,30 +187,18 @@ export default function StreamViewerPage() {
     try {
       const token = await user.getIdToken();
       const res = await fetch("/api/gift-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          giftType: gift.id,
-          streamId,
-          hostId: stream.hostId,
-          token,
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ giftType: gift.id, streamId, hostId: stream.hostId, token }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        showToast(data.error || "Payment failed");
-      }
-    } catch {
-      showToast("Something went wrong");
-    }
+      if (data.url) { window.location.href = data.url; }
+      else { showToast(data.error || "Payment failed"); }
+    } catch { showToast("Something went wrong"); }
     setSending(null);
   }
 
-  if (loading) {
-    return <div className="flex justify-center py-32"><div className="spinner" /></div>;
-  }
+  if (loading) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
+
   if (!stream) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4">
@@ -203,6 +209,42 @@ export default function StreamViewerPage() {
   }
 
   const isHost = user?.uid === stream.hostId;
+  const isPrivate = stream.privacy === "followers";
+
+  // Show access gate for private streams
+  if (!isHost && !accessChecked) {
+    return <div className="flex justify-center py-32"><div className="spinner" /></div>;
+  }
+
+  if (!isHost && !hasAccess) {
+    const init = (stream.hostName || "U").charAt(0).toUpperCase();
+    return (
+      <div className="max-w-xl mx-auto px-4 py-6 flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
+        <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-4 flex-shrink-0"
+          style={{ background: "#222" }}>
+          {stream.hostPhoto
+            ? <img src={stream.hostPhoto} alt="" className="w-full h-full object-cover" />
+            : <span className="text-2xl font-bold" style={{ color: "#aaa" }}>{init}</span>}
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-3"
+          style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
+          FOLLOWERS ONLY
+        </div>
+        <h2 className="text-xl font-bold text-center mb-2" style={{ color: "#f2f2f2" }}>{stream.hostName}&apos;s Live</h2>
+        <p className="text-sm text-center" style={{ color: "#555", maxWidth: 260 }}>
+          This stream is private. Follow {stream.hostName} to watch.
+        </p>
+        <Link href={`/user-profile?uid=${stream.hostId}`}
+          className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm"
+          style={{ background: "#ef4444", color: "#fff" }}>
+          Follow to Watch
+        </Link>
+        <Link href="/live" className="mt-3 text-sm" style={{ color: "#555" }}>← Back to Live</Link>
+      </div>
+    );
+  }
+
   const init = (stream.hostName || "U").charAt(0).toUpperCase();
 
   return (
@@ -228,8 +270,7 @@ export default function StreamViewerPage() {
       </Link>
 
       {/* Video area */}
-      <div className="relative rounded-2xl overflow-hidden mb-4"
-        style={{ background: "#0a0a0a", aspectRatio: "16/9" }}>
+      <div className="relative rounded-2xl overflow-hidden mb-4" style={{ background: "#0a0a0a", aspectRatio: "16/9" }}>
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
           <span className="material-symbols-outlined" style={{ fontSize: 56, color: "#1a1a1a" }}>live_tv</span>
         </div>
@@ -237,7 +278,14 @@ export default function StreamViewerPage() {
           <div className="w-1.5 h-1.5 rounded-full bg-white" style={{ animation: "pulse 1.5s infinite" }} />
           <span className="text-xs font-bold text-white tracking-wide">LIVE</span>
         </div>
-        {stream.viewerCount !== undefined && (
+        {isPrivate && (
+          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full"
+            style={{ background: "rgba(0,0,0,0.7)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 12, color: "#fff" }}>lock</span>
+            <span className="text-xs text-white font-medium">Followers</span>
+          </div>
+        )}
+        {!isPrivate && stream.viewerCount !== undefined && (
           <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full"
             style={{ background: "rgba(0,0,0,0.7)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 12, color: "#fff" }}>visibility</span>
@@ -254,25 +302,26 @@ export default function StreamViewerPage() {
 
       {/* Host info */}
       <div className="flex items-center gap-3 mb-4">
-        {stream.hostPhoto ? (
-          <img src={stream.hostPhoto} alt="" className="rounded-full object-cover flex-shrink-0"
-            style={{ width: 42, height: 42 }} />
-        ) : (
-          <div className="rounded-full flex items-center justify-center font-bold flex-shrink-0"
-            style={{ width: 42, height: 42, background: "#222", color: "#aaa", fontSize: 16 }}>
-            {init}
-          </div>
-        )}
+        {stream.hostPhoto
+          ? <img src={stream.hostPhoto} alt="" className="rounded-full object-cover flex-shrink-0" style={{ width: 42, height: 42 }} />
+          : <div className="rounded-full flex items-center justify-center font-bold flex-shrink-0"
+              style={{ width: 42, height: 42, background: "#222", color: "#aaa", fontSize: 16 }}>{init}</div>}
         <div className="flex-1 min-w-0">
-          <Link href={`/user-profile?uid=${stream.hostId}`}
-            className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>
+          <Link href={`/user-profile?uid=${stream.hostId}`} className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>
             {stream.hostName || "User"}
           </Link>
           {stream.title && <p className="text-xs mt-0.5 truncate" style={{ color: "#666" }}>{stream.title}</p>}
         </div>
+        {isPrivate && (
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full"
+            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 12, color: "#ef4444" }}>lock</span>
+            <span className="text-xs font-semibold" style={{ color: "#ef4444" }}>Followers Only</span>
+          </div>
+        )}
       </div>
 
-      {/* Host controls / Viewer gift tray */}
+      {/* Host controls */}
       {isHost ? (
         <div className="rounded-2xl p-5 mb-4"
           style={{ background: "#131313", border: "1px solid rgba(239,68,68,0.2)" }}>
@@ -288,16 +337,28 @@ export default function StreamViewerPage() {
               </div>
             )}
           </div>
-          {stream.title && (
-            <p className="text-sm mb-4" style={{ color: "#888" }}>{stream.title}</p>
-          )}
+          {stream.title && <p className="text-sm mb-4" style={{ color: "#888" }}>{stream.title}</p>}
+
+          {/* Privacy toggle */}
+          <button onClick={togglePrivacy} disabled={togglingPrivacy}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer flex items-center justify-center gap-2 mb-3"
+            style={{
+              background: isPrivate ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
+              color: isPrivate ? "#ef4444" : "#888",
+              border: `1px solid ${isPrivate ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.08)"}`,
+            }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+              {isPrivate ? "lock" : "public"}
+            </span>
+            {togglingPrivacy ? "Updating…" : isPrivate ? "Followers Only — tap to make Public" : "Public — tap to make Followers Only"}
+          </button>
+
           <button onClick={endStream} disabled={endingStream}
             className="w-full py-3 rounded-xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
             style={{ background: endingStream ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}>
             {endingStream
               ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Ending…</>
-              : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>stop_circle</span> End Stream</>
-            }
+              : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>stop_circle</span> End Stream</>}
           </button>
         </div>
       ) : (
@@ -326,8 +387,7 @@ export default function StreamViewerPage() {
 
       {/* Recent gifts */}
       {gifts.length > 0 && (
-        <div className="rounded-2xl p-4"
-          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="rounded-2xl p-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
           <p className="text-xs font-semibold mb-3" style={{ color: "#666" }}>RECENT GIFTS</p>
           <div className="flex flex-col gap-3">
             {gifts.slice(0, 10).map((g) => {
@@ -335,15 +395,10 @@ export default function StreamViewerPage() {
               const sinit = (g.senderName || "U").charAt(0).toUpperCase();
               return (
                 <div key={g.id} className="flex items-center gap-3">
-                  {g.senderPhoto ? (
-                    <img src={g.senderPhoto} alt="" className="rounded-full object-cover flex-shrink-0"
-                      style={{ width: 28, height: 28 }} />
-                  ) : (
-                    <div className="rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{ width: 28, height: 28, background: "#222", color: "#aaa" }}>
-                      {sinit}
-                    </div>
-                  )}
+                  {g.senderPhoto
+                    ? <img src={g.senderPhoto} alt="" className="rounded-full object-cover flex-shrink-0" style={{ width: 28, height: 28 }} />
+                    : <div className="rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{ width: 28, height: 28, background: "#222", color: "#aaa" }}>{sinit}</div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>{g.senderName}</span>
@@ -354,9 +409,7 @@ export default function StreamViewerPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs" style={{ color: "#666" }}>
-                      sent {g.giftEmoji} {g.giftType}
-                    </p>
+                    <p className="text-xs" style={{ color: "#666" }}>sent {g.giftEmoji} {g.giftType}</p>
                   </div>
                 </div>
               );
