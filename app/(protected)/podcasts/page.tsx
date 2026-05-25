@@ -76,7 +76,7 @@ export default function PodcastsPage() {
     setUploadProgress(0);
     try {
       const ext = uploadFile.name.split(".").pop();
-      const storageRef = ref(storage, `podcasts/${Date.now()}.${ext}`);
+      const storageRef = ref(storage, `uploads/podcasts/${Date.now()}.${ext}`);
       const task = uploadBytesResumable(storageRef, uploadFile);
 
       await new Promise<void>((resolve, reject) => {
