@@ -1,8 +1,1 @@
-{
-  "rewrites": [
-    {
-      "source": "/uploads/:path*",
-      "destination": "http://82.25.87.145:8080/uploads/:path*"
-    }
-  ]
-}
+{}
