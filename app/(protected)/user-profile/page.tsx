@@ -240,6 +240,12 @@ export default function UserProfilePage() {
                 : { background: "#fff", color: "#000" }}>
               {following ? "Following" : "Follow"}
             </button>
+            <Link href={`/subscribe/${uid}`}
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}
+              title="Subscribe">
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f2f2f2" }}>star</span>
+            </Link>
             <Link href={`/private-chats?uid=${uid}`}
               className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
               style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>

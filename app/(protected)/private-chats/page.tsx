@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
@@ -43,8 +43,31 @@ export default function PrivateChatsPage() {
   const [sending, setSending] = useState(false);
   const [otherName, setOtherName] = useState("Chat");
   const [otherPhoto, setOtherPhoto] = useState("");
+  const [otherOnline, setOtherOnline] = useState(false);
+  const [otherLastSeen, setOtherLastSeen] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Set own presence
+  useEffect(() => {
+    if (!user) return;
+    const presenceRef = doc(db, "users", user.uid, "presence", "status");
+    setDoc(presenceRef, { online: true, lastSeen: serverTimestamp() }, { merge: true }).catch(() => {});
+    return () => { updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {}); };
+  }, [user]);
+
+  // Watch other user's presence when chat is active
+  useEffect(() => {
+    if (!activeChat || !user) return;
+    const otherUid = activeChat.split("_").find((id) => id !== user.uid);
+    if (!otherUid) return;
+    return onSnapshot(doc(db, "users", otherUid, "presence", "status"), (snap) => {
+      if (snap.exists()) {
+        setOtherOnline(snap.data().online === true);
+        setOtherLastSeen(snap.data().lastSeen?.seconds ?? null);
+      }
+    });
+  }, [activeChat, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -161,7 +184,14 @@ export default function PrivateChatsPage() {
                 {otherName.charAt(0).toUpperCase()}
               </div>
             )}
-            <p className="font-semibold" style={{ color: "#f2f2f2" }}>{otherName}</p>
+            <div>
+              <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{otherName}</p>
+              {otherOnline
+                ? <p className="text-xs" style={{ color: "#4ade80" }}>Online now</p>
+                : otherLastSeen
+                  ? <p className="text-xs" style={{ color: "#444" }}>Active {timeAgo(otherLastSeen)}</p>
+                  : null}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">

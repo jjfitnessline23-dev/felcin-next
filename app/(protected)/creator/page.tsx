@@ -117,6 +117,7 @@ export default function CreatorPage() {
       setStatus({ msg: "Saving…", type: "info" });
       const col = mode === "reel" ? "reels" : "posts";
       const scheduledAt = scheduled && schedTime ? new Date(schedTime) : null;
+      const tags = [...new Set((caption.match(/#([a-zA-Z0-9_]+)/g) || []).map((t) => t.slice(1).toLowerCase()))];
       await addDoc(collection(db, col), {
         authorId: user.uid, caption, text: caption, mediaUrl,
         contentType: mode === "story" ? "story" : mode === "reel" ? "reel" : contentType,
@@ -128,7 +129,7 @@ export default function CreatorPage() {
         scheduledAt: scheduledAt ? Timestamp.fromDate(scheduledAt) : null,
         expiresAt: mode === "story" ? Timestamp.fromDate(new Date(Date.now() + 24 * 3600 * 1000)) : null,
         maxViews: mode === "post" && maxViews !== "" ? Number(maxViews) : null,
-        viewCount: 0,
+        viewCount: 0, tags,
         collabUid: mode === "post" && collabUser ? collabUser.uid : null,
         collabName: mode === "post" && collabUser ? collabUser.displayName : null,
         collabPhoto: mode === "post" && collabUser ? collabUser.photoURL : null,

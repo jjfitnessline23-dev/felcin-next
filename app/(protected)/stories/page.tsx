@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, limit, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 
 interface Story {
@@ -18,13 +19,17 @@ function isVideo(s: Story) {
 }
 
 const STORY_DURATION = 5000;
+const REACTIONS = ["❤️", "🔥", "💪", "😮", "😂"];
 
 export default function StoriesPage() {
+  const { user } = useAuth();
   const [groups, setGroups] = useState<UserStories[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeGroup, setActiveGroup] = useState<UserStories | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [myReaction, setMyReaction] = useState<string | null>(null);
+  const [reactionAnim, setReactionAnim] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -94,7 +99,17 @@ export default function StoriesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup, activeIdx]);
 
-  const openGroup = (g: UserStories) => { setActiveGroup(g); setActiveIdx(0); };
+  async function reactToStory(emoji: string) {
+    if (!user || !current) return;
+    setMyReaction(emoji);
+    setReactionAnim(emoji);
+    setTimeout(() => setReactionAnim(null), 900);
+    await setDoc(doc(db, "posts", current.id, "reactions", user.uid), {
+      emoji, reactedAt: serverTimestamp(),
+    }).catch(() => {});
+  }
+
+  const openGroup = (g: UserStories) => { setActiveGroup(g); setActiveIdx(0); setMyReaction(null); };
   const closeViewer = () => {
     setActiveGroup(null); setActiveIdx(0);
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -160,6 +175,7 @@ export default function StoriesPage() {
       {/* Story viewer */}
       {activeGroup && current && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "#000" }}>
+          <style>{`@keyframes reactionPop { 0%{opacity:0;transform:scale(0.5)} 30%{opacity:1;transform:scale(1.3)} 70%{opacity:1;transform:scale(1.1)} 100%{opacity:0;transform:scale(1.5)} }`}</style>
           <div className="relative w-full h-full max-w-sm mx-auto flex flex-col">
             {/* Progress bars */}
             <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-3 pt-4">
@@ -203,9 +219,33 @@ export default function StoriesPage() {
               )}
             </div>
 
+            {/* Reaction animation */}
+            {reactionAnim && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                style={{ fontSize: 72, animation: "reactionPop 0.9s ease-out forwards" }}>
+                {reactionAnim}
+              </div>
+            )}
+
+            {/* Reaction bar */}
+            <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3 z-10 px-4">
+              {REACTIONS.map((emoji) => (
+                <button key={emoji} onClick={(e) => { e.stopPropagation(); reactToStory(emoji); }}
+                  className="flex items-center justify-center border-none cursor-pointer rounded-full"
+                  style={{
+                    fontSize: 28, width: 48, height: 48, lineHeight: 1,
+                    background: myReaction === emoji ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.4)",
+                    transform: myReaction === emoji ? "scale(1.2)" : "scale(1)",
+                    transition: "transform 0.15s, background 0.15s",
+                  }}>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
             {/* Tap zones */}
-            <button onClick={goPrev} className="absolute left-0 top-0 bottom-0 w-1/3 border-none bg-transparent cursor-pointer" aria-label="Previous" />
-            <button onClick={goNext} className="absolute right-0 top-0 bottom-0 w-1/3 border-none bg-transparent cursor-pointer" aria-label="Next" />
+            <button onClick={goPrev} className="absolute left-0 top-0 w-1/3 border-none bg-transparent cursor-pointer" style={{ bottom: 80 }} aria-label="Previous" />
+            <button onClick={goNext} className="absolute right-0 top-0 w-1/3 border-none bg-transparent cursor-pointer" style={{ bottom: 80 }} aria-label="Next" />
           </div>
         </div>
       )}

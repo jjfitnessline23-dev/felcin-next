@@ -9,12 +9,15 @@ import { OWNER_UIDS } from "@/lib/firebase";
 
 const links = [
   { href: "/", icon: "home", label: "Home" },
+  { href: "/search", icon: "search", label: "Search" },
   { href: "/explore", icon: "explore", label: "Explore" },
   { href: "/reels", icon: "play_circle", label: "Reels" },
   { href: "/live", icon: "live_tv", label: "Live" },
+  { href: "/schedule", icon: "calendar_month", label: "Schedule" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },
   { href: "/ghost", icon: "sprint", label: "Ghost Workouts" },
   { href: "/challenges", icon: "link", label: "Challenges" },
+  { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
   { href: "/private-chats", icon: "chat", label: "Messages" },
   { href: "/notifications", icon: "notifications", label: "Notifications" },
   { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },

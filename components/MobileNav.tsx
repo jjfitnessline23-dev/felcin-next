@@ -6,7 +6,7 @@ import { useUnreadCount } from "@/hooks/useUnreadCount";
 
 const items = [
   { href: "/", icon: "home", label: "Home" },
-  { href: "/explore", icon: "explore", label: "Explore" },
+  { href: "/search", icon: "search", label: "Search" },
   { href: "/creator", icon: "add", label: "" },
   { href: "/notifications", icon: "notifications", label: "Alerts" },
   { href: "/profile", icon: "person", label: "Me" },
