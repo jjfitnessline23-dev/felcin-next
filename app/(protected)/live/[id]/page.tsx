@@ -1,5 +1,8 @@
 "use client";
 
+export function generateStaticParams() { return []; }
+export const dynamicParams = process.env.NEXT_PUBLIC_CAPACITOR_BUILD !== "true";
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
@@ -171,7 +174,7 @@ export default function StreamViewerPage() {
     const sessionId = searchParams.get("gift_session_id");
     if (!sessionId || !user) return;
     router.replace(`/live/${streamId}`);
-    fetch(`/api/gift-verify?session_id=${encodeURIComponent(sessionId)}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/gift-verify?session_id=${encodeURIComponent(sessionId)}`)
       .then((r) => r.json())
       .then(async (data) => {
         if (!data.ok) return;
@@ -268,7 +271,7 @@ export default function StreamViewerPage() {
     setSending(gift.id);
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/api/gift-checkout", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/gift-checkout`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ giftType: gift.id, streamId, hostId: stream.hostId, token }),
       });

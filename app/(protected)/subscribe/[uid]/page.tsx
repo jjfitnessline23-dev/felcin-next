@@ -1,5 +1,8 @@
 "use client";
 
+export function generateStaticParams() { return []; }
+export const dynamicParams = process.env.NEXT_PUBLIC_CAPACITOR_BUILD !== "true";
+
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, addDoc, collection, Timestamp } from "firebase/firestore";
@@ -45,7 +48,7 @@ export default function SubscribePage() {
     const sessionId = searchParams.get("sub_session_id");
     if (!sessionId || !user) return;
     router.replace(`/subscribe/${creatorUid}`);
-    fetch(`/api/subscribe-verify?session_id=${encodeURIComponent(sessionId)}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/subscribe-verify?session_id=${encodeURIComponent(sessionId)}`)
       .then((r) => r.json()).then(async (data) => {
         if (!data.ok || !user) return;
         const expiresAt = Timestamp.fromDate(new Date(Date.now() + 30 * 86400000));
@@ -67,7 +70,7 @@ export default function SubscribePage() {
     setSubscribing(tierId);
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/api/subscribe-checkout", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/subscribe-checkout`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tier: tierId, creatorUid, token }),
       });

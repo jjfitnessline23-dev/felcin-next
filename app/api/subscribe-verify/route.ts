@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-export const dynamic = "force-dynamic";
+export const dynamic = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" ? "force-static" : "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true") return NextResponse.json({});
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   try {
     const sessionId = req.nextUrl.searchParams.get("session_id");

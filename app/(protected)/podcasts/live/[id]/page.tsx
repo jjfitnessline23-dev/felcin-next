@@ -1,5 +1,8 @@
 "use client";
 
+export function generateStaticParams() { return []; }
+export const dynamicParams = process.env.NEXT_PUBLIC_CAPACITOR_BUILD !== "true";
+
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { doc, onSnapshot, updateDoc, increment, collection, addDoc, query, orderBy, limit, serverTimestamp, getDoc } from "firebase/firestore";

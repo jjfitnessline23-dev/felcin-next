@@ -85,7 +85,7 @@ export default function EarningsPage() {
     setConnecting(true);
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/api/creator-stripe-onboard", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/creator-stripe-onboard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, existingAccountId: stripeAccountId ?? undefined }),
