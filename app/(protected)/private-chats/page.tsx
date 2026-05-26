@@ -27,7 +27,16 @@ export default function PrivateChatsPage() {
   const [activeChat, setActiveChat] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && withUid && !activeChat) setActiveChat(chatId(user.uid, withUid));
+    if (!user || !withUid || activeChat) return;
+    setActiveChat(chatId(user.uid, withUid));
+    // Fetch the other user's profile so the chat header shows their name/photo
+    getDoc(doc(db, "users", withUid, "public", "profile")).then((snap) => {
+      const data = snap.exists() ? snap.data() : null;
+      if (data) { setOtherName(data.displayName || data.username || "User"); setOtherPhoto(data.photoURL || ""); return; }
+      return getDoc(doc(db, "users", withUid)).then((root) => {
+        if (root.exists()) { const d = root.data(); setOtherName(d.displayName || d.username || "User"); setOtherPhoto(d.photoURL || ""); }
+      });
+    }).catch(() => {});
   }, [user, withUid, activeChat]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
