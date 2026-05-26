@@ -30,20 +30,29 @@ export default function AdminPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!isOwner) { router.replace("/"); return; }
-    Promise.all([
-      getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(100))),
-      getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(100))),
-      getDocs(query(collection(db, "users"), limit(200))),
-      getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(200))),
-      getDoc(doc(db, "config", "features")),
-    ]).then(([postsSnap, reelsSnap, usersSnap, reportsSnap, featuresSnap]) => {
-      setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) })));
-      setReels(reelsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })));
-      setUsers(usersSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserRecord, "id">) })));
-      setReports(reportsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Report, "id">) })));
-      setBadgesEnabled(featuresSnap.exists() ? (featuresSnap.data().badgesEnabled ?? true) : true);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+
+    // Load each collection independently so one failure doesn't blank the rest
+    getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(100)))
+      .then((snap) => setPosts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))))
+      .catch(() => {});
+
+    getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(100)))
+      .then((snap) => setReels(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) }))))
+      .catch(() => {});
+
+    getDocs(query(collection(db, "users"), limit(200)))
+      .then((snap) => setUsers(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserRecord, "id">) }))))
+      .catch(() => {});
+
+    getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(200)))
+      .then((snap) => setReports(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Report, "id">) }))))
+      .catch(() => {});
+
+    getDoc(doc(db, "config", "features"))
+      .then((snap) => setBadgesEnabled(snap.exists() ? (snap.data().badgesEnabled ?? true) : true))
+      .catch(() => setBadgesEnabled(true));
+
+    setLoading(false);
   }, [isOwner, authLoading, router]);
 
   if (authLoading) return <div className="flex justify-center py-20"><div className="spinner" /></div>;
@@ -251,15 +260,6 @@ export default function AdminPage() {
           ))}
         </div>
 
-      ) : reports.length === 0 ? (
-        /* ── Reports empty ── */
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
-            style={{ background: "rgba(255,255,255,0.04)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 26, color: "#333" }}>flag</span>
-          </div>
-          <p style={{ color: "#555" }}>No reports yet</p>
-        </div>
       ) : tab === "settings" ? (
         /* ── Settings ── */
         <div className="flex flex-col gap-3">
@@ -293,6 +293,15 @@ export default function AdminPage() {
           </div>
         </div>
 
+      ) : reports.length === 0 ? (
+        /* ── Reports empty ── */
+        <div className="text-center py-16">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+            style={{ background: "rgba(255,255,255,0.04)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 26, color: "#333" }}>flag</span>
+          </div>
+          <p style={{ color: "#555" }}>No reports yet</p>
+        </div>
       ) : (
         /* ── Reports ── */
         <div className="flex flex-col gap-2">
