@@ -3,10 +3,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isAdmin() {
-      return request.auth != null && request.auth.uid == 'GnpVhd5SRMQGxm0lExe5Ycd6btf2';
+      return request.auth != null && (
+        request.auth.uid == 'GnpVhd5SRMQGxm0lExe5Ycd6btf2' ||
+        request.auth.uid == 'FoQAHsSnbdeHayMSl85wR5EliYm1'
+      );
     }
 
-    // Posts — public read, authenticated create, author/admin can update/delete
+    // ── Posts ──
     match /posts/{postId} {
       allow read: if true;
       allow create: if request.auth != null;
@@ -20,9 +23,15 @@ service cloud.firestore {
         allow delete: if request.auth != null
                       && (request.auth.uid == resource.data.authorId || isAdmin());
       }
+
+      // Story reactions
+      match /reactions/{userId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
-    // Reels — same rules as posts
+    // ── Reels ──
     match /reels/{reelId} {
       allow read: if true;
       allow create: if request.auth != null;
@@ -38,27 +47,32 @@ service cloud.firestore {
       }
     }
 
-    // User root doc — public read, own-uid write, admin delete
+    // ── Users ──
     match /users/{userId} {
       allow read: if true;
       allow create, update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
 
-      // Public profile sub-doc — readable by all
       match /public/{doc} {
         allow read: if true;
         allow create, update: if request.auth != null && request.auth.uid == userId;
         allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
       }
 
-      // Private subcollections (bookmarks, following, followers, blocked, etc.)
+      // All other subcollections (following, followers, blocked, workoutLogs, presence, subscriptions, etc.)
       match /{subcollection}/{docId} {
         allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
         allow write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Earnings: creator's earnings written by buyers on subscription purchase
+      match /earnings/{docId} {
+        allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+        allow create: if request.auth != null;
+      }
     }
 
-    // Chats — only participants can read/write
+    // ── Chats ──
     match /chats/{chatId} {
       allow read: if request.auth != null
                   && request.auth.uid in resource.data.participants;
@@ -73,19 +87,63 @@ service cloud.firestore {
       }
     }
 
-    // Reports — anyone auth'd can file one; only admin can read
+    // ── Scheduled Classes ──
+    match /scheduledClasses/{classId} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if request.auth != null;
+      allow delete: if isAdmin();
+
+      match /rsvps/{userId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ── Challenges ──
+    match /challenges/{challengeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if isAdmin();
+
+      match /nodes/{nodeId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+      }
+    }
+
+    // ── Live Streams ──
+    match /streams/{streamId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null;
+
+      match /{subcollection}/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
+    }
+
+    // ── Reports ──
     match /reports/{reportId} {
       allow create: if request.auth != null;
       allow read, update, delete: if isAdmin();
     }
 
-    // Notifications — own uid reads, any auth'd user creates
+    // ── Notifications ──
     match /notifications/{notifId} {
       allow read: if request.auth != null
                   && request.auth.uid == resource.data.toUid;
       allow create: if request.auth != null;
       allow delete: if request.auth != null
                     && (request.auth.uid == resource.data.toUid || isAdmin());
+    }
+
+    // ── Config (feature flags, admin settings) ──
+    match /config/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }
