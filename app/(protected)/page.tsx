@@ -185,36 +185,38 @@ export default function HomePage() {
   return (
     <div className="max-w-xl mx-auto px-4 py-4">
       {/* Header */}
-      <div className="flex items-center mb-4">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#1c1c1c" }}>
             <img src="/static/logo-nav.png" alt="" width={16} height={16} />
           </div>
           <span className="font-bold text-xl tracking-tight" style={{ color: "#f2f2f2" }}>Felcin</span>
         </div>
-      </div>
 
+        {/* Slide toggle */}
+        <div className="relative flex items-center rounded-full cursor-pointer select-none"
+          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", padding: 2 }}
+          onClick={() => setTab(tab === "foryou" ? "following" : "foryou")}>
+          <div style={{
+            position: "absolute", top: 2, bottom: 2,
+            left: tab === "foryou" ? 2 : "calc(50% + 1px)",
+            width: "calc(50% - 3px)",
+            background: "#fff", borderRadius: 999,
+            transition: "left 0.2s ease",
+          }} />
+          <span className="relative z-10 text-xs font-semibold"
+            style={{ width: 68, textAlign: "center", padding: "4px 0", color: tab === "foryou" ? "#000" : "#555", transition: "color 0.15s" }}>
+            For You
+          </span>
+          <span className="relative z-10 text-xs font-semibold"
+            style={{ width: 68, textAlign: "center", padding: "4px 0", color: tab === "following" ? "#000" : "#555", transition: "color 0.15s" }}>
+            Following
+          </span>
+        </div>
+      </div>
 
       {/* Stories strip */}
       <StoriesStrip />
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-5 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }}>
-        <button
-          onClick={() => setTab("foryou")}
-          className="flex-1 py-2 rounded-lg text-sm font-semibold border-none cursor-pointer transition-all"
-          style={tab === "foryou" ? { background: "#fff", color: "#000" } : { background: "transparent", color: "#555" }}
-        >
-          For You
-        </button>
-        <button
-          onClick={() => setTab("following")}
-          className="flex-1 py-2 rounded-lg text-sm font-semibold border-none cursor-pointer transition-all"
-          style={tab === "following" ? { background: "#fff", color: "#000" } : { background: "transparent", color: "#555" }}
-        >
-          Following
-        </button>
-      </div>
 
       {/* For You */}
       {tab === "foryou" && (
