@@ -5,31 +5,24 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Patching API routes for static export..." -ForegroundColor Cyan
 Get-ChildItem -Recurse -Filter "route.ts" -Path "app/api" | ForEach-Object {
-    (Get-Content $_.FullName -Raw) -replace '"force-dynamic"', '"force-static"' |
-        Set-Content $_.FullName -NoNewline
+    $patched = (Get-Content $_.FullName -Raw) -replace '"force-dynamic"', '"force-static"'
+    [System.IO.File]::WriteAllText($_.FullName, $patched)
 }
 
 Write-Host "Patching dynamic page wrappers..." -ForegroundColor Cyan
 
-$wrapperTemplate = @"
-import PageClient from "./PageClient";
-
-export function generateStaticParams() { return [{ PARAM: "_" }]; }
-export const dynamicParams = false;
-
-export default function Page() { return <PageClient />; }
-"@
-
 @{
-    'app/(protected)/challenges/[id]/page.tsx'   = 'id'
-    'app/(protected)/ghost/[id]/page.tsx'        = 'id'
-    'app/(protected)/live/[id]/page.tsx'         = 'id'
-    'app/(protected)/podcasts/[id]/page.tsx'     = 'id'
-    'app/(protected)/podcasts/live/[id]/page.tsx'= 'id'
-    'app/(protected)/subscribe/[uid]/page.tsx'   = 'uid'
-    'app/(protected)/tag/[name]/page.tsx'        = 'name'
+    'app/(protected)/challenges/[id]/page.tsx'    = 'id'
+    'app/(protected)/ghost/[id]/page.tsx'         = 'id'
+    'app/(protected)/live/[id]/page.tsx'          = 'id'
+    'app/(protected)/podcasts/[id]/page.tsx'      = 'id'
+    'app/(protected)/podcasts/live/[id]/page.tsx' = 'id'
+    'app/(protected)/subscribe/[uid]/page.tsx'    = 'uid'
+    'app/(protected)/tag/[name]/page.tsx'         = 'name'
 }.GetEnumerator() | ForEach-Object {
-    $wrapperTemplate -replace 'PARAM', $_.Value | Set-Content $_.Key -NoNewline
+    $k = $_.Value
+    $content = "import PageClient from `"./PageClient`";`n`nexport function generateStaticParams() { return [{ $($k): `"_`" }]; }`nexport const dynamicParams = false;`n`nexport default function Page() { return <PageClient />; }`n"
+    [System.IO.File]::WriteAllText((Join-Path (Get-Location) $_.Key), $content)
 }
 
 Write-Host "Building static export..." -ForegroundColor Cyan
