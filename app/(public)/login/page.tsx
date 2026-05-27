@@ -96,12 +96,18 @@ export default function LoginPage() {
         await signInWithCredential(auth, credential);
         router.replace("/");
       } else {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-        // Let onAuthStateChanged fire and the useEffect redirect to "/"
+        const result = await signInWithPopup(auth, new GoogleAuthProvider());
+        if (result.user) {
+          router.replace("/");
+        } else {
+          setError("Sign-in completed but no user returned.");
+          setBusy(false);
+        }
       }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
-      setError(code ? `Sign-in error: ${code}` : (err as { message?: string }).message || "Google sign-in failed");
+      const msg = (err as { message?: string }).message || "Google sign-in failed";
+      setError(`${code ? code + ": " : ""}${msg}`);
       setBusy(false);
     }
   };
