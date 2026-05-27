@@ -98,7 +98,9 @@ export default function LoginPage() {
       } else {
         const result = await signInWithPopup(auth, new GoogleAuthProvider());
         if (result.user) {
-          router.replace("/");
+          const u = result.user;
+          setError(`DEBUG uid=${u.uid} email=${u.email} verified=${u.emailVerified}`);
+          setBusy(false);
         } else {
           setError("Sign-in completed but no user returned.");
           setBusy(false);
