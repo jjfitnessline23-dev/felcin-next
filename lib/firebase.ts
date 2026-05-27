@@ -5,7 +5,7 @@ import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE",
-  authDomain: "felcin.com",
+  authDomain: "felcin.firebaseapp.com",
   projectId: "felcin",
   storageBucket: "felcin.firebasestorage.app",
   messagingSenderId: "989891719192",

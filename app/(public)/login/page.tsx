@@ -45,7 +45,10 @@ export default function LoginPage() {
     if (cap?.isNativePlatform?.() ?? cap?.isNative) return;
     getRedirectResult(auth).then((result) => {
       if (result?.user) router.replace("/");
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      const code = (err as { code?: string }).code || "";
+      if (code && code !== "auth/no-auth-event") setError(`Sign-in error: ${code}`);
+    });
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,6 +109,7 @@ export default function LoginPage() {
         router.replace("/");
       } else {
         await signInWithPopup(auth, new GoogleAuthProvider());
+        router.replace("/");
       }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";

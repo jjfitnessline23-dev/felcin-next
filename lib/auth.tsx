@@ -28,6 +28,7 @@ export function canAccessApp(user: User | null): boolean {
   if (!user) return false;
   if (user.phoneNumber) return true;
   if (OWNER_UIDS.includes(user.uid)) return true;
+  if (user.providerData.some((p) => p.providerId === "google.com")) return true;
   return !!user.email && user.emailVerified;
 }
 
