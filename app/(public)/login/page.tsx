@@ -6,9 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithRedirect,
+  signInWithPopup,
   signInWithCredential,
-  getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -39,20 +38,6 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-  // Handle Google redirect result on return (web only — native uses plugin)
-  useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
-    if (cap?.isNativePlatform?.() ?? cap?.isNative) return;
-    setBusy(true);
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) router.replace("/");
-      else setBusy(false);
-    }).catch((err: unknown) => {
-      const code = (err as { code?: string }).code || "";
-      if (code) setError(`Sign-in error: ${code}`);
-      setBusy(false);
-    });
-  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +96,8 @@ export default function LoginPage() {
         await signInWithCredential(auth, credential);
         router.replace("/");
       } else {
-        await signInWithRedirect(auth, new GoogleAuthProvider());
+        await signInWithPopup(auth, new GoogleAuthProvider());
+        router.replace("/");
       }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
