@@ -8,6 +8,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithCredential,
+  getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -38,6 +39,14 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
+  // Handle redirect result when popup falls back to redirect (popup blocked by browser)
+  useEffect(() => {
+    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
+    if (cap?.isNativePlatform?.() ?? cap?.isNative) return;
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) router.replace("/");
+    }).catch(() => {});
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,15 +105,7 @@ export default function LoginPage() {
         await signInWithCredential(auth, credential);
         router.replace("/");
       } else {
-        const result = await signInWithPopup(auth, new GoogleAuthProvider());
-        if (result.user) {
-          const u = result.user;
-          setError(`DEBUG uid=${u.uid} email=${u.email} verified=${u.emailVerified}`);
-          setBusy(false);
-        } else {
-          setError("Sign-in completed but no user returned.");
-          setBusy(false);
-        }
+        await signInWithPopup(auth, new GoogleAuthProvider());
       }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
