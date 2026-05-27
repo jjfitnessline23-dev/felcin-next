@@ -97,7 +97,7 @@ export default function LoginPage() {
         router.replace("/");
       } else {
         await signInWithPopup(auth, new GoogleAuthProvider());
-        router.replace("/");
+        // Let onAuthStateChanged fire and the useEffect redirect to "/"
       }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
