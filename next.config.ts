@@ -9,14 +9,6 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   ...(isCapacitorBuild ? {} : {
-    async rewrites() {
-      return [
-        {
-          source: "/__/auth/:path*",
-          destination: "https://felcin.firebaseapp.com/__/auth/:path*",
-        },
-      ];
-    },
     async headers() {
       return [
         {
