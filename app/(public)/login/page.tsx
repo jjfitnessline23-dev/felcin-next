@@ -33,6 +33,20 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
+    // Navigate a hidden iframe to felcin.firebaseapp.com to trigger the SW
+    // update check there. The kill-switch SW deployed to that origin will
+    // install, take over, and unregister itself — clearing the old SW that
+    // was intercepting Firebase auth popup requests.
+    const iframe = document.createElement('iframe');
+    iframe.src = 'https://felcin.firebaseapp.com/';
+    iframe.setAttribute('aria-hidden', 'true');
+    Object.assign(iframe.style, { display: 'none', width: '0', height: '0', border: 'none', position: 'absolute' });
+    document.body.appendChild(iframe);
+    const timer = setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 6000);
+    return () => { clearTimeout(timer); try { document.body.removeChild(iframe); } catch {} };
+  }, []);
+
+  useEffect(() => {
     if (!loading && user && canAccessApp(user)) {
       router.replace("/");
     }
