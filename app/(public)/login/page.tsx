@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  signInWithPopup,
   signInWithCredential,
   sendPasswordResetEmail,
   sendEmailVerification,
@@ -28,15 +29,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
-    const native = !!(cap?.isNativePlatform?.() ?? cap?.isNative);
-    setIsNativeApp(native);
-    // Preload GIS script so requestAccessToken is synchronous with user click
-    if (!native && !(window as { google?: unknown }).google) {
-      const s = document.createElement("script");
-      s.src = "https://accounts.google.com/gsi/client";
-      s.async = true;
-      document.head.appendChild(s);
-    }
+    setIsNativeApp(!!(cap?.isNativePlatform?.() ?? cap?.isNative));
   }, []);
 
   useEffect(() => {
@@ -102,30 +95,10 @@ const handleSubmit = async (e: React.FormEvent) => {
         await signInWithCredential(auth, credential);
         window.location.href = "/";
       } else {
-        type GIS = { accounts: { oauth2: { initTokenClient: (cfg: { client_id: string; scope: string; callback: (r: { access_token?: string; error?: string }) => void }) => { requestAccessToken: (o: { prompt: string }) => void } } } };
-        const google = (window as { google?: GIS }).google;
-        if (!google?.accounts?.oauth2) {
-          setError("Google sign-in is still loading — please try again in a moment.");
-          setBusy(false); return;
-        }
         setStep("Opening Google sign-in…");
-        // requestAccessToken is called synchronously inside the Promise executor,
-        // which is within the user-click call stack, so browsers allow the popup.
-        const accessToken = await new Promise<string>((resolve, reject) => {
-          const client = google.accounts.oauth2.initTokenClient({
-            client_id: "989891719192-1phpgjoadt2fulgld0l2nf4lt9fj5jlu.apps.googleusercontent.com",
-            scope: "openid email profile",
-            callback: (r) => {
-              if (r.error || !r.access_token) reject(new Error(r.error || "No access token"));
-              else resolve(r.access_token);
-            },
-          });
-          client.requestAccessToken({ prompt: "select_account" });
-        });
-        setStep("Signing in…");
-        const credential = GoogleAuthProvider.credential(null, accessToken);
-        await signInWithCredential(auth, credential);
-        setStep("Signed in! Entering app…");
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        setStep(`Signed in as ${result.user.email} — entering app…`);
         window.location.href = "/";
       }
     } catch (err: unknown) {
