@@ -108,7 +108,31 @@ export default function LoginPage() {
         await signInWithCredential(auth, credential);
         router.replace("/");
       } else {
-        await signInWithPopup(auth, new GoogleAuthProvider());
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://accounts.google.com/gsi/client";
+          script.onload = () => {
+            const google = (window as { google?: { accounts?: { oauth2?: { initTokenClient: (cfg: { client_id: string; scope: string; callback: (r: { access_token?: string; error?: string }) => void }) => { requestAccessToken: (o: { prompt: string }) => void } } } } }).google;
+            const tokenClient = google?.accounts?.oauth2?.initTokenClient({
+              client_id: "989891719192-1phpgjoadt2fulgld0l2nf4lt9fj5jlu.apps.googleusercontent.com",
+              scope: "openid email profile",
+              callback: async (tokenResponse) => {
+                try {
+                  if (tokenResponse.error || !tokenResponse.access_token) {
+                    reject(new Error(tokenResponse.error || "No access token"));
+                    return;
+                  }
+                  const credential = GoogleAuthProvider.credential(null, tokenResponse.access_token);
+                  await signInWithCredential(auth, credential);
+                  resolve();
+                } catch (e) { reject(e); }
+              },
+            });
+            tokenClient?.requestAccessToken({ prompt: "select_account" });
+          };
+          script.onerror = () => reject(new Error("Failed to load Google Sign-In"));
+          document.head.appendChild(script);
+        });
         router.replace("/");
       }
     } catch (err: unknown) {
