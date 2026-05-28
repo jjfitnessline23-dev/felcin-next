@@ -50,6 +50,7 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const { user } = useAuth();
   const [liked, setLiked] = useState(post.likedBy?.includes(user?.uid || "") ?? false);
   const [likeCount, setLikeCount] = useState(post.likes ?? 0);
+  const [imgBroken, setImgBroken] = useState(false);
   const [liking, setLiking] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
@@ -234,13 +235,13 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
       </div>
 
       {/* Media */}
-      {post.mediaUrl && (
+      {post.mediaUrl && !imgBroken && (
         <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
           {mediaType === "video" ? (
             <video ref={videoRef} src={post.mediaUrl} muted loop playsInline preload="auto" className="w-full h-full object-cover" />
           ) : (
             <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
-              <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" />
+              <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" onError={() => setImgBroken(true)} />
             </Link>
           )}
           {viewsLeft !== null && (
@@ -267,7 +268,7 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
             style={{ color: "#555" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chat_bubble</span>
-            <span className="text-sm font-semibold">{post.comments ?? 0}</span>
+            <span className="text-sm font-semibold">{Math.max(0, post.comments ?? 0)}</span>
           </Link>
 
           <button onClick={handleShare}
