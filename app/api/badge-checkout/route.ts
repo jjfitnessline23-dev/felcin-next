@@ -1,15 +1,15 @@
+﻿export const dynamic = "force-static";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
 
 const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
 
 const TIERS: Record<string, { label: string; price: number; emoji: string }> = {
-  bronze:  { label: "Bronze Badge",  price: 199,  emoji: "🥉" },
-  silver:  { label: "Silver Badge",  price: 499,  emoji: "🥈" },
-  gold:    { label: "Gold Badge",    price: 999,  emoji: "🥇" },
-  diamond: { label: "Diamond Badge", price: 1999, emoji: "💎" },
+  bronze:  { label: "Bronze Badge",  price: 199,  emoji: "ðŸ¥‰" },
+  silver:  { label: "Silver Badge",  price: 499,  emoji: "ðŸ¥ˆ" },
+  gold:    { label: "Gold Badge",    price: 999,  emoji: "ðŸ¥‡" },
+  diamond: { label: "Diamond Badge", price: 1999, emoji: "ðŸ’Ž" },
 };
 
 async function verifyFirebaseToken(idToken: string): Promise<string | null> {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         currency: "usd",
         product_data: {
           name: `${tierData.emoji} ${tierData.label}`,
-          description: "Creator badge for Felcin · sent by a supporter",
+          description: "Creator badge for Felcin Â· sent by a supporter",
           images: ["https://felcin.com/favicon.ico"],
         },
         unit_amount: tierData.price,

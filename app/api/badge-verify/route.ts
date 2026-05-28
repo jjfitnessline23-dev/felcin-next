@@ -1,7 +1,7 @@
+﻿export const dynamic = "force-static";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY) return NextResponse.json({});

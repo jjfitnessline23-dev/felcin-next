@@ -1,7 +1,7 @@
+﻿export const dynamic = "force-static";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-export const dynamic = "force-dynamic";
 
 const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const origin = req.headers.get("origin") || "https://felcin.com";
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price_data: { currency: "usd", unit_amount: tierData.amount, product_data: { name: `${tierData.name} — ${creatorName}` } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: "usd", unit_amount: tierData.amount, product_data: { name: `${tierData.name} â€” ${creatorName}` } }, quantity: 1 }],
       success_url: `${origin}/subscribe/${creatorUid}?sub_session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/user-profile?uid=${creatorUid}`,
       metadata: { buyerUid, creatorUid, tier },

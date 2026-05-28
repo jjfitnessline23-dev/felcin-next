@@ -1,7 +1,7 @@
+﻿export const dynamic = "force-static";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
 
 const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
 

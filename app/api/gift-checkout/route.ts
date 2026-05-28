@@ -1,21 +1,21 @@
+﻿export const dynamic = "force-static";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
 
 const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
 const FIREBASE_PROJECT_ID = "felcin";
 const PLATFORM_FEE_PCT = 30;
 
 const GIFTS: Record<string, { emoji: string; label: string; price: number }> = {
-  rose:    { emoji: "🌹", label: "Rose",    price: 99 },
-  heart:   { emoji: "❤️",  label: "Heart",   price: 99 },
-  clap:    { emoji: "👏", label: "Clap",    price: 99 },
-  fire:    { emoji: "🔥", label: "Fire",    price: 199 },
-  star:    { emoji: "⭐",  label: "Star",    price: 199 },
-  rocket:  { emoji: "🚀", label: "Rocket",  price: 299 },
-  crown:   { emoji: "👑", label: "Crown",   price: 499 },
-  diamond: { emoji: "💎", label: "Diamond", price: 999 },
+  rose:    { emoji: "ðŸŒ¹", label: "Rose",    price: 99 },
+  heart:   { emoji: "â¤ï¸",  label: "Heart",   price: 99 },
+  clap:    { emoji: "ðŸ‘", label: "Clap",    price: 99 },
+  fire:    { emoji: "ðŸ”¥", label: "Fire",    price: 199 },
+  star:    { emoji: "â­",  label: "Star",    price: 199 },
+  rocket:  { emoji: "ðŸš€", label: "Rocket",  price: 299 },
+  crown:   { emoji: "ðŸ‘‘", label: "Crown",   price: 499 },
+  diamond: { emoji: "ðŸ’Ž", label: "Diamond", price: 999 },
 };
 
 async function verifyFirebaseToken(idToken: string): Promise<string | null> {
