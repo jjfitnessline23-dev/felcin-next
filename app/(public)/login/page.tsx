@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [step, setStep] = useState("");
   const [busy, setBusy] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isNativeApp, setIsNativeApp] = useState(false);
@@ -81,10 +82,10 @@ const handleSubmit = async (e: React.FormEvent) => {
   };
 
   const handleGoogle = async () => {
-    setError(""); setBusy(true);
+    setError(""); setStep(""); setBusy(true);
     try {
       if (isNativeApp) {
-        // Native Google Sign-In via Capacitor Firebase Authentication plugin
+        setStep("Opening Google sign-in…");
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
         const result = await FirebaseAuthentication.signInWithGoogle();
         if (!result.credential?.idToken) throw new Error("Google sign-in failed: no ID token returned");
@@ -93,16 +94,31 @@ const handleSubmit = async (e: React.FormEvent) => {
           result.credential.accessToken ?? null
         );
         await signInWithCredential(auth, credential);
-        router.replace("/");
+        window.location.href = "/";
       } else {
+        setStep("Opening Google sign-in…");
         const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
-        router.replace("/");
+        const result = await signInWithPopup(auth, provider);
+        setStep(`Signed in as ${result.user.email} — entering app…`);
+        window.location.href = "/";
       }
     } catch (err: unknown) {
+      setStep("");
       const code = (err as { code?: string }).code || "";
       const msg = (err as { message?: string }).message || "Google sign-in failed";
-      setError(`${code ? code + ": " : ""}${msg}`);
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        setBusy(false);
+        return;
+      }
+      setError(
+        code === "auth/popup-blocked"
+          ? "Popup was blocked. Please allow popups for felcin.com in your browser settings and try again."
+          : code === "auth/unauthorized-domain"
+          ? `Domain not authorized for Google sign-in (${code}). Contact support.`
+          : code === "auth/account-exists-with-different-credential"
+          ? "An account already exists with this email. Please sign in with email and password instead."
+          : `${code ? code + ": " : ""}${msg}`
+      );
       setBusy(false);
     }
   };
@@ -124,6 +140,11 @@ const handleSubmit = async (e: React.FormEvent) => {
           {error && (
             <div className="mb-4 p-3 rounded-xl text-sm font-semibold" style={{ background: "rgba(239,68,68,0.15)", color: "#ff6b6b", border: "1px solid rgba(239,68,68,0.3)" }}>
               {error}
+            </div>
+          )}
+          {step && (
+            <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.15)" }}>
+              {step}
             </div>
           )}
           {info && (
