@@ -6,9 +6,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithCredential,
-  getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -39,19 +37,7 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-  // Handle redirect result when popup falls back to redirect (popup blocked by browser)
-  useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
-    if (cap?.isNativePlatform?.() ?? cap?.isNative) return;
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) router.replace("/");
-    }).catch((err: unknown) => {
-      const code = (err as { code?: string }).code || "";
-      if (code && code !== "auth/no-auth-event") setError(`Sign-in error: ${code}`);
-    });
-  }, [router]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setInfo(""); setBusy(true);
     try {
