@@ -235,9 +235,13 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
       </div>
 
       {/* Media */}
-      {post.mediaUrl && !imgBroken && (
-        <div className="relative" style={{ background: "#000", aspectRatio: "1/1", overflow: "hidden" }}>
-          {mediaType === "video" ? (
+      {post.mediaUrl && (
+        <div className="relative" style={{ background: "#111", aspectRatio: "1/1", overflow: "hidden" }}>
+          {imgBroken ? (
+            <div className="w-full h-full flex items-center justify-center" style={{ color: "#333" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 48 }}>hide_image</span>
+            </div>
+          ) : mediaType === "video" ? (
             <video ref={videoRef} src={post.mediaUrl} muted loop playsInline preload="auto" className="w-full h-full object-cover" />
           ) : (
             <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
