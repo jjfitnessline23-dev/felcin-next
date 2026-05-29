@@ -2,7 +2,14 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "storage": {
-    "rules": "storage.rules"
-  }
+  "storage": [
+    {
+      "bucket": "felcin.appspot.com",
+      "rules": "storage.rules"
+    },
+    {
+      "bucket": "felcin.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ]
 }

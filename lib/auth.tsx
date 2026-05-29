@@ -8,13 +8,15 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from "firebase/auth";
-import { auth, OWNER_UIDS } from "./firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db, OWNER_UIDS } from "./firebase";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
   canAccess: boolean;
+  banned: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -22,6 +24,7 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   signOut: async () => {},
   canAccess: false,
+  banned: false,
 });
 
 export function canAccessApp(user: User | null): boolean {
@@ -35,11 +38,22 @@ export function canAccessApp(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [banned, setBanned] = useState(false);
 
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence).catch(() => {});
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u && !OWNER_UIDS.includes(u.uid)) {
+        try {
+          const snap = await getDoc(doc(db, "users", u.uid));
+          setBanned(snap.exists() && snap.data()?.banned === true);
+        } catch {
+          setBanned(false);
+        }
+      } else {
+        setBanned(false);
+      }
       setLoading(false);
     });
     return unsub;
@@ -51,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signOut, canAccess: canAccessApp(user) }}
+      value={{ user, loading, signOut, canAccess: canAccessApp(user), banned }}
     >
       {children}
     </AuthContext.Provider>

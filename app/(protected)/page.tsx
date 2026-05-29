@@ -218,15 +218,58 @@ export default function HomePage() {
       {/* Stories strip */}
       <StoriesStrip />
 
+      {/* Ghost Workouts banner */}
+      <Link href="/ghost" className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-4 no-underline"
+        style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.12), rgba(139,92,246,0.06))", border: "1px solid rgba(167,139,250,0.2)" }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(167,139,250,0.15)" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold" style={{ color: "#c4b5fd" }}>Ghost Workouts</p>
+          <p className="text-xs" style={{ color: "#6d51c4" }}>Train alongside real people — on your schedule</p>
+        </div>
+        <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#6d51c4" }}>chevron_right</span>
+      </Link>
+
       {/* For You */}
       {tab === "foryou" && (
         loading ? (
           <div className="flex justify-center py-20"><div className="spinner" /></div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-20" style={{ color: "#888" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>photo_camera</span>
-            <p className="text-lg font-semibold" style={{ color: "#f1f1f1" }}>Nothing here yet</p>
-            <p className="text-sm mt-1">Be the first to share something!</p>
+          <div className="flex flex-col gap-3 py-8">
+            <div className="text-center pb-4" style={{ color: "#888" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 40, display: "block", marginBottom: 10, color: "#333" }}>photo_camera</span>
+              <p className="text-base font-semibold mb-1" style={{ color: "#f1f1f1" }}>Nothing here yet</p>
+              <p className="text-sm">Be the first to share something or explore creators.</p>
+            </div>
+            {/* Discover prompt */}
+            <Link href="/explore" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl no-underline"
+              style={{ background: "#141414", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#888", fontVariationSettings: "'FILL' 1" }}>explore</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Discover creators</p>
+                <p className="text-xs" style={{ color: "#555" }}>Find fitness creators to follow</p>
+              </div>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#444" }}>chevron_right</span>
+            </Link>
+            <Link href="/challenges" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl no-underline"
+              style={{ background: "#141414", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#888", fontVariationSettings: "'FILL' 1" }}>link</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Join a challenge</p>
+                <p className="text-xs" style={{ color: "#555" }}>Compete and stay accountable</p>
+              </div>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#444" }}>chevron_right</span>
+            </Link>
+            <Link href="/creator" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl no-underline"
+              style={{ background: "#141414", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#888", fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Share your first post</p>
+                <p className="text-xs" style={{ color: "#555" }}>Be the first creator on Felcin</p>
+              </div>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#444" }}>chevron_right</span>
+            </Link>
           </div>
         ) : (
           <>

@@ -4,24 +4,32 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { OWNER_UIDS } from "@/lib/firebase";
 
-const links = [
+const primaryLinks = [
   { href: "/", icon: "home", label: "Home" },
-  { href: "/search", icon: "search", label: "Search" },
-  { href: "/explore", icon: "explore", label: "Explore" },
+  { href: "/ghost", icon: "sprint", label: "Ghost Workouts", accent: true },
   { href: "/reels", icon: "play_circle", label: "Reels" },
   { href: "/live", icon: "live_tv", label: "Live" },
-  { href: "/schedule", icon: "calendar_month", label: "Schedule" },
-  { href: "/stories", icon: "auto_stories", label: "Stories" },
-  { href: "/ghost", icon: "sprint", label: "Ghost Workouts" },
   { href: "/challenges", icon: "link", label: "Challenges" },
-  { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
+  { href: "/explore", icon: "explore", label: "Explore" },
+  { href: "/search", icon: "search", label: "Search" },
+];
+
+const secondaryLinks = [
   { href: "/private-chats", icon: "chat", label: "Messages" },
   { href: "/notifications", icon: "notifications", label: "Notifications" },
   { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
   { href: "/dashboard", icon: "bar_chart", label: "Dashboard" },
+];
+
+const moreLinks = [
+  { href: "/stories", icon: "auto_stories", label: "Stories" },
+  { href: "/schedule", icon: "calendar_month", label: "Schedule" },
+  { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
+  { href: "/podcasts", icon: "podcasts", label: "Podcasts" },
 ];
 
 export default function Sidebar() {
@@ -29,6 +37,7 @@ export default function Sidebar() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const unread = useUnreadCount();
+  const [showMore, setShowMore] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -39,6 +48,31 @@ export default function Sidebar() {
   const photoURL = user?.photoURL;
   const initial = displayName.charAt(0).toUpperCase();
   const isOwner = user && OWNER_UIDS.includes(user.uid);
+
+  const renderLink = (l: { href: string; icon: string; label: string; accent?: boolean }) => {
+    const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+    const isNotif = l.href === "/notifications";
+    return (
+      <Link key={l.href} href={l.href} className={`nav-link${active ? " active" : ""}`}
+        style={l.accent && !active ? { color: "#a78bfa" } : undefined}>
+        <span className="relative">
+          <span className="material-symbols-outlined" style={{
+            fontSize: 19,
+            fontVariationSettings: active ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400",
+            color: l.accent && !active ? "#a78bfa" : undefined,
+          }}>{l.icon}</span>
+          {isNotif && unread > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-0.5"
+              style={{ background: "#ef4444" }}>
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </span>
+        {l.label}
+        {l.accent && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa" }}>NEW</span>}
+      </Link>
+    );
+  };
 
   return (
     <aside
@@ -56,7 +90,7 @@ export default function Sidebar() {
       {/* Create button */}
       <div className="px-3 mb-2">
         <Link href="/creator"
-          className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl font-semibold text-sm text-white"
+          className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl font-semibold text-sm"
           style={{ background: "#fff", color: "#000" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 19 }}>add_circle</span>
           Create
@@ -64,24 +98,23 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-0.5 px-3 flex-1">
-        {links.map((l) => {
-          const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
-          const isNotif = l.href === "/notifications";
-          return (
-            <Link key={l.href} href={l.href} className={`nav-link${active ? " active" : ""}`}>
-              <span className="relative">
-                <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: active ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400" }}>{l.icon}</span>
-                {isNotif && unread > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-0.5"
-                    style={{ background: "#ef4444" }}>
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </span>
-              {l.label}
-            </Link>
-          );
-        })}
+        {primaryLinks.map(renderLink)}
+
+        {/* Separator */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "6px 4px" }} />
+
+        {secondaryLinks.map(renderLink)}
+
+        {/* More toggle */}
+        <button
+          onClick={() => setShowMore((v) => !v)}
+          className="nav-link border-none bg-transparent cursor-pointer w-full text-left"
+          style={{ color: "#444" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 19 }}>{showMore ? "expand_less" : "expand_more"}</span>
+          {showMore ? "Less" : "More"}
+        </button>
+
+        {showMore && moreLinks.map(renderLink)}
 
         {/* Admin link — owner only */}
         {isOwner && (
