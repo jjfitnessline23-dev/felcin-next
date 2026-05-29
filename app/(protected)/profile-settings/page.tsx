@@ -13,6 +13,7 @@ export default function ProfileSettingsPage() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [photoURL, setPhotoURL] = useState("");
   const [badge, setBadge] = useState("");
@@ -29,6 +30,7 @@ export default function ProfileSettingsPage() {
       if (snap.exists()) {
         const d = snap.data();
         setDisplayName(d.displayName || user.displayName || "");
+        setUsername((d.username || "").toLowerCase());
         setBio(d.bio || "");
         setPhotoURL(d.photoURL || user.photoURL || "");
         setBadge(d.badge || "");
@@ -59,8 +61,9 @@ export default function ProfileSettingsPage() {
     try {
       await updateProfile(user, { displayName, photoURL });
       // Write to both paths so all parts of the app can find profile data
-      await setDoc(doc(db, "users", user.uid, "public", "profile"), { displayName, bio, photoURL, badge, updatedAt: new Date() }, { merge: true });
-      await setDoc(doc(db, "users", user.uid), { displayName, photoURL, badge, updatedAt: new Date() }, { merge: true });
+      const cleanUsername = username.toLowerCase().replace(/[^a-z0-9._]/g, "");
+      await setDoc(doc(db, "users", user.uid, "public", "profile"), { displayName, username: cleanUsername, bio, photoURL, badge, updatedAt: new Date() }, { merge: true });
+      await setDoc(doc(db, "users", user.uid), { displayName, username: cleanUsername, photoURL, badge, updatedAt: new Date() }, { merge: true });
       setStatus({ msg: "Profile saved!", ok: true });
     } catch { setStatus({ msg: "Failed to save. Try again.", ok: false }); }
     setSaving(false);
@@ -107,6 +110,22 @@ export default function ProfileSettingsPage() {
           <input value={displayName} onChange={(e) => setDisplayName(e.target.value)}
             className="w-full px-4 py-3 rounded-xl outline-none"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }} />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#555" }}>Username</label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium" style={{ color: "#444" }}>@</span>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
+              placeholder="yourname"
+              maxLength={30}
+              className="w-full pl-8 pr-4 py-3 rounded-xl outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }}
+            />
+          </div>
+          <p className="text-xs mt-1" style={{ color: "#333" }}>Lowercase letters, numbers, dots and underscores only</p>
         </div>
 
         <div>
