@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, doc, addDoc, getDocs, query, orderBy, serverTimestamp } from "firebase/firestore";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { GhostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 
 interface Exercise { name: string; durationSecs: number; }
@@ -30,7 +31,8 @@ export default function GhostPage() {
   const [exercises, setExercises] = useState<Exercise[]>([{ name: "", durationSecs: 30 }]);
   const [saving, setSaving] = useState(false);
 
-  const isOwner = user && OWNER_UIDS.includes(user.uid);
+  const isOwner = user && OWNER_UIDS.includes(user.uid); // kept for admin features
+  const canCreate = !!user;
 
   useEffect(() => {
     getDocs(query(collection(db, "ghostWorkouts"), orderBy("createdAt", "desc")))
@@ -118,30 +120,50 @@ export default function GhostPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Ghost Workouts</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#555" }}>Work out alongside a recorded session</p>
+      {/* Hero banner */}
+      <div className="rounded-2xl p-5 mb-6 relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.15) 0%, rgba(139,92,246,0.08) 100%)", border: "1px solid rgba(167,139,250,0.25)" }}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold mb-1" style={{ color: "#c4b5fd" }}>Ghost Workouts</h1>
+            <p className="text-sm leading-relaxed" style={{ color: "#7c6aad" }}>
+              Train alongside a recorded session — real exercises, real timing, like someone&apos;s right there with you.
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+            style={{ background: "rgba(167,139,250,0.2)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 26, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
+          </div>
         </div>
-        {isOwner && (
+        {canCreate && (
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
-            style={{ background: "#f2f2f2", color: "#000" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Create
+            className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm border-none cursor-pointer"
+            style={{ background: "rgba(167,139,250,0.2)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.3)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+            Create a Ghost Workout
           </button>
         )}
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><div className="spinner" /></div>
+        <div className="flex flex-col gap-3">
+          {[1,2,3].map((i) => <GhostCardSkeleton key={i} />)}
+        </div>
       ) : workouts.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#333" }}>sprint</span>
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#7c6aad" }}>sprint</span>
           </div>
-          <p className="text-lg font-semibold mb-1" style={{ color: "#f2f2f2" }}>No ghost workouts yet</p>
-          <p className="text-sm" style={{ color: "#555" }}>The owner will add workouts for you to follow</p>
+          <p className="text-base font-semibold mb-2" style={{ color: "#f2f2f2" }}>No workouts yet</p>
+          <p className="text-sm mb-5" style={{ color: "#555" }}>Be the first to create a Ghost Workout for the community.</p>
+          {canCreate && (
+            <button onClick={() => setShowCreate(true)}
+              className="px-5 py-2.5 rounded-xl font-bold text-sm border-none cursor-pointer"
+              style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" }}>
+              Create the first one
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -152,27 +174,26 @@ export default function GhostPage() {
                 className="flex items-center gap-4 p-4 rounded-2xl"
                 style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#555", fontVariationSettings: "'FILL' 1" }}>sprint</span>
+                  style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>{w.title}</p>
-                  {w.description && <p className="text-xs mt-0.5 truncate" style={{ color: "#666" }}>{w.description}</p>}
+                  {w.description && <p className="text-xs mt-0.5 truncate" style={{ color: "#555" }}>{w.description}</p>}
                   <div className="flex items-center gap-3 mt-1.5">
-                    <span className="text-xs" style={{ color: "#555" }}>{w.exercises.length} exercises</span>
-                    <span style={{ color: "#333", fontSize: 10 }}>·</span>
-                    <span className="text-xs" style={{ color: "#555" }}>{totalDuration(w.exercises)}</span>
-                    {(w.sessionCount ?? 0) > 0 && <>
-                      <span style={{ color: "#333", fontSize: 10 }}>·</span>
-                      <span className="text-xs" style={{ color: "#555" }}>{w.sessionCount} sessions</span>
-                    </>}
+                    <span className="text-xs" style={{ color: "#555" }}>{w.exercises.length} exercises · {totalDuration(w.exercises)}</span>
+                    {(w.sessionCount ?? 0) > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa" }}>
+                        {w.sessionCount} trained
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {w.hostPhoto
-                    ? <img src={w.hostPhoto} alt="" className="rounded-full object-cover" style={{ width: 22, height: 22 }} />
-                    : <div className="rounded-full flex items-center justify-center text-xs font-bold" style={{ width: 22, height: 22, background: "#222", color: "#aaa" }}>{init}</div>}
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#333" }}>play_circle</span>
+                    ? <img src={w.hostPhoto} alt="" className="rounded-full object-cover" style={{ width: 24, height: 24 }} />
+                    : <div className="rounded-full flex items-center justify-center text-xs font-bold" style={{ width: 24, height: 24, background: "#222", color: "#aaa" }}>{init}</div>}
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>play_circle</span>
                 </div>
               </Link>
             );

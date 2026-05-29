@@ -261,6 +261,37 @@ export default function UserProfilePage() {
         )}
       </div>
 
+      {/* ── Profile completion banner (own profile only) ── */}
+      {isSelf && (() => {
+        const missing = [];
+        if (!profile.photoURL) missing.push("photo");
+        if (!profile.bio) missing.push("bio");
+        if (posts.length === 0) missing.push("first post");
+        if (missing.length === 0) return null;
+        const pct = Math.round(((3 - missing.length) / 3) * 100);
+        return (
+          <div className="mx-4 mt-3 mb-1 p-4 rounded-2xl" style={{ background: "#141414", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold" style={{ color: "#f2f2f2" }}>Complete your profile</span>
+              <span className="text-xs font-bold" style={{ color: "#555" }}>{pct}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full mb-3" style={{ background: "rgba(255,255,255,0.07)" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "#fff" }} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {missing.map((m) => (
+                <Link key={m} href="/profile-settings"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold no-underline"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "#888", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>add</span>
+                  Add {m}
+                </Link>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Profile info ── */}
       <div className="px-4 pt-1 pb-5">
         {profile.bio ? (

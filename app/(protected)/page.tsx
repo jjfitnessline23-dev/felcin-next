@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
+import { PostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
 
@@ -234,7 +235,9 @@ export default function HomePage() {
       {/* For You */}
       {tab === "foryou" && (
         loading ? (
-          <div className="flex justify-center py-20"><div className="spinner" /></div>
+          <div className="flex flex-col gap-5">
+            {[1,2,3].map((i) => <PostCardSkeleton key={i} />)}
+          </div>
         ) : posts.length === 0 ? (
           <div className="flex flex-col gap-3 py-8">
             <div className="text-center pb-4" style={{ color: "#888" }}>

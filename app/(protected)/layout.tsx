@@ -7,12 +7,14 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, banned, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const onboardingChecked = useRef(false);
+  usePushNotifications();
 
   useEffect(() => {
     if (loading) return;

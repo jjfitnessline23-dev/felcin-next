@@ -59,6 +59,7 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const [reportDone, setReportDone] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [copied, setCopied] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
@@ -131,8 +132,15 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
 
   const handleShare = async () => {
     const url = `${window.location.origin}/comments?postId=${post.id}`;
-    if (navigator.share) navigator.share({ url }).catch(() => {});
-    else await navigator.clipboard.writeText(url).catch(() => {});
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: caption || "Check this out on Felcin", url });
+        return;
+      }
+    } catch {}
+    try { await navigator.clipboard.writeText(url); } catch {}
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const copyLink = async () => {
@@ -186,6 +194,14 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
 
   return (
     <>
+    {/* Copied toast */}
+    {copied && mounted && createPortal(
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-full text-sm font-semibold pointer-events-none"
+        style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }}>
+        Link copied
+      </div>,
+      document.body
+    )}
     <article style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, overflow: "hidden" }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
