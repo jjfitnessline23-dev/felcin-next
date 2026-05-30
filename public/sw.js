@@ -16,8 +16,8 @@ self.addEventListener('push', function(event) {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Felcin', {
       body: data.body || '',
-      icon: '/static/logo-nav.png',
-      badge: '/static/logo-nav.png',
+      icon: '/static/logo-nav.svg',
+      badge: '/static/logo-nav.svg',
       data: { url: data.url || '/' },
     })
   );
