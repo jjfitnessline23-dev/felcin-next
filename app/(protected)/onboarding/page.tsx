@@ -64,7 +64,7 @@ export default function OnboardingPage() {
         {step === 0 && (
           <div className="text-center">
             <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: "#1c1c1c" }}>
-              <img src="/static/logo-nav.png" alt="Felcin" width={44} height={44} />
+              <img src="/static/logo-nav.svg" alt="Felcin" width={44} height={44} />
             </div>
             <h1 className="text-3xl font-bold mb-3" style={{ color: "#f2f2f2" }}>Welcome to Felcin</h1>
             <p className="text-base leading-relaxed mb-8" style={{ color: "#666" }}>

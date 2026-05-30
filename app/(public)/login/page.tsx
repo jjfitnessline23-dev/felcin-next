@@ -141,7 +141,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/static/logo-nav.png" alt="Felcin" width={56} height={56} className="mx-auto mb-3" />
+          <img src="/static/logo-nav.svg" alt="Felcin" width={56} height={56} className="mx-auto mb-3" />
           <h1 className="text-2xl font-bold" style={{ color: "#f1f1f1" }}>Felcin</h1>
           <p className="text-sm mt-1" style={{ color: "#888" }}>
             {mode === "login" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset your password"}

@@ -2,7 +2,7 @@ export default function GuidelinesPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#111", color: "#ccc", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "48px 24px" }}>
-        <img src="/static/logo-nav.png" alt="Felcin" width={40} height={40} style={{ marginBottom: 20 }} />
+        <img src="/static/logo-nav.svg" alt="Felcin" width={40} height={40} style={{ marginBottom: 20 }} />
         <h1 style={{ fontSize: 28, fontWeight: 700, color: "#f1f1f1", marginBottom: 6 }}>Community Guidelines</h1>
         <p style={{ color: "#555", fontSize: 13, marginBottom: 16 }}>Last updated: May 2025</p>
         <p style={{ marginBottom: 40 }}>Felcin is built around fitness, creativity, and community. These guidelines exist to keep the platform safe, positive, and welcoming for everyone. Violating these guidelines may result in content removal, account suspension, or a permanent ban.</p>

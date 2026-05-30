@@ -2,7 +2,7 @@ export default function SupportPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#111", color: "#f2f2f2", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "48px 24px" }}>
-        <img src="/static/logo-nav.png" alt="Felcin" width={48} height={48} style={{ marginBottom: 16 }} />
+        <img src="/static/logo-nav.svg" alt="Felcin" width={48} height={48} style={{ marginBottom: 16 }} />
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Felcin Support</h1>
         <p style={{ color: "#888", marginBottom: 40, fontSize: 15 }}>
           We're here to help. Reach out using any of the options below and we'll get back to you within 24 hours.

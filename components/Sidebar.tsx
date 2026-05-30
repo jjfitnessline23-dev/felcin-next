@@ -82,7 +82,7 @@ export default function Sidebar() {
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2.5 px-5 pt-6 pb-5">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#1c1c1c" }}>
-          <img src="/static/logo-nav.png" alt="" width={18} height={18} />
+          <img src="/static/logo-nav.svg" alt="" width={18} height={18} />
         </div>
         <span className="font-bold text-lg tracking-tight" style={{ color: "#f2f2f2" }}>Felcin</span>
       </Link>
