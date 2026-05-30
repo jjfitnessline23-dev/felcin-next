@@ -60,6 +60,17 @@ export default function LivePage() {
         viewerCount: 0,
         startedAt: serverTimestamp(),
       });
+      // Notify followers that host went live
+      fetch("/api/notify-live", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hostUid: user.uid,
+          hostName: user.displayName || "Someone",
+          title: streamTitle.trim() || null,
+          privacy,
+        }),
+      }).catch(() => {});
       router.push(`/live/${user.uid}`);
     } catch {
       setStarting(false);

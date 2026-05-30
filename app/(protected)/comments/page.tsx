@@ -134,6 +134,19 @@ export default function CommentsPage() {
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, col, postId), { comments: increment(1) });
+      // Notify post author (not if commenting on own post)
+      if (post && post.authorId && post.authorId !== user.uid) {
+        fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientUid: post.authorId,
+            type: "comment",
+            senderName: user.displayName || "Someone",
+            postId,
+          }),
+        }).catch(() => {});
+      }
     } catch {}
     setSending(false);
   };
