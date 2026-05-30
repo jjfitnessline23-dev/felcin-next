@@ -51,6 +51,8 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const [liked, setLiked] = useState(post.likedBy?.includes(user?.uid || "") ?? false);
   const [likeCount, setLikeCount] = useState(post.likes ?? 0);
   const [imgBroken, setImgBroken] = useState(false);
+  const [videoPaused, setVideoPaused] = useState(false);
+  const [videoMuted, setVideoMuted] = useState(true);
   const [liking, setLiking] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
@@ -110,6 +112,19 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
         likes: increment(newLiked ? 1 : -1),
         likedBy: newLiked ? arrayUnion(user.uid) : arrayRemove(user.uid),
       });
+      // Send push notification to post author (not to yourself)
+      if (newLiked && post.authorId && post.authorId !== user.uid) {
+        fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientUid: post.authorId,
+            type: "like",
+            senderName: user.displayName || "Someone",
+            postId: post.id,
+          }),
+        }).catch(() => {});
+      }
     } catch {
       setLiked(!newLiked);
       setLikeCount((c) => c + (newLiked ? -1 : 1));
@@ -258,7 +273,44 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
               <span className="material-symbols-outlined" style={{ fontSize: 48 }}>hide_image</span>
             </div>
           ) : mediaType === "video" ? (
-            <video ref={videoRef} src={post.mediaUrl} muted loop playsInline preload="auto" className="w-full h-full object-cover" />
+            <div className="relative w-full h-full">
+              <video
+                ref={videoRef}
+                src={post.mediaUrl}
+                muted loop playsInline preload="auto"
+                className="w-full h-full object-cover"
+                onClick={() => {
+                  const v = videoRef.current;
+                  if (!v) return;
+                  if (v.paused) { v.play().catch(() => {}); setVideoPaused(false); }
+                  else { v.pause(); setVideoPaused(true); }
+                }}
+              />
+              {/* Pause indicator */}
+              {videoPaused && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: 32, fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                  </div>
+                </div>
+              )}
+              {/* Volume toggle */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const v = videoRef.current;
+                  if (!v) return;
+                  v.muted = !v.muted;
+                  setVideoMuted(v.muted);
+                }}
+                className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}>
+                  {videoMuted ? "volume_off" : "volume_up"}
+                </span>
+              </button>
+            </div>
           ) : (
             <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
               <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" onError={() => setImgBroken(true)} />
