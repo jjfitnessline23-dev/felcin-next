@@ -9,6 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import AgoraVideo from "@/components/AgoraVideo";
 
 const GIFTS = [
   { id: "rose",    emoji: "🌹", label: "Rose",    cents: 99  },
@@ -352,9 +353,10 @@ export default function StreamViewerPage() {
       </Link>
 
       {/* Video area */}
-      <div className="relative rounded-2xl overflow-hidden mb-4" style={{ background: "#0a0a0a", aspectRatio: "16/9" }}>
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-          <span className="material-symbols-outlined" style={{ fontSize: 56, color: "#1a1a1a" }}>live_tv</span>
+      <div className="relative rounded-2xl overflow-hidden mb-4" style={{ background: "#0a0a0a", aspectRatio: "9/16", maxHeight: "70vh" }}>
+        {/* Real Agora video stream */}
+        <div className="absolute inset-0">
+          <AgoraVideo channelName={streamId} isHost={isHost} />
         </div>
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "#ef4444" }}>
           <div className="w-1.5 h-1.5 rounded-full bg-white" style={{ animation: "pulse 1.5s infinite" }} />
