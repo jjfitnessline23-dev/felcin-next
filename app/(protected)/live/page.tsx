@@ -68,36 +68,8 @@ export default function LivePage() {
 
   if (authLoading) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
 
-  if (!isOwner) {
-    if (followers === null) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
-    if (followers < 300) {
-      return (
-        <div className="max-w-xl mx-auto px-4 py-6 flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
-          <div className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
-            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 44, color: "#ef4444", fontVariationSettings: "'FILL' 1" }}>lock</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-4"
-            style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>group</span>
-            300 FOLLOWERS REQUIRED
-          </div>
-          <h1 className="text-2xl font-bold text-center mb-3" style={{ color: "#f2f2f2" }}>Live Streams</h1>
-          <p className="text-sm text-center leading-relaxed" style={{ color: "#555", maxWidth: 280 }}>
-            Reach 300 followers to unlock live streaming. You currently have {followers} follower{followers !== 1 ? "s" : ""}.
-          </p>
-          <div className="mt-6 w-full max-w-xs">
-            <div className="flex justify-between text-xs mb-1.5" style={{ color: "#555" }}>
-              <span>{followers} followers</span><span>300 needed</span>
-            </div>
-            <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
-              <div className="h-full rounded-full" style={{ width: `${Math.min(100, (followers / 300) * 100)}%`, background: "#ef4444" }} />
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }
+  // canGoLive: owner always can, others need 300 followers
+  const canGoLive = isOwner || (followers !== null && followers >= 300);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -166,12 +138,14 @@ export default function LivePage() {
           <div className="w-3 h-3 rounded-full" style={{ background: "#ef4444", boxShadow: "0 0 8px rgba(239,68,68,0.6)", animation: "pulse 1.5s infinite" }} />
           <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Live Now</h1>
         </div>
-        <button onClick={() => setShowGoLive(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
-          style={{ background: "#ef4444", color: "#fff" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>sensors</span>
-          Go Live
-        </button>
+        {canGoLive && (
+          <button onClick={() => setShowGoLive(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
+            style={{ background: "#ef4444", color: "#fff" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>sensors</span>
+            Go Live
+          </button>
+        )}
       </div>
 
       {streamsLoading ? (
@@ -184,12 +158,14 @@ export default function LivePage() {
           </div>
           <p className="text-lg font-semibold mb-2" style={{ color: "#f2f2f2" }}>No one is live</p>
           <p className="text-sm mb-6" style={{ color: "#555" }}>Check back later — streams appear here in real time.</p>
-          <button onClick={() => setShowGoLive(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm border-none cursor-pointer"
-            style={{ background: "#ef4444", color: "#fff" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>sensors</span>
-            Be the first — Go Live
-          </button>
+          {canGoLive && (
+            <button onClick={() => setShowGoLive(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm border-none cursor-pointer"
+              style={{ background: "#ef4444", color: "#fff" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>sensors</span>
+              Be the first — Go Live
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
