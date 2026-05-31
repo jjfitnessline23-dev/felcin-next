@@ -188,8 +188,8 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#1c1c1c" }}>
-            <img src="/static/logo-nav.svg" alt="" width={16} height={16} />
+          <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0">
+            <img src="/static/logo-nav.svg" alt="" width={28} height={28} />
           </div>
           <span className="font-bold text-xl tracking-tight" style={{ color: "#f2f2f2" }}>Felcin</span>
         </div>
