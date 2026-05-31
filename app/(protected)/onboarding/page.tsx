@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import FelcinLogo from "@/components/FelcinLogo";
 import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -63,8 +64,8 @@ export default function OnboardingPage() {
 
         {step === 0 && (
           <div className="text-center">
-            <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: "#1c1c1c" }}>
-              <img src="/static/logo-nav.svg" alt="Felcin" width={44} height={44} />
+            <div className="flex justify-center mx-auto mb-6">
+              <FelcinLogo size={80} />
             </div>
             <h1 className="text-3xl font-bold mb-3" style={{ color: "#f2f2f2" }}>Welcome to Felcin</h1>
             <p className="text-base leading-relaxed mb-8" style={{ color: "#666" }}>

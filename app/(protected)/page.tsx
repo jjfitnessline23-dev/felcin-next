@@ -11,6 +11,7 @@ import PostCard from "@/components/PostCard";
 import { PostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
+import FelcinLogo from "@/components/FelcinLogo";
 
 interface Post {
   id: string;
@@ -188,8 +189,8 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0">
-            <img src="/static/logo-nav.svg" alt="" width={28} height={28} />
+          <div className="shrink-0">
+            <FelcinLogo size={28} />
           </div>
           <span className="font-bold text-xl tracking-tight" style={{ color: "#f2f2f2" }}>Felcin</span>
         </div>
