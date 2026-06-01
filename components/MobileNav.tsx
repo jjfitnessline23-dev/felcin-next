@@ -76,6 +76,7 @@ export default function MobileNav() {
           const isNotif = item.href === "/notifications";
 
           if (item.isCreate) {
+            if (pathname.startsWith("/live") || pathname.startsWith("/podcasts")) return null;
             return (
               <Link key={item.href} href={item.href}
                 className="flex-1 flex items-center justify-center py-3">

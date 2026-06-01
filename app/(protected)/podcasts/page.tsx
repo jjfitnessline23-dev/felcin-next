@@ -67,6 +67,7 @@ export default function PodcastsPage() {
   const [showGoLive, setShowGoLive] = useState(false);
   const [liveTitle, setLiveTitle] = useState("");
   const [goingLive, setGoingLive] = useState(false);
+  const [kbOffset, setKbOffset] = useState(0);
 
   const isOwner = !authLoading && !!user && OWNER_UIDS.includes(user.uid);
   const isLive = liveShows.some((s) => s.hostId === user?.uid);
@@ -102,6 +103,17 @@ export default function PodcastsPage() {
       setEpisodesLoading(false);
     }).catch(() => setEpisodesLoading(false));
   }, []);
+
+  useEffect(() => {
+    const isOpen = showGoLive || showUpload;
+    if (!isOpen) { setKbOffset(0); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const baseH = vv.height;
+    const update = () => setKbOffset(Math.max(0, baseH - vv.height));
+    vv.addEventListener("resize", update);
+    return () => vv.removeEventListener("resize", update);
+  }, [showGoLive, showUpload]);
 
   async function startLive() {
     if (!user || goingLive) return;
@@ -213,8 +225,8 @@ export default function PodcastsPage() {
 
       {/* Go Live modal */}
       {showGoLive && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.7)", paddingBottom: kbOffset }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowGoLive(false); }}>
           <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl p-6"
             style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -247,8 +259,8 @@ export default function PodcastsPage() {
 
       {/* Upload modal */}
       {showUpload && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.7)", paddingBottom: kbOffset }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowUpload(false); }}>
           <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6"
             style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.1)" }}>

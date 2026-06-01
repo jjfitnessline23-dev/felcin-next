@@ -20,6 +20,7 @@ export default function LivePage() {
   const [streamTitle, setStreamTitle] = useState("");
   const [privacy, setPrivacy] = useState<Privacy>("public");
   const [starting, setStarting] = useState(false);
+  const [kbOffset, setKbOffset] = useState(0);
 
   const isOwner = !authLoading && !!user && OWNER_UIDS.includes(user.uid);
 
@@ -45,6 +46,16 @@ export default function LivePage() {
       setStreamsLoading(false);
     }, () => setStreamsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!showGoLive) { setKbOffset(0); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const baseH = vv.height;
+    const update = () => setKbOffset(Math.max(0, baseH - vv.height));
+    vv.addEventListener("resize", update);
+    return () => vv.removeEventListener("resize", update);
+  }, [showGoLive]);
 
   async function startStream() {
     if (!user || starting) return;
@@ -86,8 +97,8 @@ export default function LivePage() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Go Live modal */}
       {showGoLive && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.7)", paddingBottom: kbOffset }}
           onClick={(e) => { if (e.target === e.currentTarget) { setShowGoLive(false); setPrivacy("public"); } }}>
           <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl p-6"
             style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.1)" }}>
