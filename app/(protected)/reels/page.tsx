@@ -11,6 +11,7 @@ export default function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [errorIds, setErrorIds] = useState<Set<string>>(new Set());
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const currentRef = useRef(0);
 
@@ -78,13 +79,21 @@ export default function ReelsPage() {
           const init = (reel.authorName || "U").charAt(0).toUpperCase();
           return (
             <div key={reel.id} className="snap-start relative flex-shrink-0" style={{ height: "100%", background: "#000" }}>
+              {errorIds.has(reel.id) ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                  <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#333" }}>broken_image</span>
+                  <p className="text-sm" style={{ color: "#555" }}>Video unavailable</p>
+                </div>
+              ) : (
               <video
                 ref={(el) => { videoRefs.current[i] = el; if (el) { el.muted = true; el.setAttribute("muted", ""); } }}
                 src={reel.mediaUrl}
-                loop playsInline muted preload="auto"
+                loop playsInline muted preload="metadata"
                 className="w-full h-full object-cover"
                 onClick={() => togglePlay(i)}
+                onError={() => setErrorIds((prev) => new Set([...prev, reel.id]))}
               />
+              )}
 
               {/* Pause indicator */}
               {paused && currentRef.current === i && (
@@ -117,6 +126,7 @@ export default function ReelsPage() {
               </div>
 
               {/* Right actions */}
+              {!errorIds.has(reel.id) && (
               <div className="absolute right-4 bottom-24 flex flex-col items-center gap-5">
                 <div className="flex flex-col items-center gap-1">
                   <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
@@ -130,6 +140,7 @@ export default function ReelsPage() {
                   </div>
                 </Link>
               </div>
+              )}
             </div>
           );
         })}

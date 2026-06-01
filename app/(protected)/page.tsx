@@ -87,9 +87,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user) return;
-    getDocs(collection(db, "users", user.uid, "blocked")).then((snap) => {
+    return onSnapshot(collection(db, "users", user.uid, "blocked"), (snap) => {
       setBlockedUids(new Set(snap.docs.map((d) => d.id)));
-    }).catch(() => {});
+    }, () => {});
   }, [user]);
 
   // For You feed
@@ -292,7 +292,9 @@ export default function HomePage() {
       {/* Following */}
       {tab === "following" && (
         followingLoading ? (
-          <div className="flex justify-center py-20"><div className="spinner" /></div>
+          <div className="flex flex-col gap-5">
+            {[1,2,3].map((i) => <PostCardSkeleton key={i} />)}
+          </div>
         ) : followingIds?.length === 0 ? (
           <div className="text-center py-20" style={{ color: "#888" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>group</span>

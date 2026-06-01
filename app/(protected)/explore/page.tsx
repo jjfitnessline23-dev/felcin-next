@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { collection, query, orderBy, limit, getDocs, getDoc, doc } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, getDoc, doc, startAfter, QueryDocumentSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface Post {
@@ -62,6 +62,8 @@ function GridSkeleton() {
   );
 }
 
+const PAGE_SIZE = 12;
+
 export default function ExplorePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -69,48 +71,62 @@ export default function ExplorePage() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [creatorsLoading, setCreatorsLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Fetch posts
-  useEffect(() => {
-    getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(60)))
-      .then(async (snap) => {
-        const raw = snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
-          .filter((p) => p.mediaUrl);
-
-        // Get unique authors and fetch their profiles
-        const authorIds = [...new Set(raw.map((p) => p.authorId).filter(Boolean))];
-        const profileMap = new Map<string, { name: string; photo: string }>();
-        await Promise.all(
-          authorIds.slice(0, 20).map(async (uid) => {
-            try {
-              const snap = await getDoc(doc(db, "users", uid, "public", "profile"));
-              if (snap.exists()) {
-                const d = snap.data();
-                profileMap.set(uid, { name: d.displayName || "User", photo: d.photoURL || "" });
-              }
-            } catch {}
-          })
-        );
-
-        setPosts(raw.map((p) => ({
-          ...p,
-          authorName: profileMap.get(p.authorId)?.name || p.authorName || "User",
-          authorPhoto: profileMap.get(p.authorId)?.photo || p.authorPhoto || "",
-        })));
-
-        // Build creators from unique authors
-        const creatorList: Creator[] = authorIds.slice(0, 12).map((uid) => ({
-          uid,
-          displayName: profileMap.get(uid)?.name || "User",
-          photoURL: profileMap.get(uid)?.photo,
-        }));
-        setCreators(creatorList.filter((c) => c.displayName !== "User" || c.photoURL));
-        setCreatorsLoading(false);
-        setLoading(false);
+  const fetchPage = useCallback(async (after: QueryDocumentSnapshot | null) => {
+    const q = after
+      ? query(collection(db, "posts"), orderBy("createdAt", "desc"), startAfter(after), limit(PAGE_SIZE))
+      : query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+    const snap = await getDocs(q);
+    const raw = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) })).filter((p) => p.mediaUrl);
+    setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+    setHasMore(snap.docs.length === PAGE_SIZE);
+    const authorIds = [...new Set(raw.map((p) => p.authorId).filter(Boolean))];
+    const profileMap = new Map<string, { name: string; photo: string }>();
+    await Promise.all(
+      authorIds.slice(0, 12).map(async (uid) => {
+        try {
+          const s = await getDoc(doc(db, "users", uid, "public", "profile"));
+          if (s.exists()) { const d = s.data(); profileMap.set(uid, { name: d.displayName || "User", photo: d.photoURL || "" }); }
+        } catch {}
       })
-      .catch(() => { setLoading(false); setCreatorsLoading(false); });
+    );
+    return { raw, profileMap, authorIds };
   }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchPage(null).then(({ raw, profileMap, authorIds }) => {
+      setPosts(raw.map((p) => ({ ...p, authorName: profileMap.get(p.authorId)?.name || p.authorName || "User", authorPhoto: profileMap.get(p.authorId)?.photo || p.authorPhoto || "" })));
+      const creatorList: Creator[] = authorIds.slice(0, 12).map((uid) => ({ uid, displayName: profileMap.get(uid)?.name || "User", photoURL: profileMap.get(uid)?.photo }));
+      setCreators(creatorList.filter((c) => c.displayName !== "User" || c.photoURL));
+      setCreatorsLoading(false);
+      setLoading(false);
+    }).catch(() => { setLoading(false); setCreatorsLoading(false); });
+  }, [fetchPage]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !lastDoc) return;
+    setLoadingMore(true);
+    try {
+      const { raw, profileMap } = await fetchPage(lastDoc);
+      const enriched = raw.map((p) => ({ ...p, authorName: profileMap.get(p.authorId)?.name || p.authorName || "User", authorPhoto: profileMap.get(p.authorId)?.photo || p.authorPhoto || "" }));
+      setPosts((prev) => { const ids = new Set(prev.map((p) => p.id)); return [...prev, ...enriched.filter((p) => !ids.has(p.id))]; });
+    } catch {}
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, lastDoc, fetchPage]);
+
+  // Infinite scroll sentinel
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => { if (entries[0].isIntersecting) loadMore(); }, { rootMargin: "400px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loadMore]);
 
   // Fetch ghost workouts
   useEffect(() => {
@@ -219,6 +235,7 @@ export default function ExplorePage() {
             style={{ background: "#fff", color: "#000" }}>Create a post</Link>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-3" style={{ gap: 2 }}>
           {filtered.map((post) => {
             const type = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
@@ -257,6 +274,10 @@ export default function ExplorePage() {
             );
           })}
         </div>
+        <div ref={sentinelRef} className="flex justify-center py-4">
+          {loadingMore && <div className="spinner" />}
+        </div>
+        </>
       )}
     </div>
   );

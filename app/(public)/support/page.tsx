@@ -1,8 +1,8 @@
-export default function SupportPage() {
+﻿export default function SupportPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#111", color: "#f2f2f2", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "48px 24px" }}>
-        <img src="/static/logo-nav.svg" alt="Felcin" width={48} height={48} style={{ marginBottom: 16 }} />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="48" height="48"><rect width="64" height="64" rx="14" fill="#080808"/><path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="white"/><circle cx="24" cy="29" r="4.5" fill="#080808"/><circle cx="40" cy="29" r="4.5" fill="#080808"/><path d="M 0,36 L 14,36 L 16,34 L 18,36 L 20,36 L 21,38 L 24,20 L 27,39 L 30,34 L 32,36 C 34,36 35,31 37,36 L 64,36" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Felcin Support</h1>
         <p style={{ color: "#888", marginBottom: 40, fontSize: 15 }}>
           We're here to help. Reach out using any of the options below and we'll get back to you within 24 hours.
@@ -51,10 +51,11 @@ export default function SupportPage() {
         </div>
 
         <p style={{ color: "#555", fontSize: 13, marginTop: 40 }}>
-          © {new Date().getFullYear()} Felcin. All rights reserved. ·{" "}
+          Â© {new Date().getFullYear()} Felcin. All rights reserved. Â·{" "}
           <a href="/privacy" style={{ color: "#666", textDecoration: "none" }}>Privacy Policy</a>
         </p>
       </div>
     </div>
   );
 }
+

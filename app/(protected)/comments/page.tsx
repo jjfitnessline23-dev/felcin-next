@@ -76,10 +76,15 @@ export default function CommentsPage() {
       setLikeCount(p.likes ?? 0);
       if (user) setLiked(p.likedBy?.includes(user.uid) ?? false);
 
-      if (!isReel && p.maxViews != null) {
-        const newCount = (p.viewCount ?? 0) + 1;
-        if (newCount >= p.maxViews) { await deleteDoc(postRef); router.replace("/"); return; }
-        else await updateDoc(postRef, { viewCount: increment(1) });
+      if (!isReel && p.maxViews != null && user?.uid !== p.authorId) {
+        const viewedKey = `viewed_${postId}`;
+        const alreadyViewed = typeof window !== "undefined" && sessionStorage.getItem(viewedKey);
+        if (!alreadyViewed) {
+          if (typeof window !== "undefined") sessionStorage.setItem(viewedKey, "1");
+          const newCount = (p.viewCount ?? 0) + 1;
+          if (newCount >= p.maxViews) { await deleteDoc(postRef); router.replace("/"); return; }
+          else await updateDoc(postRef, { viewCount: increment(1) });
+        }
       }
 
       if (p.authorId) {

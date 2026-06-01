@@ -48,12 +48,20 @@ export default function PrivateChatsPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Set own presence
+  // Set own presence — also clears on tab close/hide
   useEffect(() => {
     if (!user) return;
     const presenceRef = doc(db, "users", user.uid, "presence", "status");
     setDoc(presenceRef, { online: true, lastSeen: serverTimestamp() }, { merge: true }).catch(() => {});
-    return () => { updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {}); };
+    const goOffline = () => updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {});
+    const handleVisibility = () => { if (document.visibilityState === "hidden") goOffline(); else setDoc(presenceRef, { online: true, lastSeen: serverTimestamp() }, { merge: true }).catch(() => {}); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("beforeunload", goOffline);
+    return () => {
+      goOffline();
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", goOffline);
+    };
   }, [user]);
 
   // Watch other user's presence when chat is active

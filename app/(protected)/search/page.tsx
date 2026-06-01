@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, query, getDocs, limit, where, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
@@ -8,24 +8,32 @@ import Link from "next/link";
 interface UserResult { uid: string; displayName?: string; photoURL?: string; followersCount?: number; }
 interface PostResult { id: string; mediaUrl?: string; caption?: string; contentType?: string; }
 
+// Module-level cache: users are fetched once per session
+let usersCache: UserResult[] | null = null;
+
 export default function SearchPage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<"people" | "tags">("people");
   const [users, setUsers] = useState<UserResult[]>([]);
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const fetchingUsers = useRef(false);
 
   const search = useCallback(async (term: string, activeTab: string) => {
     if (!term.trim()) { setUsers([]); setPosts([]); return; }
     setLoading(true);
     try {
       if (activeTab === "people") {
-        const snap = await getDocs(query(collection(db, "users"), limit(300)));
+        // Fetch user list once and cache it for the session
+        if (!usersCache && !fetchingUsers.current) {
+          fetchingUsers.current = true;
+          const snap = await getDocs(query(collection(db, "users"), limit(200)));
+          usersCache = snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Omit<UserResult, "uid">) }));
+          fetchingUsers.current = false;
+        }
+        const all = usersCache ?? [];
         const tl = term.toLowerCase();
-        const results = snap.docs
-          .map((d) => ({ uid: d.id, ...(d.data() as Omit<UserResult, "uid">) }))
-          .filter((u) => (u.displayName || "").toLowerCase().includes(tl));
-        setUsers(results.slice(0, 20));
+        setUsers(all.filter((u) => (u.displayName || "").toLowerCase().includes(tl)).slice(0, 20));
       } else {
         const tag = term.replace(/^#/, "").toLowerCase();
         const snap = await getDocs(
