@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { updateProfile } from "firebase/auth";
+import { updateProfile, deleteUser } from "firebase/auth";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,9 @@ export default function ProfileSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -70,6 +73,25 @@ export default function ProfileSettingsPage() {
   };
 
   const handleSignOut = async () => { await signOut(); router.push("/login"); };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await setDoc(doc(db, "users", user.uid), { deleted: true, deletedAt: new Date() }, { merge: true });
+      await deleteUser(user);
+      router.replace("/login");
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code || "";
+      setDeleteError(
+        code === "auth/requires-recent-login"
+          ? "For security, please sign out and sign back in, then try again."
+          : "Failed to delete account. Please try again."
+      );
+      setDeleting(false);
+    }
+  };
   const initial = (displayName || user?.email || "U").charAt(0).toUpperCase();
   const isOwner = user && OWNER_UIDS.includes(user.uid);
 
@@ -193,6 +215,43 @@ export default function ProfileSettingsPage() {
           style={{ background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.08)" }}>
           Sign out
         </button>
+
+        <div style={{ height: 1, background: "rgba(255,255,255,0.04)" }} />
+
+        {!deleteConfirm ? (
+          <button
+            onClick={() => setDeleteConfirm(true)}
+            className="w-full py-3.5 rounded-xl font-semibold text-sm border-none cursor-pointer"
+            style={{ background: "transparent", color: "#555", border: "1px solid rgba(239,68,68,0.15)" }}>
+            Delete Account
+          </button>
+        ) : (
+          <div className="rounded-xl p-4" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <p className="text-sm font-semibold mb-1" style={{ color: "#f87171" }}>Delete your account?</p>
+            <p className="text-xs mb-4" style={{ color: "#666" }}>
+              This permanently deletes your account and cannot be undone.
+            </p>
+            {deleteError && (
+              <p className="text-xs mb-3 font-medium" style={{ color: "#f87171" }}>{deleteError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setDeleteConfirm(false); setDeleteError(""); }}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm border-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.06)", color: "#aaa" }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm border-none cursor-pointer"
+                style={{ background: deleting ? "rgba(239,68,68,0.2)" : "rgba(239,68,68,0.75)", color: deleting ? "#888" : "#fff" }}>
+                {deleting ? "Deleting…" : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Legal links */}
         <div className="flex items-center justify-center gap-5 flex-wrap pt-2 pb-4">
