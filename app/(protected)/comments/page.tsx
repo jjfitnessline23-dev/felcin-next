@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   doc, getDoc, collection, query, orderBy, onSnapshot,
   addDoc, serverTimestamp, updateDoc, increment, deleteDoc,
-  arrayUnion, arrayRemove, setDoc,
+  arrayUnion, arrayRemove, setDoc, getDocs, limit, startAfter, QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -60,12 +60,16 @@ export default function CommentsPage() {
   const [reportModal, setReportModal] = useState(false);
   const [reportDone, setReportDone] = useState(false);
   const [postDeleted, setPostDeleted] = useState(false);
+  const [imgLightbox, setImgLightbox] = useState(false);
+  const [prevPostId, setPrevPostId] = useState<string | null>(null);
+  const [nextPostId, setNextPostId] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement>(null);
   const initialLoadDone = useRef(false);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     if (!postId) return;
@@ -101,6 +105,18 @@ export default function CommentsPage() {
               setAuthorData({ name: d.displayName || d.username || "User", photo: d.photoURL || "" });
             }
           }
+        } catch {}
+      }
+
+      // Load adjacent posts for swipe navigation (posts only, not reels)
+      if (!isReel) {
+        try {
+          const [newerSnap, olderSnap] = await Promise.all([
+            getDocs(query(collection(db, "posts"), orderBy("createdAt", "asc"), startAfter(snap), limit(1))),
+            getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), startAfter(snap), limit(1))),
+          ]);
+          setPrevPostId(newerSnap.docs[0]?.id ?? null);
+          setNextPostId(olderSnap.docs[0]?.id ?? null);
         } catch {}
       }
     }).catch(() => router.replace("/"));
@@ -242,7 +258,29 @@ export default function CommentsPage() {
 
   return (
     <>
-    <div className="max-w-xl mx-auto flex flex-col w-full" style={{ minHeight: "100dvh", background: "#090909" }}>
+    {/* Image lightbox */}
+    {imgLightbox && post?.mediaUrl && (
+      <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#000", zIndex: 99999 }}
+        onClick={() => setImgLightbox(false)}>
+        <img src={post.mediaUrl} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} onClick={(e) => e.stopPropagation()} />
+        <button onClick={() => setImgLightbox(false)}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer"
+          style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}>
+          <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>close</span>
+        </button>
+      </div>
+    )}
+
+    <div className="max-w-xl mx-auto flex flex-col w-full" style={{ minHeight: "100dvh", background: "#090909" }}
+      onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+      onTouchEnd={(e) => {
+        if (touchStartX.current === null) return;
+        const delta = touchStartX.current - e.changedTouches[0].clientX;
+        touchStartX.current = null;
+        if (Math.abs(delta) < 60) return;
+        if (delta > 0 && nextPostId) router.replace(`/comments?postId=${nextPostId}`);
+        else if (delta < 0 && prevPostId) router.replace(`/comments?postId=${prevPostId}`);
+      }}>
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-3 sticky z-10"
         style={{ top: "env(safe-area-inset-top,0px)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -250,6 +288,19 @@ export default function CommentsPage() {
           <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#f2f2f2" }}>arrow_back</span>
         </button>
         <h1 className="font-bold text-base flex-1" style={{ color: "#f2f2f2" }}>Post</h1>
+        {/* Prev / Next post navigation */}
+        {prevPostId && (
+          <button onClick={() => router.replace(`/comments?postId=${prevPostId}`)}
+            className="icon-btn" style={{ width: 32, height: 32 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#555" }}>chevron_left</span>
+          </button>
+        )}
+        {nextPostId && (
+          <button onClick={() => router.replace(`/comments?postId=${nextPostId}`)}
+            className="icon-btn" style={{ width: 32, height: 32 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#555" }}>chevron_right</span>
+          </button>
+        )}
         {canDotMenu && (
           <button onClick={() => setDotMenu(true)} className="icon-btn" style={{ width: 36, height: 36 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#f2f2f2" }}>more_horiz</span>
@@ -300,7 +351,15 @@ export default function CommentsPage() {
                     </button>
                   </div>
                 ) : (
-                  <img src={post.mediaUrl} alt="" className="w-full object-contain" style={{ maxHeight: 480 }} />
+                  <div className="relative">
+                    <img src={post.mediaUrl} alt="" className="w-full object-contain" style={{ maxHeight: 480 }}
+                      onClick={() => setImgLightbox(true)} />
+                    <button onClick={() => setImgLightbox(true)}
+                      className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+                      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}>
+                      <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
+                    </button>
+                  </div>
                 )}
               </div>
             )}

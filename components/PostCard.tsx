@@ -62,6 +62,7 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const [deleted, setDeleted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [imgLightbox, setImgLightbox] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
@@ -325,9 +326,18 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
               </button>
             </div>
           ) : (
-            <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
-              <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" onError={() => setImgBroken(true)} />
-            </Link>
+            <div className="relative w-full h-full">
+              <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
+                <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" onError={() => setImgBroken(true)} />
+              </Link>
+              {/* Image fullscreen button */}
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImgLightbox(true); }}
+                className="absolute bottom-3 left-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
+              </button>
+            </div>
           )}
           {viewsLeft !== null && (
             <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full"
@@ -411,6 +421,28 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
           </button>
         </div>
       </>,
+      document.body
+    )}
+
+    {/* Image lightbox */}
+    {imgLightbox && mounted && post.mediaUrl && createPortal(
+      <div
+        className="fixed inset-0 flex items-center justify-center"
+        style={{ background: "#000", zIndex: 99999 }}
+        onClick={() => setImgLightbox(false)}>
+        <img
+          src={post.mediaUrl}
+          alt=""
+          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <button
+          onClick={() => setImgLightbox(false)}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer"
+          style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}>
+          <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>close</span>
+        </button>
+      </div>,
       document.body
     )}
 
