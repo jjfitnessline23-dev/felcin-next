@@ -310,6 +310,19 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
                   {videoMuted ? "volume_off" : "volume_up"}
                 </span>
               </button>
+              {/* Fullscreen button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const v = videoRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+                  if (!v) return;
+                  if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+                  else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+                }}
+                className="absolute bottom-3 left-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
+              </button>
             </div>
           ) : (
             <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
