@@ -170,32 +170,48 @@ export default function GhostPage() {
           {workouts.map((w) => {
             const init = (w.hostName || "H").charAt(0).toUpperCase();
             return (
-              <Link key={w.id} href={`/ghost/${w.id}`}
-                className="flex items-center gap-4 p-4 rounded-2xl"
-                style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>{w.title}</p>
-                  {w.description && <p className="text-xs mt-0.5 truncate" style={{ color: "#555" }}>{w.description}</p>}
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <span className="text-xs" style={{ color: "#555" }}>{w.exercises.length} exercises · {totalDuration(w.exercises)}</span>
-                    {(w.sessionCount ?? 0) > 0 && (
-                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa" }}>
-                        {w.sessionCount} trained
+              <div key={w.id} className="rounded-2xl overflow-hidden"
+                style={{ background: "#131313", border: "1px solid rgba(167,139,250,0.15)" }}>
+                {/* Card body */}
+                <div className="flex items-start gap-4 p-4">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>{w.title}</p>
+                    {w.description && <p className="text-xs mt-0.5 truncate" style={{ color: "#555" }}>{w.description}</p>}
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "#666" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>fitness_center</span>
+                        {w.exercises.length} exercises
                       </span>
-                    )}
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "#666" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>timer</span>
+                        {totalDuration(w.exercises)}
+                      </span>
+                      {(w.sessionCount ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 11 }}>group</span>
+                          {w.sessionCount} trained
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 pt-1">
+                    {w.hostPhoto
+                      ? <img src={w.hostPhoto} alt="" className="rounded-full object-cover" style={{ width: 22, height: 22 }} />
+                      : <div className="rounded-full flex items-center justify-center text-xs font-bold" style={{ width: 22, height: 22, background: "#222", color: "#aaa", fontSize: 9 }}>{init}</div>}
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {w.hostPhoto
-                    ? <img src={w.hostPhoto} alt="" className="rounded-full object-cover" style={{ width: 24, height: 24 }} />
-                    : <div className="rounded-full flex items-center justify-center text-xs font-bold" style={{ width: 24, height: 24, background: "#222", color: "#aaa" }}>{init}</div>}
-                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>play_circle</span>
-                </div>
-              </Link>
+                {/* Start button strip */}
+                <Link href={`/ghost/${w.id}`}
+                  className="flex items-center justify-center gap-2 py-3 font-bold text-sm"
+                  style={{ background: "rgba(167,139,250,0.15)", borderTop: "1px solid rgba(167,139,250,0.15)", color: "#c4b5fd" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}>play_circle</span>
+                  Start Ghost Session
+                </Link>
+              </div>
             );
           })}
         </div>

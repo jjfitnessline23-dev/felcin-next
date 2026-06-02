@@ -185,18 +185,19 @@ export default function UserProfilePage() {
         )}
       </div>
 
-      {/* ── Banner ── avatar sits inside using absolute, buttons row follows */}
-      <div className="relative" style={{ height: 100, background: "#141414" }}>
-        {/* Avatar anchored to bottom-left of banner */}
-        <div className="absolute" style={{ bottom: -58, left: 16 }}>
+      {/* ── Banner ── */}
+      <div className="relative" style={{ height: 140, background: "linear-gradient(135deg, #1a1035 0%, #0d1f3c 50%, #111 100%)" }}>
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 60%, rgba(167,139,250,0.18) 0%, transparent 65%)" }} />
+        {/* Avatar anchored to bottom-left */}
+        <div className="absolute" style={{ bottom: -52, left: 16 }}>
           <div className="relative inline-block">
             <div className="rounded-full" style={{ padding: 3, background: "#090909" }}>
               {profile.photoURL ? (
                 <img src={profile.photoURL} alt="" className="rounded-full object-cover block"
-                  style={{ width: 76, height: 76 }} />
+                  style={{ width: 88, height: 88 }} />
               ) : (
-                <div className="rounded-full flex items-center justify-center text-2xl font-bold"
-                  style={{ width: 76, height: 76, background: "#222", color: "#aaa" }}>
+                <div className="rounded-full flex items-center justify-center text-3xl font-bold"
+                  style={{ width: 88, height: 88, background: "linear-gradient(135deg,#2a2a3e,#1a1a2e)", color: "#888" }}>
                   {initial}
                 </div>
               )}
@@ -208,26 +209,23 @@ export default function UserProfilePage() {
               </div>
             )}
           </div>
-          <div className="font-semibold mt-2 truncate" style={{ color: "#aaa", fontSize: 10, letterSpacing: "0.04em", maxWidth: 84 }}>
-            {displayName}
-          </div>
         </div>
       </div>
 
       {/* ── Row: avatar spacer + stats + action buttons ── */}
-      <div className="flex items-center px-4 gap-3" style={{ height: 72 }}>
-        <div style={{ width: 96, flexShrink: 0 }} />
-        <div className="flex gap-5 flex-1">
+      <div className="flex items-center px-4 gap-3" style={{ height: 80 }}>
+        <div style={{ width: 108, flexShrink: 0 }} />
+        <div className="flex gap-6 flex-1">
           <div className="text-center">
-            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{posts.length}</div>
+            <div className="font-bold text-base" style={{ color: "#f2f2f2" }}>{posts.length}</div>
             <div className="text-xs" style={{ color: "#555" }}>Posts</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followersCount ?? 0}</div>
+            <div className="font-bold text-base" style={{ color: "#f2f2f2" }}>{(profile.followersCount ?? 0).toLocaleString()}</div>
             <div className="text-xs" style={{ color: "#555" }}>Followers</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{profile.followingCount ?? 0}</div>
+            <div className="font-bold text-base" style={{ color: "#f2f2f2" }}>{(profile.followingCount ?? 0).toLocaleString()}</div>
             <div className="text-xs" style={{ color: "#555" }}>Following</div>
           </div>
         </div>

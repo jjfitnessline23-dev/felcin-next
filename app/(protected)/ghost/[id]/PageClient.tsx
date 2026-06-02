@@ -153,20 +153,31 @@ export default function GhostSessionPage() {
       {(phase === "active" || phase === "rest") && (
         <div className="flex flex-col items-center">
           <div className="w-full rounded-2xl p-6 mb-4 text-center"
-            style={{ background: phase === "rest" ? "#131313" : "rgba(255,255,255,0.04)", border: `1px solid ${phase === "rest" ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.12)"}` }}>
-            <p className="text-xs font-bold mb-2" style={{ color: phase === "rest" ? "#555" : "#888" }}>
+            style={{ background: phase === "rest" ? "#131313" : "rgba(167,139,250,0.06)", border: `1px solid ${phase === "rest" ? "rgba(255,255,255,0.07)" : "rgba(167,139,250,0.3)"}` }}>
+            <p className="text-xs font-bold mb-4 tracking-widest" style={{ color: phase === "rest" ? "#555" : "#a78bfa" }}>
               {phase === "rest" ? "REST" : `EXERCISE ${currentIdx + 1} OF ${workout.exercises.length}`}
             </p>
-            <p className="text-2xl font-bold mb-1" style={{ color: "#f2f2f2" }}>
+            <p className="text-xl font-bold mb-6" style={{ color: "#f2f2f2" }}>
               {phase === "rest" ? "Rest" : current?.name}
             </p>
-            <p className="text-6xl font-bold my-6 tabular-nums" style={{ color: phase === "rest" ? "#555" : "#f2f2f2" }}>{timeLeft}</p>
-            {/* Progress bar */}
-            <div className="w-full rounded-full overflow-hidden mb-2" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: phase === "rest" ? "#333" : "#f2f2f2" }} />
+            {/* Circular progress ring */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="relative flex items-center justify-center" style={{ width: 160, height: 160 }}>
+                <svg width="160" height="160" style={{ position: "absolute", transform: "rotate(-90deg)" }}>
+                  <circle cx="80" cy="80" r="70" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+                  <circle cx="80" cy="80" r="70" fill="none"
+                    stroke={phase === "rest" ? "#444" : "#a78bfa"} strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 70}`}
+                    strokeDashoffset={`${2 * Math.PI * 70 * (1 - progress / 100)}`}
+                    style={{ transition: "stroke-dashoffset 0.9s linear" }}
+                  />
+                </svg>
+                <span className="tabular-nums font-bold" style={{ fontSize: 52, color: phase === "rest" ? "#555" : "#f2f2f2", lineHeight: 1 }}>{timeLeft}</span>
+              </div>
             </div>
             {phase === "rest" && currentIdx + 1 < workout.exercises.length && (
-              <p className="text-xs mt-2" style={{ color: "#555" }}>
+              <p className="text-xs" style={{ color: "#555" }}>
                 Up next: <span style={{ color: "#888" }}>{workout.exercises[currentIdx + 1].name}</span>
               </p>
             )}
@@ -198,22 +209,35 @@ export default function GhostSessionPage() {
 
       {/* Done */}
       {phase === "done" && (
-        <div className="flex flex-col items-center py-12">
-          <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
-            style={{ background: "rgba(255,255,255,0.06)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#f2f2f2", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+        <div className="flex flex-col items-center py-10">
+          <div className="w-28 h-28 rounded-full flex items-center justify-center mb-6"
+            style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(139,92,246,0.1))", border: "2px solid rgba(167,139,250,0.4)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 52, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
           </div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: "#f2f2f2" }}>Ghost Complete!</h2>
-          <p className="text-sm mb-2" style={{ color: "#555" }}>You finished <span style={{ color: "#888" }}>{workout.title}</span></p>
-          <p className="text-xs mb-8" style={{ color: "#333" }}>alongside {workout.hostName}&apos;s ghost</p>
-          <div className="flex gap-3">
+          <h2 className="text-3xl font-bold mb-2" style={{ color: "#f2f2f2" }}>Ghost Complete!</h2>
+          <p className="text-sm mb-1" style={{ color: "#666" }}>You finished</p>
+          <p className="text-base font-semibold mb-1" style={{ color: "#c4b5fd" }}>{workout.title}</p>
+          <p className="text-xs mb-10" style={{ color: "#444" }}>alongside {workout.hostName}&apos;s ghost</p>
+          {/* Stats */}
+          <div className="flex gap-6 mb-10">
+            <div className="text-center">
+              <p className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>{workout.exercises.length}</p>
+              <p className="text-xs" style={{ color: "#555" }}>exercises</p>
+            </div>
+            <div className="w-px" style={{ background: "rgba(255,255,255,0.08)" }} />
+            <div className="text-center">
+              <p className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>{Math.round(workout.exercises.reduce((s, e) => s + e.durationSecs, 0) / 60)}</p>
+              <p className="text-xs" style={{ color: "#555" }}>minutes</p>
+            </div>
+          </div>
+          <div className="flex gap-3 w-full max-w-xs">
             <button onClick={start}
-              className="px-5 py-2.5 rounded-full font-bold text-sm border-none cursor-pointer"
-              style={{ background: "rgba(255,255,255,0.08)", color: "#f2f2f2" }}>
+              className="flex-1 py-3 rounded-2xl font-bold text-sm border-none cursor-pointer"
+              style={{ background: "rgba(167,139,250,0.12)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.25)" }}>
               Do it again
             </button>
             <Link href="/ghost"
-              className="px-5 py-2.5 rounded-full font-bold text-sm"
+              className="flex-1 py-3 rounded-2xl font-bold text-sm flex items-center justify-center"
               style={{ background: "#f2f2f2", color: "#000" }}>
               More Workouts
             </Link>
