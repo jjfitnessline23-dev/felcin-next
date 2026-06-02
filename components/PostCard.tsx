@@ -228,8 +228,10 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const handleBlock = async () => {
     if (!user || user.uid === post.authorId) return;
     setDotMenu(false);
-    const ref = doc(db, "users", user.uid, "blocked", post.authorId);
-    await setDoc(ref, { blockedAt: new Date() }).catch(() => {});
+    await Promise.all([
+      setDoc(doc(db, "users", user.uid, "blocked", post.authorId), { blockedAt: serverTimestamp() }),
+      setDoc(doc(db, "users", post.authorId, "blockedBy", user.uid), { blockedAt: serverTimestamp() }),
+    ]).catch(() => {});
     await addDoc(collection(db, "reports"), {
       type: "block",
       blockedUid: post.authorId,

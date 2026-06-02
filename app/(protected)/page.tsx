@@ -86,12 +86,17 @@ export default function HomePage() {
   const unread = useUnreadCount();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
   const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
+  const [blockedByUids, setBlockedByUids] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
-    return onSnapshot(collection(db, "users", user.uid, "blocked"), (snap) => {
+    const unsubBlocked = onSnapshot(collection(db, "users", user.uid, "blocked"), (snap) => {
       setBlockedUids(new Set(snap.docs.map((d) => d.id)));
     }, () => {});
+    const unsubBlockedBy = onSnapshot(collection(db, "users", user.uid, "blockedBy"), (snap) => {
+      setBlockedByUids(new Set(snap.docs.map((d) => d.id)));
+    }, () => {});
+    return () => { unsubBlocked(); unsubBlockedBy(); };
   }, [user]);
 
   // For You feed
@@ -295,7 +300,7 @@ export default function HomePage() {
         ) : (
           <>
             <div className="flex flex-col gap-5">
-              {posts.filter((p) => !blockedUids.has(p.authorId)).map((post) => (
+              {posts.filter((p) => !blockedUids.has(p.authorId) && !blockedByUids.has(p.authorId)).map((post) => (
                 <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
               ))}
             </div>
@@ -326,7 +331,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="flex flex-col gap-5">
-            {followingPosts.filter((p) => !blockedUids.has(p.authorId)).map((post) => (
+            {followingPosts.filter((p) => !blockedUids.has(p.authorId) && !blockedByUids.has(p.authorId)).map((post) => (
               <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
             ))}
           </div>

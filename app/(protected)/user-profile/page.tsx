@@ -46,6 +46,7 @@ export default function UserProfilePage() {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState(false);
+  const [blockedByThem, setBlockedByThem] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const isSelf = user?.uid === uid;
 
@@ -88,6 +89,7 @@ export default function UserProfilePage() {
 
     if (user && user.uid !== uid) {
       getDoc(doc(db, "users", user.uid, "blocked", uid)).then((s) => setBlocked(s.exists()));
+      getDoc(doc(db, "users", user.uid, "blockedBy", uid)).then((s) => setBlockedByThem(s.exists()));
       const ref = doc(db, "users", uid, "followers", user.uid);
       return onSnapshot(ref, (snap) => setFollowing(snap.exists()));
     }
@@ -103,18 +105,22 @@ export default function UserProfilePage() {
   const handleBlock = async () => {
     if (!user || blocking) return;
     setBlocking(true);
-    const ref = doc(db, "users", user.uid, "blocked", uid);
+    const myBlockRef = doc(db, "users", user.uid, "blocked", uid);
+    const theirBlockedByRef = doc(db, "users", uid, "blockedBy", user.uid);
     if (blocked) {
-      await deleteDoc(ref).catch(() => {});
+      await Promise.all([
+        deleteDoc(myBlockRef),
+        deleteDoc(theirBlockedByRef),
+      ]).catch(() => {});
       setBlocked(false);
     } else {
-      await setDoc(ref, { blockedAt: serverTimestamp() }).catch(() => {});
+      await Promise.all([
+        setDoc(myBlockRef, { blockedAt: serverTimestamp() }),
+        setDoc(theirBlockedByRef, { blockedAt: serverTimestamp() }),
+      ]).catch(() => {});
       await addDoc(collection(db, "reports"), {
-        type: "block",
-        blockedUid: uid,
-        blockerId: user.uid,
-        createdAt: serverTimestamp(),
-        status: "pending",
+        type: "block", blockedUid: uid, blockerId: user.uid,
+        createdAt: serverTimestamp(), status: "pending",
       }).catch(() => {});
       setBlocked(true);
     }
@@ -133,6 +139,27 @@ export default function UserProfilePage() {
 
   if (loading) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
   if (!profile) return <div className="text-center py-32" style={{ color: "#555" }}>User not found</div>;
+
+  // This account has blocked the viewer — show a minimal wall
+  if (blockedByThem && !isSelf) return (
+    <div className="max-w-2xl mx-auto pb-10">
+      <div className="sticky z-20 flex items-center gap-3 px-4 py-3"
+        style={{ top: "env(safe-area-inset-top,0px)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <button onClick={() => router.back()} className="icon-btn" style={{ width: 36, height: 36 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#f2f2f2" }}>arrow_back</span>
+        </button>
+        <div className="font-bold text-base truncate" style={{ color: "#f2f2f2" }}>{displayName}</div>
+      </div>
+      <div className="flex flex-col items-center justify-center py-24 px-8 text-center">
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#333" }}>lock</span>
+        </div>
+        <p className="font-semibold mb-2" style={{ color: "#f2f2f2" }}>This account is not available</p>
+        <p className="text-sm" style={{ color: "#555" }}>You can&apos;t view this profile.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto pb-10">

@@ -236,7 +236,10 @@ export default function CommentsPage() {
   const handleBlock = async () => {
     if (!user || !post) return;
     setDotMenu(false);
-    await setDoc(doc(db, "users", user.uid, "blocked", post.authorId), { blockedAt: serverTimestamp() }).catch(() => {});
+    await Promise.all([
+      setDoc(doc(db, "users", user.uid, "blocked", post.authorId), { blockedAt: serverTimestamp() }),
+      setDoc(doc(db, "users", post.authorId, "blockedBy", user.uid), { blockedAt: serverTimestamp() }),
+    ]).catch(() => {});
     await addDoc(collection(db, "reports"), {
       type: "block", blockedUid: post.authorId, blockerId: user.uid,
       postId, createdAt: serverTimestamp(), status: "pending",
