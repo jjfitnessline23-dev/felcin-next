@@ -5,6 +5,7 @@ import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 
 interface FollowUser { uid: string; displayName?: string; photoURL?: string; bio?: string; }
 
@@ -39,8 +40,9 @@ export default function FollowingPage() {
   }, [user, tab]);
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-5" style={{ color: "#f2f2f2" }}>Connections</h1>
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Connections" />
+      <div className="px-4 pt-4">
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: "rgba(255,255,255,0.04)" }}>
@@ -91,6 +93,7 @@ export default function FollowingPage() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -7,19 +7,45 @@ import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useAuth } from "@/lib/auth";
 import { OWNER_UIDS } from "@/lib/firebase";
 
-const moreItems = [
-  { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },
-  { href: "/reels", icon: "play_circle", label: "Reels" },
-  { href: "/live", icon: "live_tv", label: "Live" },
-  { href: "/challenges", icon: "link", label: "Challenges" },
-  { href: "/stories", icon: "auto_stories", label: "Stories" },
-  { href: "/schedule", icon: "calendar_month", label: "Schedule" },
-  { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
-  { href: "/podcasts", icon: "podcasts", label: "Podcasts" },
-  { href: "/private-chats", icon: "chat", label: "Messages" },
-  { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
-  { href: "/dashboard", icon: "bar_chart", label: "Dashboard" },
+const moreGroups = [
+  {
+    label: "Connect",
+    items: [
+      { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },
+      { href: "/private-chats", icon: "chat", label: "Messages" },
+      { href: "/following", icon: "group", label: "Connections" },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { href: "/reels", icon: "play_circle", label: "Reels" },
+      { href: "/live", icon: "live_tv", label: "Live" },
+      { href: "/stories", icon: "auto_stories", label: "Stories" },
+      { href: "/podcasts", icon: "podcasts", label: "Podcasts" },
+    ],
+  },
+  {
+    label: "Fitness",
+    items: [
+      { href: "/challenges", icon: "link", label: "Challenges" },
+      { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
+      { href: "/schedule", icon: "calendar_month", label: "Schedule" },
+    ],
+  },
+  {
+    label: "Creator",
+    items: [
+      { href: "/dashboard", icon: "bar_chart", label: "Dashboard" },
+      { href: "/earnings", icon: "payments", label: "Earnings" },
+      { href: "/badges", icon: "verified", label: "Badges" },
+      { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
+    ],
+  },
 ];
+
+// Flat list for active-path detection
+const moreItems = moreGroups.flatMap((g) => g.items);
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -158,40 +184,49 @@ export default function MobileNav() {
           </Link>
         </div>
 
-        {/* Menu items */}
-        <div className="overflow-y-auto flex-1 px-2 py-2">
-          <div className="grid grid-cols-2 gap-1">
-            {moreItems.map((item) => {
-              const active = pathname.startsWith(item.href);
-              return (
-                <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl relative"
-                  style={{ background: active ? "rgba(255,255,255,0.08)" : "transparent", color: active ? "#fff" : "#888" }}>
-                  <span className="relative">
-                    <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
-                      {item.icon}
-                    </span>
-                    {item.badge && unread > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] rounded-full flex items-center justify-center text-[7px] font-bold text-white px-0.5"
-                        style={{ background: "#ef4444" }}>
-                        {unread > 9 ? "9+" : unread}
+        {/* Menu items — grouped */}
+        <div className="overflow-y-auto flex-1 px-3 py-2">
+          {moreGroups.map((group) => (
+            <div key={group.label} className="mb-4">
+              <p className="text-[10px] font-bold tracking-widest px-1 mb-1.5" style={{ color: "#333" }}>
+                {group.label.toUpperCase()}
+              </p>
+              <div className="grid grid-cols-2 gap-1">
+                {group.items.map((item) => {
+                  const active = pathname.startsWith(item.href);
+                  return (
+                    <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl relative"
+                      style={{ background: active ? "rgba(255,255,255,0.08)" : "transparent", color: active ? "#fff" : "#888" }}>
+                      <span className="relative">
+                        <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
+                          {item.icon}
+                        </span>
+                        {item.badge && unread > 0 && (
+                          <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] rounded-full flex items-center justify-center text-[7px] font-bold text-white px-0.5"
+                            style={{ background: "#ef4444" }}>
+                            {unread > 9 ? "9+" : unread}
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Link>
-              );
-            })}
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
-            {isOwner && (
+          {isOwner && (
+            <div className="mt-1 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
               <Link href="/admin" onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl col-span-2"
-                style={{ background: pathname.startsWith("/admin") ? "rgba(239,68,68,0.1)" : "transparent", color: "#f87171", borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 4 }}>
+                className="flex items-center gap-3 px-3 py-3 rounded-xl"
+                style={{ background: pathname.startsWith("/admin") ? "rgba(239,68,68,0.1)" : "transparent", color: "#f87171" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>admin_panel_settings</span>
                 <span className="text-sm font-medium">Admin Panel</span>
               </Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
