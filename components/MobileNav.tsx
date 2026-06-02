@@ -7,19 +7,11 @@ import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useAuth } from "@/lib/auth";
 import { OWNER_UIDS } from "@/lib/firebase";
 
-const bottomItems = [
-  { href: "/", icon: "home", label: "Home" },
-  { href: "/ghost", icon: "sprint", label: "Workout", accent: true },
-  { href: "/creator", icon: "add", label: "", isCreate: true },
-  { href: "/notifications", icon: "notifications", label: "Alerts" },
-];
-
 const moreItems = [
+  { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },
   { href: "/reels", icon: "play_circle", label: "Reels" },
   { href: "/live", icon: "live_tv", label: "Live" },
   { href: "/challenges", icon: "link", label: "Challenges" },
-  { href: "/explore", icon: "explore", label: "Explore" },
-  { href: "/search", icon: "search", label: "Search" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },
   { href: "/schedule", icon: "calendar_month", label: "Schedule" },
   { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
@@ -42,145 +34,149 @@ export default function MobileNav() {
   const initial = displayName.charAt(0).toUpperCase();
 
   useEffect(() => { setOpen(false); }, [pathname]);
-
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const handleSignOut = async () => {
-    setOpen(false);
-    await signOut();
-    router.push("/login");
-  };
+  const handleSignOut = async () => { setOpen(false); await signOut(); router.push("/login"); };
 
   if (pathname.startsWith("/comments") || pathname.startsWith("/private-chats")) return null;
 
-  const moreActive = moreItems.some((i) => pathname.startsWith(i.href)) || pathname.startsWith("/profile");
+  const profileActive = pathname.startsWith("/profile") || pathname.startsWith("/profile-settings");
+  const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
+  const isGhostPath = pathname.startsWith("/ghost");
+  const isExplorePath = pathname.startsWith("/explore") || pathname.startsWith("/search");
+
+  const tabs = [
+    { href: "/", icon: "home", label: "Home", active: pathname === "/" },
+    { href: "/ghost", icon: "sprint", label: "Workout", active: isGhostPath, accent: true },
+    null, // create button placeholder
+    { href: "/explore", icon: "explore", label: "Explore", active: isExplorePath },
+  ];
 
   return (
     <>
-      {/* Bottom nav bar */}
-      <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
+      {/* Bottom nav */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
         style={{
           background: "rgba(9,9,9,0.96)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderTop: "1px solid rgba(255,255,255,0.07)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        }}
-      >
-        {bottomItems.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          const isNotif = item.href === "/notifications";
+        }}>
 
-          if (item.isCreate) {
-            if (pathname.startsWith("/live") || pathname.startsWith("/podcasts")) return null;
+        {tabs.map((tab, i) => {
+          if (tab === null) {
+            // Create button — hidden on live/podcasts
+            if (pathname.startsWith("/live") || pathname.startsWith("/podcasts")) return <div key="create-spacer" className="flex-1" />;
             return (
-              <Link key={item.href} href={item.href}
-                className="flex-1 flex items-center justify-center py-3">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center"
-                  style={{ background: "#fff" }}>
+              <Link key="create" href="/creator" className="flex-1 flex items-center justify-center py-3">
+                <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#fff" }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#000", fontVariationSettings: "'FILL' 1, 'wght' 500" }}>add</span>
                 </div>
               </Link>
             );
           }
-
-          const isGhost = item.href === "/ghost";
-
           return (
-            <Link key={item.href} href={item.href}
+            <Link key={tab.href} href={tab.href}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5"
-              style={{ color: active ? (isGhost ? "#a78bfa" : "#fff") : (isGhost ? "#6d51c4" : "#555") }}>
-              <span className="relative">
-                <span className="material-symbols-outlined" style={{
-                  fontSize: 24,
-                  fontVariationSettings: active ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400",
-                }}>
-                  {item.icon}
-                </span>
-                {isNotif && unread > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white px-0.5"
-                    style={{ background: "#ef4444" }}>
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </span>
-              {item.label && (
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
-              )}
+              style={{ color: tab.active ? (tab.accent ? "#a78bfa" : "#fff") : (tab.accent ? "#6d51c4" : "#555") }}>
+              <span className="material-symbols-outlined" style={{
+                fontSize: 24,
+                fontVariationSettings: tab.active ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400",
+              }}>{tab.icon}</span>
+              <span className="text-[10px] font-medium leading-none">{tab.label}</span>
             </Link>
           );
         })}
 
-        {/* More button */}
-        <button
-          onClick={() => setOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 border-none bg-transparent cursor-pointer"
-          style={{ color: moreActive || open ? "#fff" : "#555" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 24, fontVariationSettings: (moreActive || open) ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400" }}>
-            menu
+        {/* Profile picture — replaces 3-bar More button */}
+        <button onClick={() => setOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 border-none bg-transparent cursor-pointer relative">
+          <div className="relative">
+            {photoURL ? (
+              <img src={photoURL} alt="" className="rounded-full object-cover"
+                style={{ width: 26, height: 26, border: `2px solid ${open || moreActive || profileActive ? "#fff" : "rgba(255,255,255,0.25)"}` }} />
+            ) : (
+              <div className="rounded-full flex items-center justify-center text-[11px] font-bold"
+                style={{ width: 26, height: 26, background: "#2a2a2a", color: "#aaa", border: `2px solid ${open || moreActive || profileActive ? "#fff" : "rgba(255,255,255,0.2)"}` }}>
+                {initial}
+              </div>
+            )}
+            {unread > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[13px] h-[13px] rounded-full flex items-center justify-center text-[7px] font-bold text-white px-0.5"
+                style={{ background: "#ef4444" }}>
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] font-medium leading-none" style={{ color: open || moreActive || profileActive ? "#fff" : "#555" }}>
+            Me
           </span>
-          <span className="text-[10px] font-medium leading-none">More</span>
         </button>
       </nav>
 
       {/* Backdrop */}
       {open && (
-        <div
-          className="lg:hidden fixed inset-0 z-[60]"
-          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-          onClick={() => setOpen(false)}
-        />
+        <div className="lg:hidden fixed inset-0 z-[60]" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={() => setOpen(false)} />
       )}
 
       {/* Slide-up drawer */}
-      <div
-        className="lg:hidden fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl overflow-hidden flex flex-col transition-transform duration-300"
+      <div className="lg:hidden fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl overflow-hidden flex flex-col transition-transform duration-300"
         style={{
           background: "#111",
           borderTop: "1px solid rgba(255,255,255,0.08)",
           maxHeight: "85dvh",
           transform: open ? "translateY(0)" : "translateY(100%)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        }}
-      >
+        }}>
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)" }} />
         </div>
 
+        {/* Profile header */}
         <div className="px-4 pt-2 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <Link href="/profile" className="flex items-center gap-3">
+          <Link href="/profile" className="flex items-center gap-3" onClick={() => setOpen(false)}>
             {photoURL ? (
               <img src={photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
             ) : (
               <div className="rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                style={{ width: 44, height: 44, background: "#222", color: "#888" }}>
-                {initial}
-              </div>
+                style={{ width: 44, height: 44, background: "#222", color: "#888" }}>{initial}</div>
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{displayName}</p>
               <p className="text-xs" style={{ color: "#555" }}>View profile</p>
             </div>
+            <Link href="/profile-settings" onClick={() => setOpen(false)}
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "rgba(255,255,255,0.06)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>edit</span>
+            </Link>
           </Link>
         </div>
 
+        {/* Menu items */}
         <div className="overflow-y-auto flex-1 px-2 py-2">
           <div className="grid grid-cols-2 gap-1">
             {moreItems.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
-                <Link key={item.href} href={item.href}
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl"
-                  style={{
-                    background: active ? "rgba(255,255,255,0.08)" : "transparent",
-                    color: active ? "#fff" : "#888",
-                  }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
-                    {item.icon}
+                <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl relative"
+                  style={{ background: active ? "rgba(255,255,255,0.08)" : "transparent", color: active ? "#fff" : "#888" }}>
+                  <span className="relative">
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
+                      {item.icon}
+                    </span>
+                    {item.badge && unread > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] rounded-full flex items-center justify-center text-[7px] font-bold text-white px-0.5"
+                        style={{ background: "#ef4444" }}>
+                        {unread > 9 ? "9+" : unread}
+                      </span>
+                    )}
                   </span>
                   <span className="text-sm font-medium">{item.label}</span>
                 </Link>
@@ -188,14 +184,9 @@ export default function MobileNav() {
             })}
 
             {isOwner && (
-              <Link href="/admin"
+              <Link href="/admin" onClick={() => setOpen(false)}
                 className="flex items-center gap-3 px-3 py-3 rounded-xl col-span-2"
-                style={{
-                  background: pathname.startsWith("/admin") ? "rgba(239,68,68,0.1)" : "transparent",
-                  color: "#f87171",
-                  borderTop: "1px solid rgba(255,255,255,0.05)",
-                  marginTop: 4,
-                }}>
+                style={{ background: pathname.startsWith("/admin") ? "rgba(239,68,68,0.1)" : "transparent", color: "#f87171", borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 4 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>admin_panel_settings</span>
                 <span className="text-sm font-medium">Admin Panel</span>
               </Link>
@@ -204,8 +195,7 @@ export default function MobileNav() {
         </div>
 
         <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <button
-            onClick={handleSignOut}
+          <button onClick={handleSignOut}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border-none cursor-pointer"
             style={{ background: "rgba(255,255,255,0.05)", color: "#666" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 17 }}>logout</span>

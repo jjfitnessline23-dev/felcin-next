@@ -12,6 +12,7 @@ import { PostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
 import FelcinLogo from "@/components/FelcinLogo";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 
 interface Post {
   id: string;
@@ -82,6 +83,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const unread = useUnreadCount();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
   const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
 
@@ -195,8 +197,22 @@ export default function HomePage() {
           <span className="font-bold text-xl tracking-tight" style={{ color: "#f2f2f2" }}>Felcin</span>
         </div>
 
-        {/* Slide toggle */}
-        <div className="relative flex items-center rounded-full cursor-pointer select-none"
+        <div className="flex items-center gap-3">
+          {/* Notification bell */}
+          <Link href="/notifications" className="relative flex items-center justify-center" style={{ width: 36, height: 36 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24, color: unread > 0 ? "#f2f2f2" : "#555", fontVariationSettings: unread > 0 ? "'FILL' 1" : "'FILL' 0" }}>
+              notifications
+            </span>
+            {unread > 0 && (
+              <span className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white px-0.5"
+                style={{ background: "#ef4444" }}>
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </Link>
+
+          {/* For You / Following slide toggle */}
+          <div className="relative flex items-center rounded-full cursor-pointer select-none"
           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", padding: 2 }}
           onClick={() => setTab(tab === "foryou" ? "following" : "foryou")}>
           <div style={{
@@ -214,6 +230,7 @@ export default function HomePage() {
             style={{ width: 68, textAlign: "center", padding: "4px 0", color: tab === "following" ? "#000" : "#555", transition: "color 0.15s" }}>
             Following
           </span>
+          </div>
         </div>
       </div>
 
