@@ -260,13 +260,13 @@ export default function CommentsPage() {
     <>
     {/* Image lightbox */}
     {imgLightbox && post?.mediaUrl && (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#000", zIndex: 99999 }}
-        onClick={() => setImgLightbox(false)}>
-        <img src={post.mediaUrl} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} onClick={(e) => e.stopPropagation()} />
+      <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#000", zIndex: 99999 }}>
+        <img src={post.mediaUrl} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+          onClick={() => setImgLightbox(false)} />
         <button onClick={() => setImgLightbox(false)}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer"
-          style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}>
-          <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>close</span>
+          className="absolute left-4 flex items-center justify-center border-none cursor-pointer"
+          style={{ top: "calc(env(safe-area-inset-top, 16px) + 8px)", width: 40, height: 40, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", borderRadius: "50%" }}>
+          <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>arrow_back</span>
         </button>
       </div>
     )}
