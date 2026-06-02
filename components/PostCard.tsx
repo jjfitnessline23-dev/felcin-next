@@ -29,6 +29,10 @@ interface Post {
   collabUid?: string | null;
   collabName?: string | null;
   collabPhoto?: string | null;
+  repostCount?: number;
+  isRepost?: boolean;
+  repostOf?: string | null;
+  repostOriginalAuthorName?: string | null;
 }
 
 function resolveMediaType(contentType?: string, mimeType?: string, url?: string): "video" | "image" {
@@ -63,6 +67,9 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
   const [imgLightbox, setImgLightbox] = useState(false);
+  const [reposted, setReposted] = useState(false);
+  const [repostCount, setRepostCount] = useState(post.repostCount ?? 0);
+  const [reposting, setReposting] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
@@ -189,6 +196,35 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
     setDeleted(true);
   };
 
+  const handleRepost = async () => {
+    if (!user || reposting || reposted || post.isRepost) return;
+    setReposting(true);
+    try {
+      await addDoc(collection(db, "posts"), {
+        authorId: user.uid,
+        authorName: user.displayName || "User",
+        authorPhoto: user.photoURL || null,
+        isRepost: true,
+        repostOf: post.id,
+        repostOriginalAuthorId: post.authorId,
+        repostOriginalAuthorName: post.authorName || "User",
+        mediaUrl: post.mediaUrl || null,
+        caption: post.caption || post.text || null,
+        contentType: post.contentType || null,
+        createdAt: serverTimestamp(),
+        likes: 0, comments: 0,
+      });
+      await updateDoc(doc(db, "posts", post.id), { repostCount: increment(1) });
+      setReposted(true);
+      setRepostCount((c) => c + 1);
+      if (post.authorId !== user.uid) {
+        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipientUid: post.authorId, type: "repost", senderName: user.displayName || "Someone", postId: post.id }) }).catch(() => {});
+      }
+    } catch {}
+    setReposting(false);
+  };
+
   const handleBlock = async () => {
     if (!user || user.uid === post.authorId) return;
     setDotMenu(false);
@@ -219,6 +255,15 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
       document.body
     )}
     <article style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, overflow: "hidden" }}>
+      {/* Repost header */}
+      {post.isRepost && (
+        <div className="flex items-center gap-1.5 px-4 pt-2.5 pb-0">
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#555" }}>repeat</span>
+          <span className="text-xs" style={{ color: "#555" }}>
+            {post.authorName || "Someone"} reposted
+          </span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -335,6 +380,13 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chat_bubble</span>
             <span className="text-sm font-semibold">{Math.max(0, post.comments ?? 0)}</span>
           </Link>
+
+          <button onClick={handleRepost} disabled={reposting || !!post.isRepost}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer transition-all"
+            style={{ background: reposted ? "rgba(74,222,128,0.1)" : "transparent", color: reposted ? "#4ade80" : "#555" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: reposted ? "'FILL' 1" : "'FILL' 0" }}>repeat</span>
+            {repostCount > 0 && <span className="text-sm font-semibold">{repostCount}</span>}
+          </button>
 
           <button onClick={handleShare}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer"
