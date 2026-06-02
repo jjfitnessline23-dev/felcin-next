@@ -85,28 +85,20 @@ export default function ReelsPage() {
                   <p className="text-sm" style={{ color: "#555" }}>Video unavailable</p>
                 </div>
               ) : (
-              <>
               <video
                 ref={(el) => { videoRefs.current[i] = el; if (el) { el.muted = true; el.setAttribute("muted", ""); } }}
                 src={reel.mediaUrl}
                 loop playsInline muted preload="metadata"
-                className="w-full h-full object-cover"
-                onClick={() => togglePlay(i)}
-                onError={() => setErrorIds((prev) => new Set([...prev, reel.id]))}
-              />
-              {/* Fullscreen button */}
-              <button
+                className="w-full h-full object-cover cursor-pointer"
                 onClick={() => {
                   const v = videoRefs.current[i] as HTMLVideoElement & { webkitEnterFullscreen?: () => void } | null;
                   if (!v) return;
+                  v.play().catch(() => {});
                   if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
                   else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
                 }}
-                className="absolute top-14 right-4 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-                style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}>
-                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
-              </button>
-              </>
+                onError={() => setErrorIds((prev) => new Set([...prev, reel.id]))}
+              />
               )}
 
               {/* Pause indicator */}

@@ -328,38 +328,19 @@ export default function CommentsPage() {
             {post.mediaUrl && (
               <div style={{ background: "#000" }}>
                 {mediaType === "video" ? (
-                  <div className="relative">
-                    <video ref={videoRef} src={post.mediaUrl} muted playsInline preload="auto"
-                      className="w-full object-contain" style={{ maxHeight: 480, display: "block" }}
-                      onClick={() => {
-                        const v = videoRef.current;
-                        if (!v) return;
-                        if (v.paused) v.play().catch(() => {}); else v.pause();
-                      }}
-                    />
-                    {/* Fullscreen button */}
-                    <button
-                      onClick={() => {
-                        const v = videoRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-                        if (!v) return;
-                        if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
-                        else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
-                      }}
-                      className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-                      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}>
-                      <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
-                    </button>
-                  </div>
+                  <video ref={videoRef} src={post.mediaUrl} muted playsInline preload="auto"
+                    className="w-full object-contain cursor-pointer" style={{ maxHeight: 480, display: "block" }}
+                    onClick={() => {
+                      const v = videoRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+                      if (!v) return;
+                      v.play().catch(() => {});
+                      if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+                      else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+                    }}
+                  />
                 ) : (
-                  <div className="relative">
-                    <img src={post.mediaUrl} alt="" className="w-full object-contain" style={{ maxHeight: 480 }}
-                      onClick={() => setImgLightbox(true)} />
-                    <button onClick={() => setImgLightbox(true)}
-                      className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-                      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}>
-                      <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
-                    </button>
-                  </div>
+                  <img src={post.mediaUrl} alt="" className="w-full object-contain cursor-pointer" style={{ maxHeight: 480 }}
+                    onClick={() => setImgLightbox(true)} />
                 )}
               </div>
             )}

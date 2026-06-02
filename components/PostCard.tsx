@@ -279,24 +279,16 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
                 ref={videoRef}
                 src={post.mediaUrl}
                 muted loop playsInline preload="auto"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover cursor-pointer"
                 onClick={() => {
-                  const v = videoRef.current;
+                  const v = videoRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
                   if (!v) return;
-                  if (v.paused) { v.play().catch(() => {}); setVideoPaused(false); }
-                  else { v.pause(); setVideoPaused(true); }
+                  v.play().catch(() => {});
+                  if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+                  else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
                 }}
               />
-              {/* Pause indicator */}
-              {videoPaused && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center"
-                    style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
-                    <span className="material-symbols-outlined text-white" style={{ fontSize: 32, fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
-                  </div>
-                </div>
-              )}
-              {/* Volume toggle */}
+              {/* Mute toggle — only control remaining */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -311,32 +303,10 @@ export default function PostCard({ post, onBlock }: { post: Post; onBlock?: (uid
                   {videoMuted ? "volume_off" : "volume_up"}
                 </span>
               </button>
-              {/* Fullscreen button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const v = videoRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-                  if (!v) return;
-                  if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
-                  else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
-                }}
-                className="absolute bottom-3 left-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
-              </button>
             </div>
           ) : (
-            <div className="relative w-full h-full">
-              <Link href={`/comments?postId=${post.id}`} className="block w-full h-full">
-                <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" onError={() => setImgBroken(true)} />
-              </Link>
-              {/* Image fullscreen button */}
-              <button
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImgLightbox(true); }}
-                className="absolute bottom-3 left-3 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-                <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>fullscreen</span>
-              </button>
+            <div className="w-full h-full cursor-pointer" onClick={() => setImgLightbox(true)}>
+              <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover" loading="lazy" onError={() => setImgBroken(true)} />
             </div>
           )}
           {viewsLeft !== null && (
