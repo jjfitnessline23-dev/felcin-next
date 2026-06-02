@@ -242,7 +242,7 @@ export default function PodcastsPage() {
             </div>
             <input type="text" placeholder="Session title (optional)"
               value={liveTitle} onChange={(e) => setLiveTitle(e.target.value)}
-              maxLength={80} autoFocus
+              maxLength={80}
               className="w-full px-4 py-3 rounded-xl outline-none text-sm mb-4"
               style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "#f2f2f2" }}
               onKeyDown={(e) => { if (e.key === "Enter") startLive(); }} />
