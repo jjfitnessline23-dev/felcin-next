@@ -65,6 +65,7 @@ export default function CommentsPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
     if (!postId) return;
@@ -104,11 +105,15 @@ export default function CommentsPage() {
       }
     }).catch(() => router.replace("/"));
 
+    initialLoadDone.current = false;
     const q = query(collection(db, col, postId, "comments"), orderBy("createdAt", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setComments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Comment, "id">) })));
-      clearTimeout(scrollTimer.current);
-      scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+      if (initialLoadDone.current) {
+        clearTimeout(scrollTimer.current);
+        scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+      }
+      initialLoadDone.current = true;
     });
     return () => { unsub(); clearTimeout(scrollTimer.current); };
   }, [postId, col, isReel, router, user]);
