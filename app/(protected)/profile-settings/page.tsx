@@ -8,6 +8,7 @@ import { db, storage, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 
 export default function ProfileSettingsPage() {
   const { user, signOut } = useAuth();
@@ -96,10 +97,9 @@ export default function ProfileSettingsPage() {
   const isOwner = user && OWNER_UIDS.includes(user.uid);
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Edit Profile</h1>
-      </div>
+    <div className="max-w-lg mx-auto pb-6">
+      <PageHeader title="Edit Profile" />
+      <div className="px-4 pt-6">
 
       {/* Avatar section */}
       <div className="flex flex-col items-center mb-8">
@@ -259,6 +259,7 @@ export default function ProfileSettingsPage() {
           <a href="/privacy" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Privacy Policy</a>
           <a href="/guidelines" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Community Guidelines</a>
         </div>
+      </div>
       </div>
     </div>
   );

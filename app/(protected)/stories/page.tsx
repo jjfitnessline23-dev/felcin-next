@@ -5,6 +5,7 @@ import { collection, query, orderBy, limit, onSnapshot, doc, getDoc, setDoc, ser
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 
 interface Story {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
@@ -120,16 +121,16 @@ export default function StoriesPage() {
   const current = activeGroup?.stories[activeIdx];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Stories</h1>
+    <div className="max-w-2xl mx-auto pb-6">
+      <PageHeader title="Stories" right={
         <Link href="/creator?mode=story"
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold text-white"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold"
           style={{ background: "#fff", color: "#000" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 17 }}>add</span>
-          Add Story
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span>
+          Add
         </Link>
-      </div>
+      } />
+      <div className="px-4 pt-4">
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="spinner" /></div>
@@ -249,6 +250,7 @@ export default function StoriesPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

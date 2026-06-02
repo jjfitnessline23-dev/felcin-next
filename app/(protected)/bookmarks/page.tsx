@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, doc, getDoc } from "firebase/fi
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
+import PageHeader from "@/components/PageHeader";
 
 interface Post { id: string; authorId: string; authorName?: string; authorPhoto?: string; caption?: string; text?: string; mediaUrl?: string; contentType?: string; mimeType?: string; likes?: number; comments?: number; likedBy?: string[]; createdAt?: { seconds: number } | null; }
 
@@ -29,13 +30,9 @@ export default function BookmarksPage() {
   }, [user]);
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Bookmarks</h1>
-        {!loading && posts.length > 0 && (
-          <p className="text-sm mt-1" style={{ color: "#555" }}>{posts.length} saved post{posts.length !== 1 ? "s" : ""}</p>
-        )}
-      </div>
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Bookmarks" />
+      <div className="px-4 pt-4">
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="spinner" /></div>
@@ -52,6 +49,7 @@ export default function BookmarksPage() {
           {posts.map((p) => <PostCard key={p.id} post={p} />)}
         </div>
       )}
+      </div>
     </div>
   );
 }

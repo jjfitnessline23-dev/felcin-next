@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import PageHeader from "@/components/PageHeader";
 
 const BADGES = [
   {
@@ -168,12 +169,9 @@ export default function BadgesPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Creator Badges</h1>
-        <p className="text-sm mt-1" style={{ color: "#555" }}>Stand out and grow your audience</p>
-      </div>
-
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Creator Badges" />
+      <div className="px-4 pt-4">
       <div className="flex flex-col gap-4">
         {BADGES.map((badge) => (
           <div key={badge.id} className="rounded-2xl overflow-hidden relative"
@@ -218,6 +216,7 @@ export default function BadgesPage() {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { collection, query, orderBy, getDocs, addDoc, setDoc, deleteDoc, doc, se
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 
 interface ScheduledClass {
   id: string; hostId: string; hostName: string; hostPhoto?: string;
@@ -92,20 +93,17 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Live Schedule</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#555" }}>Upcoming live workout classes</p>
-        </div>
-        {isOwner && (
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Live Schedule" right={
+        isOwner && (
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
             style={{ background: "#ef4444", color: "#fff" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Schedule
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Add
           </button>
-        )}
-      </div>
+        )
+      } />
+      <div className="px-4 pt-4">
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="spinner" /></div>
@@ -210,6 +208,7 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

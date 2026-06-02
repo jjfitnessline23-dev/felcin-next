@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import PageHeader from "@/components/PageHeader";
 
 interface EarningItem {
   id: string;
@@ -110,18 +111,15 @@ export default function EarningsPage() {
   const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Earnings" />
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full text-sm font-semibold"
           style={{ background: "rgba(30,30,30,0.95)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(12px)" }}>
           {toast}
         </div>
       )}
-
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Earnings</h1>
-        <p className="text-sm mt-1" style={{ color: "#555" }}>Your share of gifts from live streams</p>
-      </div>
+      <div className="px-4 pt-4">
 
       {/* Total */}
       <div className="rounded-2xl p-5 mb-4"
@@ -230,6 +228,7 @@ export default function EarningsPage() {
       <p className="text-xs text-center mt-4" style={{ color: "#2a2a2a" }}>
         Stripe automatically pays out your balance on a rolling 2-day schedule once your bank is connected.
       </p>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, orderBy, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import PageHeader from "@/components/PageHeader";
 
 interface SetEntry { reps: number; weight: number; }
 interface Exercise { name: string; sets: SetEntry[]; }
@@ -82,18 +83,15 @@ export default function WorkoutsPage() {
     log.exercises.reduce((sum, ex) => sum + ex.sets.reduce((s2, set) => s2 + set.reps * set.weight, 0), 0);
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Workout Log</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#555" }}>Track your lifts and PRs</p>
-        </div>
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Workout Log" right={
         <button onClick={() => setShowNew(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
           style={{ background: "#f2f2f2", color: "#000" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span> Log
         </button>
-      </div>
+      } />
+      <div className="px-4 pt-4">
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="spinner" /></div>
@@ -236,6 +234,7 @@ export default function WorkoutsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

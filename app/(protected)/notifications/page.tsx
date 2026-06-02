@@ -5,6 +5,7 @@ import Link from "next/link";
 import { collection, query, where, limit, onSnapshot, updateDoc, doc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import PageHeader from "@/components/PageHeader";
 
 interface Notif {
   id: string; type: string; senderId?: string; senderName?: string; senderPhoto?: string;
@@ -110,23 +111,17 @@ export default function NotificationsPage() {
   const groups = groupByDate(notifs);
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Notifications</h1>
-          <p className="text-xs mt-0.5" style={{ color: "#555" }}>
-            {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
-          </p>
-        </div>
-        {unreadCount > 0 && (
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Notifications" right={
+        unreadCount > 0 && (
           <button onClick={markAll}
             className="text-sm font-semibold border-none cursor-pointer px-4 py-2 rounded-full"
             style={{ color: "#000", background: "#fff" }}>
             Mark all read
           </button>
-        )}
-      </div>
+        )
+      } />
+      <div className="px-4 pt-4">
 
       {loading ? (
         <div className="flex flex-col gap-2">
@@ -193,6 +188,7 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

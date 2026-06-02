@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import PageHeader from "@/components/PageHeader";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -34,11 +35,9 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Dashboard</h1>
-        <p className="text-sm mt-1" style={{ color: "#555" }}>Your creator stats at a glance</p>
-      </div>
+    <div className="max-w-xl mx-auto pb-6">
+      <PageHeader title="Dashboard" />
+      <div className="px-4 pt-6">
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="spinner" /></div>
@@ -77,6 +76,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
