@@ -165,23 +165,25 @@ export default function MobileNav() {
 
         {/* Profile header */}
         <div className="px-4 pt-2 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <Link href="/profile" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-            {photoURL ? (
-              <img src={photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
-            ) : (
-              <div className="rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                style={{ width: 44, height: 44, background: "#222", color: "#888" }}>{initial}</div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{displayName}</p>
-              <p className="text-xs" style={{ color: "#555" }}>View profile</p>
-            </div>
-            <Link href="/profile-settings" onClick={() => setOpen(false)}
+          <div className="flex items-center gap-3">
+            <Link href="/profile" onClick={() => setOpen(false)} className="flex items-center gap-3 flex-1 min-w-0">
+              {photoURL ? (
+                <img src={photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
+              ) : (
+                <div className="rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                  style={{ width: 44, height: 44, background: "#222", color: "#888" }}>{initial}</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{displayName}</p>
+                <p className="text-xs" style={{ color: "#555" }}>View profile</p>
+              </div>
+            </Link>
+            <Link href="/settings" onClick={() => setOpen(false)}
               className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
               style={{ background: "rgba(255,255,255,0.06)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>edit</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>settings</span>
             </Link>
-          </Link>
+          </div>
         </div>
 
         {/* Menu items — grouped */}
