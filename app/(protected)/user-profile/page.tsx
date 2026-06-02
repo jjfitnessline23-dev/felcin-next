@@ -45,7 +45,6 @@ export default function UserProfilePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const isSelf = user?.uid === uid;
@@ -139,7 +138,7 @@ export default function UserProfilePage() {
     <div className="max-w-2xl mx-auto pb-10">
 
       {/* ── Top bar ── */}
-      <div className="sticky z-20" style={{ top: "env(safe-area-inset-top,0px)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)", borderBottom: menuOpen ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="sticky z-20" style={{ top: "env(safe-area-inset-top,0px)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="flex items-center gap-3 px-4 py-3">
           <button onClick={() => router.back()} className="icon-btn" style={{ width: 36, height: 36 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#f2f2f2" }}>arrow_back</span>
@@ -148,41 +147,7 @@ export default function UserProfilePage() {
             <div className="font-bold text-base truncate" style={{ color: "#f2f2f2" }}>{displayName}</div>
             {username && <div className="text-xs" style={{ color: "#555" }}>{username}</div>}
           </div>
-          <button onClick={() => setMenuOpen((v) => !v)} className="icon-btn" style={{ width: 36, height: 36 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#f2f2f2" }}>
-              {menuOpen ? "close" : "menu"}
-            </span>
-          </button>
         </div>
-
-        {/* Slide-down menu */}
-        {menuOpen && (
-          <div className="mx-4 mb-3 rounded-2xl overflow-hidden" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
-            {[
-              { href: "/live", icon: "live_tv", label: "Live", sub: "Watch live streams", dot: true },
-              { href: "/podcasts", icon: "podcasts", label: "Podcasts", sub: "Audio shows coming soon", dot: false },
-              { href: "/reels", icon: "play_circle", label: "Reels", sub: "Short videos", dot: false },
-              { href: "/stories", icon: "auto_stories", label: "Stories", sub: "24-hour stories", dot: false },
-            ].map((item, i, arr) => (
-              <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3.5 transition-colors"
-                style={{ borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(255,255,255,0.08)" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 19, color: "#fff" }}>{item.icon}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{item.label}</span>
-                    {item.dot && <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#ef4444" }} />}
-                  </div>
-                  <span className="text-xs" style={{ color: "#555" }}>{item.sub}</span>
-                </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#333" }}>chevron_right</span>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* ── Banner ── */}
@@ -306,29 +271,21 @@ export default function UserProfilePage() {
           </a>
         )}
 
-        {/* Dashboard + Edit Profile + Share Profile — only for self */}
+        {/* Edit Profile + Share Profile — only for self */}
         {isSelf && (
-          <div className="mt-4">
-            <Link href="/dashboard"
-              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-semibold"
+          <div className="flex gap-2 mt-4">
+            <Link href="/profile-settings"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold"
               style={{ background: "rgba(255,255,255,0.06)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.09)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>bar_chart</span>
-              Dashboard
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+              Edit Profile
             </Link>
-            <div className="flex gap-2 mt-2">
-              <Link href="/profile-settings"
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
-                style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.09)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
-                Edit Profile
-              </Link>
-              <button onClick={shareProfile}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border-none cursor-pointer"
-                style={{ background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid rgba(255,255,255,0.09)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>ios_share</span>
-                Share Profile
-              </button>
-            </div>
+            <button onClick={shareProfile}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer"
+              style={{ background: "rgba(255,255,255,0.06)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>ios_share</span>
+              Share Profile
+            </button>
           </div>
         )}
       </div>
