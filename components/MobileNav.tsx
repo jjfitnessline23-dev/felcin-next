@@ -84,7 +84,7 @@ export default function MobileNav() {
   return (
     <>
       {/* Bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
+      <nav className="mobile-nav-bar fixed bottom-0 left-0 right-0 z-50 items-stretch"
         style={{
           background: "rgba(9,9,9,0.96)",
           backdropFilter: "blur(24px)",
@@ -146,12 +146,12 @@ export default function MobileNav() {
 
       {/* Backdrop */}
       {open && (
-        <div className="lg:hidden fixed inset-0 z-[60]" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+        <div className="mobile-nav-drawer fixed inset-0 z-[60]" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
           onClick={() => setOpen(false)} />
       )}
 
       {/* Slide-up drawer */}
-      <div className="lg:hidden fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl overflow-hidden flex flex-col transition-transform duration-300"
+      <div className="mobile-nav-drawer fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl overflow-hidden flex-col transition-transform duration-300"
         style={{
           background: "#111",
           borderTop: "1px solid rgba(255,255,255,0.08)",

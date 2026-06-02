@@ -77,7 +77,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="hidden lg:flex flex-col w-60 shrink-0 fixed top-0 left-0 bottom-0 z-30 overflow-y-auto"
+      className="sidebar-desktop flex-col w-60 shrink-0 fixed top-0 left-0 bottom-0 z-30 overflow-y-auto"
       style={{ background: "#0a0a0a", borderRight: "1px solid rgba(255,255,255,0.06)" }}
     >
       {/* Logo */}

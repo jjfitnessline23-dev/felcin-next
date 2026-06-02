@@ -146,3 +146,15 @@ main { animation: pageFadeIn 0.18s ease-out both; }
   color: #666;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.07); color: #ccc; }
+
+/* Sidebar: desktop only — explicit media query so Tailwind v4 doesn't interfere */
+.sidebar-desktop { display: none !important; }
+@media (min-width: 1024px) {
+  .sidebar-desktop { display: flex !important; }
+}
+
+/* MobileNav: mobile only */
+.mobile-nav-bar, .mobile-nav-drawer { display: flex !important; }
+@media (min-width: 1024px) {
+  .mobile-nav-bar, .mobile-nav-drawer { display: none !important; }
+}
