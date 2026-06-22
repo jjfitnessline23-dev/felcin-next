@@ -146,38 +146,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
   };
 
-  const handleApple = async () => {
-    setError(""); setStep(""); setBusy(true);
-    try {
-      setStep("Opening Apple sign-in…");
-      const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-      const result = await FirebaseAuthentication.signInWithApple();
-      if (!result.credential?.idToken) throw new Error("Apple sign-in failed: no ID token returned");
-      const { OAuthProvider } = await import("firebase/auth");
-      const provider = new OAuthProvider("apple.com");
-      const credential = provider.credential({
-        idToken: result.credential.idToken,
-        rawNonce: (result.credential as { nonce?: string }).nonce ?? undefined,
-      });
-      const appleCred = await signInWithCredential(auth, credential);
-      const isNew = appleCred.user.metadata.creationTime === appleCred.user.metadata.lastSignInTime;
-      window.location.href = isNew ? "/onboarding" : "/";
-    } catch (err: unknown) {
-      setStep("");
-      const code = (err as { code?: string }).code || "";
-      const msg = (err as { message?: string }).message || "Apple sign-in failed";
-      if (
-        code === "auth/cancelled-popup-request" ||
-        msg.toLowerCase().includes("cancel") ||
-        msg.toLowerCase().includes("dismiss")
-      ) {
-        setBusy(false);
-        return;
-      }
-      setError(`${code ? code + ": " : ""}${msg}`);
-      setBusy(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#111" }}>
@@ -295,19 +263,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </svg>
                   Continue with Google
                 </button>
-                {isNativeApp && (
-                  <button
-                    onClick={handleApple}
-                    disabled={busy}
-                    className="w-full py-3 rounded-xl font-bold text-sm cursor-pointer border-none flex items-center justify-center gap-2"
-                    style={{ background: "#fff", color: "#000" }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 814 1000" fill="currentColor">
-                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-37.5-148.2-91.5c-49-61.1-92-155.8-92-245.7 0-180.7 124.5-277.8 247.3-277.8 61.6 0 109 40.1 147 40.1 36.1 0 92.7-42.5 163.5-42.5 26.2 0 108.2 2.6 162.7 89.7zm-106-97.4c15.6-17.5 29.9-41.3 29.9-66.1 0-3.2-.3-6.4-.9-9-29.6 1.1-64.6 19.4-85.7 45.5-14.4 16.8-30.5 41.8-30.5 67.8 0 3.8.6 7.7 1 9 1.9.3 5.1.6 8.3.6 27.4 0 60.7-17.5 77.9-47.8z"/>
-                    </svg>
-                    Continue with Apple
-                  </button>
-                )}
               </div>
             </>
           )}
