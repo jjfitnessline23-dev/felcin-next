@@ -7,8 +7,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
-  signInWithCredential,
+  signInWithRedirect,
+  getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -26,12 +26,7 @@ export default function LoginPage() {
   const [step, setStep] = useState("");
   const [busy, setBusy] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [isNativeApp, setIsNativeApp] = useState(false);
-
-  useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
-    setIsNativeApp(!!(cap?.isNativePlatform?.() ?? cap?.isNative));
-  }, []);
+  const [dob, setDob] = useState("");
 
   useEffect(() => {
     // Navigate a hidden iframe to felcin.firebaseapp.com to trigger the SW
@@ -53,6 +48,20 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
+  useEffect(() => {
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) {
+        const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+        window.location.href = isNew ? "/onboarding" : "/";
+      }
+    }).catch((err: unknown) => {
+      const code = (err as { code?: string }).code || "";
+      if (code && code !== "auth/null-user" && code !== "auth/no-current-user") {
+        setError("Google sign-in failed. Please try again.");
+      }
+    });
+  }, []);
+
 const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setInfo(""); setBusy(true);
@@ -63,6 +72,13 @@ const handleSubmit = async (e: React.FormEvent) => {
         setBusy(false); return;
       }
       if (mode === "signup") {
+        if (!dob) { setError("Please enter your date of birth."); setBusy(false); return; }
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+        if (age < 17) { setError("You must be at least 17 years old to create an account."); setBusy(false); return; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await sendEmailVerification(cred.user);
         setInfo("Account created! Please verify your email then log in.");
@@ -96,43 +112,54 @@ const handleSubmit = async (e: React.FormEvent) => {
   };
 
   const handleGoogle = async () => {
-    setError(""); setStep(""); setBusy(true);
+    setError(""); setStep("Redirecting to Google…"); setBusy(true);
     try {
-      if (isNativeApp) {
-        setStep("Opening Google sign-in…");
-        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        const result = await FirebaseAuthentication.signInWithGoogle();
-        if (!result.credential?.idToken) throw new Error("Google sign-in failed: no ID token returned");
-        const credential = GoogleAuthProvider.credential(
-          result.credential.idToken,
-          result.credential.accessToken ?? null
-        );
-        await signInWithCredential(auth, credential);
-        window.location.href = "/";
-      } else {
-        setStep("Opening Google sign-in…");
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        setStep(`Signed in as ${result.user.email} — entering app…`);
-        window.location.href = "/";
-      }
+      const provider = new GoogleAuthProvider();
+      provider.addScope("email");
+      provider.addScope("profile");
+      await signInWithRedirect(auth, provider);
     } catch (err: unknown) {
       setStep("");
       const code = (err as { code?: string }).code || "";
       const msg = (err as { message?: string }).message || "Google sign-in failed";
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+      setError(
+        code === "auth/unauthorized-domain"
+          ? `Domain not authorized for Google sign-in. Contact support.`
+          : `${code ? code + ": " : ""}${msg}`
+      );
+      setBusy(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setError(""); setStep(""); setBusy(true);
+    try {
+      setStep("Opening Apple sign-in…");
+      const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+      const result = await FirebaseAuthentication.signInWithApple();
+      if (!result.credential?.idToken) throw new Error("Apple sign-in failed: no ID token returned");
+      const { OAuthProvider } = await import("firebase/auth");
+      const provider = new OAuthProvider("apple.com");
+      const credential = provider.credential({
+        idToken: result.credential.idToken,
+        rawNonce: (result.credential as { nonce?: string }).nonce ?? undefined,
+      });
+      const appleCred = await signInWithCredential(auth, credential);
+      const isNew = appleCred.user.metadata.creationTime === appleCred.user.metadata.lastSignInTime;
+      window.location.href = isNew ? "/onboarding" : "/";
+    } catch (err: unknown) {
+      setStep("");
+      const code = (err as { code?: string }).code || "";
+      const msg = (err as { message?: string }).message || "Apple sign-in failed";
+      if (
+        code === "auth/cancelled-popup-request" ||
+        msg.toLowerCase().includes("cancel") ||
+        msg.toLowerCase().includes("dismiss")
+      ) {
         setBusy(false);
         return;
       }
-      setError(
-        code === "auth/popup-blocked"
-          ? "Popup was blocked. Please allow popups for felcin.com in your browser settings and try again."
-          : code === "auth/unauthorized-domain"
-          ? `Domain not authorized for Google sign-in (${code}). Contact support.`
-          : code === "auth/account-exists-with-different-credential"
-          ? "An account already exists with this email. Please sign in with email and password instead."
-          : `${code ? code + ": " : ""}${msg}`
-      );
+      setError(`${code ? code + ": " : ""}${msg}`);
       setBusy(false);
     }
   };
@@ -190,6 +217,20 @@ const handleSubmit = async (e: React.FormEvent) => {
               />
             )}
             {mode === "signup" && (
+              <div>
+                <label className="block text-xs mb-1.5" style={{ color: "#666" }}>Date of Birth</label>
+                <input
+                  type="date"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 17)).toISOString().split("T")[0]}
+                  required
+                  className="w-full px-4 py-3 rounded-xl outline-none"
+                  style={{ background: "#111", border: "1px solid #333", color: "#f1f1f1", fontSize: 16 }}
+                />
+              </div>
+            )}
+            {mode === "signup" && (
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -209,7 +250,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             )}
             <button
               type="submit"
-              disabled={busy || (mode === "signup" && !agreedToTerms)}
+              disabled={busy || (mode === "signup" && (!agreedToTerms || !dob))}
               className="w-full py-3 rounded-xl font-bold text-sm text-white cursor-pointer border-none"
               style={{ background: (busy || (mode === "signup" && !agreedToTerms)) ? "rgba(255,255,255,0.12)" : "#fff", color: (busy || (mode === "signup" && !agreedToTerms)) ? "#888" : "#000", opacity: 1 }}
             >
@@ -224,20 +265,35 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <span className="text-xs" style={{ color: "#555" }}>or</span>
                 <div className="flex-1 h-px" style={{ background: "#2a2a2a" }} />
               </div>
-              <button
-                onClick={handleGoogle}
-                disabled={busy}
-                className="w-full py-3 rounded-xl font-bold text-sm cursor-pointer border-none flex items-center justify-center gap-2"
-                style={{ background: "#222", color: "#f1f1f1", border: "1px solid #333" }}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18">
-                  <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-                  <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-                  <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
-                  <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
-                </svg>
-                Continue with Google
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleGoogle}
+                  disabled={busy}
+                  className="w-full py-3 rounded-xl font-bold text-sm cursor-pointer border-none flex items-center justify-center gap-2"
+                  style={{ background: "#222", color: "#f1f1f1", border: "1px solid #333" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+                  </svg>
+                  Continue with Google
+                </button>
+                {isNativeApp && (
+                  <button
+                    onClick={handleApple}
+                    disabled={busy}
+                    className="w-full py-3 rounded-xl font-bold text-sm cursor-pointer border-none flex items-center justify-center gap-2"
+                    style={{ background: "#fff", color: "#000" }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 814 1000" fill="currentColor">
+                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-37.5-148.2-91.5c-49-61.1-92-155.8-92-245.7 0-180.7 124.5-277.8 247.3-277.8 61.6 0 109 40.1 147 40.1 36.1 0 92.7-42.5 163.5-42.5 26.2 0 108.2 2.6 162.7 89.7zm-106-97.4c15.6-17.5 29.9-41.3 29.9-66.1 0-3.2-.3-6.4-.9-9-29.6 1.1-64.6 19.4-85.7 45.5-14.4 16.8-30.5 41.8-30.5 67.8 0 3.8.6 7.7 1 9 1.9.3 5.1.6 8.3.6 27.4 0 60.7-17.5 77.9-47.8z"/>
+                    </svg>
+                    Continue with Apple
+                  </button>
+                )}
+              </div>
             </>
           )}
 
