@@ -34,6 +34,13 @@ export default function LoginPage() {
     setIsNativeApp(!!(cap?.isNativePlatform?.() ?? cap?.isNative));
   }, []);
 
+  // Synchronous native check — always accurate at call time regardless of state timing
+  const checkIsNative = (): boolean => {
+    if (typeof window === "undefined") return false;
+    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
+    return !!(cap?.isNativePlatform?.() ?? cap?.isNative);
+  };
+
   useEffect(() => {
     // Navigate a hidden iframe to felcin.firebaseapp.com to trigger the SW
     // update check there. The kill-switch SW deployed to that origin will
@@ -105,8 +112,9 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const handleGoogle = async () => {
     setError(""); setStep(""); setBusy(true);
+    const native = checkIsNative();
     try {
-      if (isNativeApp) {
+      if (native) {
         setStep("Opening Google sign-in…");
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
         const result = await FirebaseAuthentication.signInWithGoogle();
@@ -140,7 +148,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           ? "Domain not authorized for Google sign-in. Contact support."
           : code === "auth/account-exists-with-different-credential"
           ? "An account already exists with this email. Please sign in with email and password."
-          : `${code ? code + ": " : ""}${msg}`
+          : code === "auth/network-request-failed"
+          ? "Network error. Check your internet connection and try again."
+          : `Sign-in failed${code ? " (" + code + ")" : ""}: ${msg}`
       );
       setBusy(false);
     }
