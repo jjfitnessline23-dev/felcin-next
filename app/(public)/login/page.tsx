@@ -7,7 +7,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithCredential,
   signInWithPopup,
   sendPasswordResetEmail,
   sendEmailVerification,
@@ -27,20 +26,6 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [dob, setDob] = useState("");
-  const [isNativeApp, setIsNativeApp] = useState(false);
-
-  useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
-    setIsNativeApp(!!(cap?.isNativePlatform?.() ?? cap?.isNative));
-  }, []);
-
-  // Synchronous native check — always accurate at call time regardless of state timing
-  const checkIsNative = (): boolean => {
-    if (typeof window === "undefined") return false;
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
-    return !!(cap?.isNativePlatform?.() ?? cap?.isNative);
-  };
-
   useEffect(() => {
     // Navigate a hidden iframe to felcin.firebaseapp.com to trigger the SW
     // update check there. The kill-switch SW deployed to that origin will
@@ -111,28 +96,12 @@ const handleSubmit = async (e: React.FormEvent) => {
   };
 
   const handleGoogle = async () => {
-    setError(""); setStep(""); setBusy(true);
-    const native = checkIsNative();
+    setError(""); setStep("Opening Google sign-in…"); setBusy(true);
     try {
-      if (native) {
-        setStep("Opening Google sign-in…");
-        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        const result = await FirebaseAuthentication.signInWithGoogle();
-        if (!result.credential?.idToken) throw new Error("Google sign-in failed: no ID token returned");
-        const credential = GoogleAuthProvider.credential(
-          result.credential.idToken,
-          result.credential.accessToken ?? null
-        );
-        const userCred = await signInWithCredential(auth, credential);
-        const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
-        window.location.href = isNew ? "/onboarding" : "/";
-      } else {
-        setStep("Opening Google sign-in…");
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
-        window.location.href = isNew ? "/onboarding" : "/";
-      }
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+      window.location.href = isNew ? "/onboarding" : "/";
     } catch (err: unknown) {
       setStep("");
       const code = (err as { code?: string }).code || "";
