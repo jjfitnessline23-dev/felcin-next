@@ -7,12 +7,26 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  OAuthProvider,
+  signInWithCredential,
   signInWithPopup,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth, canAccessApp } from "@/lib/auth";
+
+type Platform = "ios" | "android" | "web";
+
+function getPlatform(): Platform {
+  if (typeof window === "undefined") return "web";
+  const cap = (window as any).Capacitor;
+  if (!cap?.isNativePlatform?.()) return "web";
+  const p = cap.getPlatform?.();
+  if (p === "ios") return "ios";
+  if (p === "android") return "android";
+  return "web";
+}
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
@@ -26,19 +40,25 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [dob, setDob] = useState("");
+  const [platform, setPlatform] = useState<Platform>("web");
+
   useEffect(() => {
-    // Navigate a hidden iframe to felcin.firebaseapp.com to trigger the SW
-    // update check there. The kill-switch SW deployed to that origin will
-    // install, take over, and unregister itself — clearing the old SW that
-    // was intercepting Firebase auth popup requests.
-    const iframe = document.createElement('iframe');
-    iframe.src = 'https://felcin.firebaseapp.com/';
-    iframe.setAttribute('aria-hidden', 'true');
-    Object.assign(iframe.style, { display: 'none', width: '0', height: '0', border: 'none', position: 'absolute' });
-    document.body.appendChild(iframe);
-    const timer = setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 6000);
-    return () => { clearTimeout(timer); try { document.body.removeChild(iframe); } catch {} };
+    setPlatform(getPlatform());
   }, []);
+
+  useEffect(() => {
+    // Proactively trigger the kill-switch SW on felcin.firebaseapp.com
+    // so the old intercepting SW is cleared before any popup auth attempt.
+    if (platform === "web") {
+      const iframe = document.createElement("iframe");
+      iframe.src = "https://felcin.firebaseapp.com/";
+      iframe.setAttribute("aria-hidden", "true");
+      Object.assign(iframe.style, { display: "none", width: "0", height: "0", border: "none", position: "absolute" });
+      document.body.appendChild(iframe);
+      const timer = setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 6000);
+      return () => { clearTimeout(timer); try { document.body.removeChild(iframe); } catch {} };
+    }
+  }, [platform]);
 
   useEffect(() => {
     if (!loading && user && canAccessApp(user)) {
@@ -46,7 +66,7 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setInfo(""); setBusy(true);
     try {
@@ -87,9 +107,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           ? "Network error. Check your internet connection and try again."
           : code === "auth/user-disabled"
           ? "This account has been disabled."
-          : code
-          ? `Sign-in error: ${code}`
-          : msg
+          : code ? `Sign-in error: ${code}` : msg
       );
     }
     setBusy(false);
@@ -97,18 +115,33 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const handleGoogle = async () => {
     setError(""); setStep("Opening Google sign-in…"); setBusy(true);
+    const currentPlatform = getPlatform();
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
-      window.location.href = isNew ? "/onboarding" : "/";
+      if (currentPlatform !== "web") {
+        // Native: use Capacitor plugin — no popup, no sessionStorage issues
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        if (!result.credential?.idToken) throw new Error("No ID token returned");
+        const credential = GoogleAuthProvider.credential(
+          result.credential.idToken,
+          result.credential.accessToken ?? null
+        );
+        const userCred = await signInWithCredential(auth, credential);
+        const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
+        window.location.href = isNew ? "/onboarding" : "/";
+      } else {
+        // Web browser: use popup
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+        window.location.href = isNew ? "/onboarding" : "/";
+      }
     } catch (err: unknown) {
       setStep("");
       const code = (err as { code?: string }).code || "";
       const msg = (err as { message?: string }).message || "Google sign-in failed";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        setBusy(false);
-        return;
+        setBusy(false); return;
       }
       setError(
         code === "auth/popup-blocked"
@@ -125,6 +158,31 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
   };
 
+  const handleApple = async () => {
+    setError(""); setStep("Opening Apple sign-in…"); setBusy(true);
+    try {
+      const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+      const result = await FirebaseAuthentication.signInWithApple();
+      if (!result.credential?.idToken) throw new Error("No ID token returned");
+      const provider = new OAuthProvider("apple.com");
+      const credential = provider.credential({
+        idToken: result.credential.idToken,
+        rawNonce: result.credential.nonce ?? undefined,
+      });
+      const userCred = await signInWithCredential(auth, credential);
+      const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
+      window.location.href = isNew ? "/onboarding" : "/";
+    } catch (err: unknown) {
+      setStep("");
+      const code = (err as { code?: string }).code || "";
+      const msg = (err as { message?: string }).message || "Apple sign-in failed";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        setBusy(false); return;
+      }
+      setError(`Sign-in failed${code ? " (" + code + ")" : ""}: ${msg}`);
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#111" }}>
@@ -202,7 +260,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   style={{ width: 16, height: 16, accentColor: "#fff" }}
                 />
                 <span className="text-xs leading-relaxed" style={{ color: "#888" }}>
-                  I agree to Felcin's{" "}
+                  I agree to Felcin&apos;s{" "}
                   <a href="/terms" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Terms of Service</a>,{" "}
                   <a href="/privacy" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Privacy Policy</a>, and{" "}
                   <a href="/guidelines" target="_blank" style={{ color: "#aaa", textDecoration: "underline" }}>Community Guidelines</a>.
@@ -228,6 +286,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <div className="flex-1 h-px" style={{ background: "#2a2a2a" }} />
               </div>
               <div className="flex flex-col gap-3">
+                {/* Google — shown on all platforms */}
                 <button
                   onClick={handleGoogle}
                   disabled={busy}
@@ -242,6 +301,21 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </svg>
                   Continue with Google
                 </button>
+
+                {/* Apple — shown only on iOS native */}
+                {platform === "ios" && (
+                  <button
+                    onClick={handleApple}
+                    disabled={busy}
+                    className="w-full py-3 rounded-xl font-bold text-sm cursor-pointer border-none flex items-center justify-center gap-2"
+                    style={{ background: "#fff", color: "#000", border: "1px solid #333" }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                      <path d="M12.525 0c.078.87-.248 1.74-.716 2.388-.468.65-1.235 1.157-2.002 1.092-.09-.845.29-1.72.742-2.34C11.013.49 11.836 0 12.525 0zM15.75 12.37c-.382.962-.566 1.39-1.058 2.24-.686 1.17-1.655 2.63-2.858 2.642-.936.012-1.248-.588-2.329-.583-1.08.006-1.413.6-2.358.588-1.2-.014-2.117-1.34-2.804-2.51C2.37 11.89 2.25 8.758 3.344 7.09c.762-1.19 1.97-1.888 3.112-1.888 1.157 0 1.884.596 2.843.596.93 0 1.497-.598 2.836-.598 1.024 0 2.107.558 2.862 1.524-2.513 1.376-2.106 4.966.753 5.646z"/>
+                    </svg>
+                    Continue with Apple
+                  </button>
+                )}
               </div>
             </>
           )}
