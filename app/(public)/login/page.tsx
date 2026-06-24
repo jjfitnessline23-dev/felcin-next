@@ -118,10 +118,11 @@ export default function LoginPage() {
     setError(""); setStep("Opening Google sign-in…"); setBusy(true);
     const currentPlatform = getPlatform();
     try {
-      if (currentPlatform === "ios") {
-        // iOS: use native Capacitor plugin (works perfectly on iOS)
+      if (currentPlatform !== "web") {
+        // iOS + Android: use native Capacitor plugin
+        // useCredentialManager: false forces GoogleSignInClient on Android (bypasses Credential Manager)
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        const result = await FirebaseAuthentication.signInWithGoogle();
+        const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
         if (!result.credential?.idToken) throw new Error("No ID token returned");
         const credential = GoogleAuthProvider.credential(
           result.credential.idToken,
@@ -131,8 +132,7 @@ export default function LoginPage() {
         const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
         window.location.href = isNew ? "/onboarding" : "/";
       } else {
-        // Android WebView + Web browser: use signInWithPopup
-        // On Android the WebView supports popups via MainActivity onCreateWindow
+        // Web browser only: use signInWithPopup
         // Web browser: use popup
         const provider = new GoogleAuthProvider();
         const result = await signInWithPopup(auth, provider);
