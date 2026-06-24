@@ -10,8 +10,6 @@ import {
   OAuthProvider,
   signInWithCredential,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -68,16 +66,6 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-  // Handle Android signInWithRedirect return
-  useEffect(() => {
-    if (platform !== "android") return;
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) {
-        const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
-        window.location.href = isNew ? "/onboarding" : "/";
-      }
-    }).catch(() => {});
-  }, [platform]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,10 +118,13 @@ export default function LoginPage() {
     setError(""); setStep("Opening Google sign-in…"); setBusy(true);
     const currentPlatform = getPlatform();
     try {
-      if (currentPlatform === "ios") {
-        // iOS native: use Capacitor plugin
+      if (currentPlatform !== "web") {
+        // Native iOS/Android: use Capacitor plugin
+        // useCredentialManager: false forces the old GoogleSignInClient on Android
+        // which works reliably. The default (true) uses Credential Manager which
+        // throws "no credentials available" on many devices.
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        const result = await FirebaseAuthentication.signInWithGoogle();
+        const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
         if (!result.credential?.idToken) throw new Error("No ID token returned");
         const credential = GoogleAuthProvider.credential(
           result.credential.idToken,
@@ -142,10 +133,6 @@ export default function LoginPage() {
         const userCred = await signInWithCredential(auth, credential);
         const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
         window.location.href = isNew ? "/onboarding" : "/";
-      } else if (currentPlatform === "android") {
-        // Android WebView: use redirect (popup is blocked, native Credential Manager has issues)
-        await signInWithRedirect(auth, new GoogleAuthProvider());
-        // Result handled by getRedirectResult on next page load
       } else {
         // Web browser: use popup
         const provider = new GoogleAuthProvider();
