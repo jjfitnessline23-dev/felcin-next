@@ -122,8 +122,6 @@ export default function LoginPage() {
         // iOS + Android: use native Capacitor plugin
         // useCredentialManager: false forces GoogleSignInClient on Android (bypasses Credential Manager)
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        // Sign out first so GoogleSignInClient clears its cache → account chooser always appears
-        await FirebaseAuthentication.signOut().catch(() => {});
         const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
         if (!result.credential?.idToken) throw new Error("No ID token returned");
         const credential = GoogleAuthProvider.credential(
