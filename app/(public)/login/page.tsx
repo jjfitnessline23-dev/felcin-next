@@ -9,7 +9,7 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signInWithCredential,
-  signInWithPopup,
+  signInWithRedirect,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -45,20 +45,6 @@ export default function LoginPage() {
   useEffect(() => {
     setPlatform(getPlatform());
   }, []);
-
-  useEffect(() => {
-    // Proactively trigger the kill-switch SW on felcin.firebaseapp.com
-    // so the old intercepting SW is cleared before any popup auth attempt.
-    if (platform === "web") {
-      const iframe = document.createElement("iframe");
-      iframe.src = "https://felcin.firebaseapp.com/";
-      iframe.setAttribute("aria-hidden", "true");
-      Object.assign(iframe.style, { display: "none", width: "0", height: "0", border: "none", position: "absolute" });
-      document.body.appendChild(iframe);
-      const timer = setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 6000);
-      return () => { clearTimeout(timer); try { document.body.removeChild(iframe); } catch {} };
-    }
-  }, [platform]);
 
   useEffect(() => {
     if (!loading && user && canAccessApp(user)) {
@@ -132,12 +118,10 @@ export default function LoginPage() {
         const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
         window.location.href = isNew ? "/onboarding" : "/";
       } else {
-        // Web browser only: use signInWithPopup
-        // Web browser: use popup
+        // Web browser: use redirect (avoids popup blocking and SW interception on felcin.firebaseapp.com)
         const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        const isNew = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
-        window.location.href = isNew ? "/onboarding" : "/";
+        await signInWithRedirect(auth, provider);
+        // Page navigates away — getRedirectResult in AuthProvider handles the return
       }
     } catch (err: unknown) {
       setStep("");
