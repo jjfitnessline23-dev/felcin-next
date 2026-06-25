@@ -120,9 +120,9 @@ export default function LoginPage() {
     try {
       if (currentPlatform !== "web") {
         // iOS + Android: use native Capacitor plugin
-        // useCredentialManager: false forces GoogleSignInClient on Android (bypasses Credential Manager)
+        // Credential Manager is enabled (rgcfaIncludeGoogle=true in variables.gradle includes deps)
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
+        const result = await FirebaseAuthentication.signInWithGoogle();
         if (!result.credential?.idToken) throw new Error("No ID token returned");
         const credential = GoogleAuthProvider.credential(
           result.credential.idToken,
