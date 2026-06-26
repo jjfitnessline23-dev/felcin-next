@@ -20,7 +20,7 @@ const moreGroups = [
     label: "Content",
     items: [
       { href: "/reels", icon: "play_circle", label: "Reels" },
-      { href: "/live", icon: "live_tv", label: "Live" },
+      { href: "/live", icon: "live_tv", label: "Live Studio" },
       { href: "/stories", icon: "auto_stories", label: "Stories" },
       { href: "/podcasts", icon: "mic", label: "Podcast Studio" },
     ],

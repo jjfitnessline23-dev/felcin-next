@@ -15,7 +15,7 @@ const primaryLinks = [
   { href: "/ghost", icon: "sprint", label: "Ghost Workouts", accent: true },
   { href: "/podcasts", icon: "mic", label: "Podcast Studio", studio: true },
   { href: "/reels", icon: "play_circle", label: "Reels" },
-  { href: "/live", icon: "live_tv", label: "Live" },
+  { href: "/live", icon: "live_tv", label: "Live Studio" },
   { href: "/challenges", icon: "link", label: "Challenges" },
   { href: "/explore", icon: "explore", label: "Explore" },
 ];
