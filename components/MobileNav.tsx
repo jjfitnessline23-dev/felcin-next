@@ -5,47 +5,58 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useAuth } from "@/lib/auth";
-import { OWNER_UIDS } from "@/lib/firebase";
+import { OWNER_UIDS, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+
+const quickActions = [
+  { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },
+  { href: "/private-chats", icon: "chat", label: "Messages" },
+  { href: "/following", icon: "group", label: "Connections" },
+  { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
+];
 
 const moreGroups = [
-  {
-    label: "Connect",
-    items: [
-      { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },
-      { href: "/private-chats", icon: "chat", label: "Messages" },
-      { href: "/following", icon: "group", label: "Connections" },
-    ],
-  },
   {
     label: "Content",
     items: [
       { href: "/reels", icon: "play_circle", label: "Reels" },
       { href: "/live", icon: "live_tv", label: "Live" },
       { href: "/stories", icon: "auto_stories", label: "Stories" },
-      { href: "/podcasts", icon: "podcasts", label: "Podcasts" },
+      { href: "/podcasts", icon: "mic", label: "Podcast Studio" },
     ],
   },
   {
     label: "Fitness",
     items: [
-      { href: "/challenges", icon: "link", label: "Challenges" },
       { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
+      { href: "/trainers", icon: "sports_martial_arts", label: "Find Trainer" },
+      { href: "/training-sessions", icon: "event_available", label: "My Sessions" },
       { href: "/schedule", icon: "calendar_month", label: "Schedule" },
+      { href: "/challenges", icon: "link", label: "Challenges" },
     ],
   },
   {
-    label: "Creator",
+    label: "Fitness Tools",
+    items: [
+      { href: "/muscle-map", icon: "accessibility_new", label: "Muscle Map" },
+      { href: "/recovery", icon: "monitor_heart", label: "Recovery" },
+      { href: "/nemesis", icon: "sports_mma", label: "Nemesis" },
+      { href: "/capsule", icon: "lock_clock", label: "Time Capsule" },
+      { href: "/will", icon: "history_edu", label: "Fitness Will" },
+    ],
+  },
+  {
+    label: "Creator Studio",
     items: [
       { href: "/dashboard", icon: "bar_chart", label: "Dashboard" },
       { href: "/earnings", icon: "payments", label: "Earnings" },
       { href: "/badges", icon: "verified", label: "Badges" },
-      { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
+      { href: "/trainer-dashboard", icon: "school", label: "Trainer Hub" },
     ],
   },
 ];
 
-// Flat list for active-path detection
-const moreItems = moreGroups.flatMap((g) => g.items);
+const moreItems = [...quickActions, ...moreGroups.flatMap((g) => g.items)];
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -55,7 +66,15 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false);
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
+  const [advertiseEnabled, setAdvertiseEnabled] = useState(true);
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Profile";
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "features")).then((snap) => {
+      if (snap.exists()) setAdvertiseEnabled(snap.data().advertiseEnabled ?? true);
+    }).catch(() => {});
+  }, []);
+
   const photoURL = user?.photoURL;
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -65,9 +84,18 @@ export default function MobileNav() {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Re-open drawer when user navigates back to the "menu open" history state
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      if (e.state?.drawerOpen) setOpen(true);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   const handleSignOut = async () => { setOpen(false); await signOut(); router.push("/login"); };
 
-  if (pathname.startsWith("/comments") || pathname.startsWith("/private-chats")) return null;
+  if (pathname.startsWith("/comments")) return null;
 
   const profileActive = pathname.startsWith("/profile") || pathname.startsWith("/profile-settings");
   const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
@@ -77,13 +105,13 @@ export default function MobileNav() {
   const tabs = [
     { href: "/", icon: "home", label: "Home", active: pathname === "/" },
     { href: "/ghost", icon: "sprint", label: "Workout", active: isGhostPath, accent: true },
-    null, // create button placeholder
+    null,
     { href: "/explore", icon: "explore", label: "Explore", active: isExplorePath },
   ];
 
   return (
     <>
-      {/* Bottom nav */}
+      {/* Bottom nav bar */}
       <nav className="mobile-nav-bar fixed bottom-0 left-0 right-0 z-50 items-stretch"
         style={{
           background: "rgba(9,9,9,0.96)",
@@ -95,7 +123,6 @@ export default function MobileNav() {
 
         {tabs.map((tab, i) => {
           if (tab === null) {
-            // Create button — hidden on live/podcasts
             if (pathname.startsWith("/live") || pathname.startsWith("/podcasts")) return <div key="create-spacer" className="flex-1" />;
             return (
               <Link key="create" href="/creator" className="flex-1 flex items-center justify-center py-3">
@@ -118,8 +145,7 @@ export default function MobileNav() {
           );
         })}
 
-        {/* Profile picture — replaces 3-bar More button */}
-        <button onClick={() => setOpen(true)}
+        <button onClick={() => { setOpen(true); window.history.pushState({ drawerOpen: true }, ""); }}
           className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 border-none bg-transparent cursor-pointer relative">
           <div className="relative">
             {photoURL ? (
@@ -159,6 +185,8 @@ export default function MobileNav() {
           transform: open ? "translateY(0)" : "translateY(100%)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}>
+
+        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)" }} />
         </div>
@@ -186,8 +214,61 @@ export default function MobileNav() {
           </div>
         </div>
 
-        {/* Menu items — grouped */}
+        {/* Scrollable menu */}
         <div className="overflow-y-auto flex-1 px-3 py-2">
+
+          {/* FELCIN STUDIO — featured entry */}
+          <Link href="/podcasts" onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-4 relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg,#0d0618,#130a24)", border: "1px solid rgba(124,58,237,0.3)" }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at left, rgba(124,58,237,0.18) 0%, transparent 65%)" }} />
+            <div className="relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(124,58,237,0.25)", border: "1px solid rgba(124,58,237,0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>mic</span>
+            </div>
+            <div className="relative flex-1 min-w-0">
+              <p className="text-sm font-black" style={{ color: "#f2f2f2" }}>Podcast Studio</p>
+              <p className="text-xs" style={{ color: "#666" }}>Episodes · Live broadcasts</p>
+            </div>
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0"
+              style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 11, color: "#a78bfa" }}>podcasts</span>
+              <span className="text-[10px] font-bold" style={{ color: "#a78bfa" }}>STUDIO</span>
+            </div>
+          </Link>
+
+          {/* QUICK ACTIONS — 4-column icon strip */}
+          <div className="mb-4">
+            <p className="text-[10px] font-bold tracking-widest px-1 mb-1.5" style={{ color: "#333" }}>QUICK ACTIONS</p>
+            <div className="flex" style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16 }}>
+              {quickActions.map((item, idx) => {
+                const active = pathname.startsWith(item.href);
+                return (
+                  <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+                    className="flex-1 flex flex-col items-center gap-1.5 py-4"
+                    style={{
+                      color: active ? "#fff" : "#888",
+                      borderRight: idx < quickActions.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none",
+                    }}>
+                    <span className="relative">
+                      <span className="material-symbols-outlined" style={{ fontSize: 24, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
+                        {item.icon}
+                      </span>
+                      {item.badge && unread > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center text-[8px] font-bold text-white"
+                          style={{ background: "#ef4444" }}>
+                          {unread > 9 ? "9+" : unread}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[10px] font-medium leading-none">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section groups — 2-column grid */}
           {moreGroups.map((group) => (
             <div key={group.label} className="mb-4">
               <p className="text-[10px] font-bold tracking-widest px-1 mb-1.5" style={{ color: "#333" }}>
@@ -198,20 +279,13 @@ export default function MobileNav() {
                   const active = pathname.startsWith(item.href);
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-3 py-3 rounded-xl relative"
-                      style={{ background: active ? "rgba(255,255,255,0.08)" : "transparent", color: active ? "#fff" : "#888" }}>
-                      <span className="relative">
-                        <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
-                          {item.icon}
-                        </span>
-                        {item.badge && unread > 0 && (
-                          <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] rounded-full flex items-center justify-center text-[7px] font-bold text-white px-0.5"
-                            style={{ background: "#ef4444" }}>
-                            {unread > 9 ? "9+" : unread}
-                          </span>
-                        )}
+                      className="flex items-center gap-2.5 px-3 py-3 rounded-xl"
+                      style={{ background: active ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)", color: active ? "#fff" : "#888" }}>
+                      <span className="material-symbols-outlined shrink-0" style={{ fontSize: 19, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>
+                        {item.icon}
                       </span>
-                      <span className="text-sm font-medium">{item.label}</span>
+                      <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
+                      <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.2)" }}>›</span>
                     </Link>
                   );
                 })}
@@ -219,6 +293,7 @@ export default function MobileNav() {
             </div>
           ))}
 
+          {/* Admin Panel — same structure as original, no overflow-hidden wrapper */}
           {isOwner && (
             <div className="mt-1 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
               <Link href="/admin" onClick={() => setOpen(false)}
@@ -231,6 +306,7 @@ export default function MobileNav() {
           )}
         </div>
 
+        {/* Sign out */}
         <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <button onClick={handleSignOut}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border-none cursor-pointer"

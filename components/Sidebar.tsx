@@ -5,18 +5,19 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
-import { OWNER_UIDS } from "@/lib/firebase";
+import { OWNER_UIDS, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 const primaryLinks = [
   { href: "/", icon: "home", label: "Home" },
   { href: "/ghost", icon: "sprint", label: "Ghost Workouts", accent: true },
+  { href: "/podcasts", icon: "mic", label: "Podcast Studio", studio: true },
   { href: "/reels", icon: "play_circle", label: "Reels" },
   { href: "/live", icon: "live_tv", label: "Live" },
   { href: "/challenges", icon: "link", label: "Challenges" },
   { href: "/explore", icon: "explore", label: "Explore" },
-  { href: "/search", icon: "search", label: "Search" },
 ];
 
 const secondaryLinks = [
@@ -30,7 +31,6 @@ const moreLinks = [
   { href: "/stories", icon: "auto_stories", label: "Stories" },
   { href: "/schedule", icon: "calendar_month", label: "Schedule" },
   { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
-  { href: "/podcasts", icon: "podcasts", label: "Podcasts" },
 ];
 
 export default function Sidebar() {
@@ -39,6 +39,13 @@ export default function Sidebar() {
   const router = useRouter();
   const unread = useUnreadCount();
   const [showMore, setShowMore] = useState(false);
+  const [advertiseEnabled, setAdvertiseEnabled] = useState(true);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "features")).then((snap) => {
+      if (snap.exists()) setAdvertiseEnabled(snap.data().advertiseEnabled ?? true);
+    }).catch(() => {});
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -50,17 +57,19 @@ export default function Sidebar() {
   const initial = displayName.charAt(0).toUpperCase();
   const isOwner = user && OWNER_UIDS.includes(user.uid);
 
-  const renderLink = (l: { href: string; icon: string; label: string; accent?: boolean }) => {
+  const renderLink = (l: { href: string; icon: string; label: string; accent?: boolean; studio?: boolean }) => {
     const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
     const isNotif = l.href === "/notifications";
+    const iconColor = l.studio && !active ? "#a78bfa" : l.accent && !active ? "#a78bfa" : undefined;
     return (
-      <Link key={l.href} href={l.href} className={`nav-link${active ? " active" : ""}`}
-        style={l.accent && !active ? { color: "#a78bfa" } : undefined}>
+      <Link key={l.href} href={l.href}
+        className={`nav-link${active ? " active" : ""}`}
+        style={(l.accent || l.studio) && !active ? { color: "#a78bfa" } : undefined}>
         <span className="relative">
           <span className="material-symbols-outlined" style={{
             fontSize: 19,
             fontVariationSettings: active ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400",
-            color: l.accent && !active ? "#a78bfa" : undefined,
+            color: iconColor,
           }}>{l.icon}</span>
           {isNotif && unread > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-0.5"
@@ -70,7 +79,10 @@ export default function Sidebar() {
           )}
         </span>
         {l.label}
-        {l.accent && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa" }}>NEW</span>}
+        {l.studio && !active && (
+          <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(124,58,237,0.18)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.3)" }}>LIVE</span>
+        )}
+        {l.accent && !l.studio && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa" }}>NEW</span>}
       </Link>
     );
   };
@@ -96,6 +108,29 @@ export default function Sidebar() {
         </Link>
       </div>
 
+      {/* Ghost Workout promo card */}
+      <div className="px-3 mb-3">
+        <Link href="/ghost"
+          className="block rounded-2xl overflow-hidden relative"
+          style={{ background: "linear-gradient(135deg, #0c0818 0%, #100c22 60%, #0a0814 100%)", border: "1px solid rgba(109,40,217,0.35)", textDecoration: "none" }}>
+          {/* Watermark ghost */}
+          <img src="/static/logo-full.svg" alt="" aria-hidden="true"
+            style={{ position: "absolute", right: -14, top: "50%", transform: "translateY(-50%)", width: 90, height: 90, opacity: 0.14, pointerEvents: "none" }} />
+          <div style={{ position: "absolute", top: -20, right: 10, width: 80, height: 80, borderRadius: "50%", background: "radial-gradient(circle, rgba(109,40,217,0.3) 0%, transparent 70%)", pointerEvents: "none" }} />
+          <div className="relative p-3" style={{ zIndex: 1 }}>
+            <div className="flex items-center gap-1.5 mb-1">
+              <img src="/static/logo-nav.svg" alt="" style={{ width: 20, height: 20, borderRadius: 5 }} />
+              <span className="text-[9px] font-bold tracking-[0.15em]" style={{ color: "#6d28d9" }}>GHOST WORKOUT</span>
+            </div>
+            <p className="text-sm font-bold mb-0.5" style={{ color: "#f3e8ff", letterSpacing: "-0.2px" }}>Train with the Ghost.</p>
+            <svg width="70" height="12" viewBox="0 0 70 12" style={{ display: "block" }}>
+              <path d="M 0,6 L 15,6 L 18,4 L 21,6 L 25,6 L 27,8 L 29,1 L 32,9 L 34,6 C 36,6 37,3 40,6 L 70,6"
+                fill="none" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+            </svg>
+          </div>
+        </Link>
+      </div>
+
       <nav className="flex flex-col gap-0.5 px-3 flex-1">
         {primaryLinks.map(renderLink)}
 
@@ -104,7 +139,18 @@ export default function Sidebar() {
 
         {secondaryLinks.map(renderLink)}
 
+        {/* Separator */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "6px 4px" }} />
+
+        {/* Monetization section */}
+        <p className="text-[10px] font-bold tracking-widest px-2 mt-1 mb-0.5" style={{ color: "#333" }}>MONETIZE</p>
+        {renderLink({ href: "/earnings", icon: "payments", label: "Earnings" })}
+        {renderLink({ href: "/badges", icon: "verified", label: "Badges" })}
+        {renderLink({ href: "/settings", icon: "workspace_premium", label: "Premium" })}
+        {advertiseEnabled && renderLink({ href: "/advertise", icon: "ads_click", label: "Advertise" })}
+
         {/* More toggle */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "6px 4px" }} />
         <button
           onClick={() => setShowMore((v) => !v)}
           className="nav-link border-none bg-transparent cursor-pointer w-full text-left"
