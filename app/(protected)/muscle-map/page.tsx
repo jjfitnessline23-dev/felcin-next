@@ -35,7 +35,7 @@ const MUSCLES: { key: MuscleKey; label: string; keywords: string[]; ant: string[
     ant:[],                                  post:["hamstring"] },
   { key:"glutes",     label:"Glutes",      keywords:["hip thrust","glute","bridge","kickback","sumo","cable pull through","fire hydrant","abduction","donkey kick"],
     ant:[],                                  post:["gluteal"] },
-  { key:"calves",     label:"Calves",      keywords:["calf","calf raise","donkey","heel raise","heel press","toe press","toe raise","standing calf","seated calf","gastrocnemius","soleus","jump rope","box jump"],
+  { key:"calves",     label:"Calves",      keywords:["calf","calves","calf raise","calve raise","donkey","heel raise","heel press","toe press","toe raise","standing calf","seated calf","standing calves","seated calves","gastrocnemius","soleus","jump rope","box jump"],
     ant:["calves"],                          post:["calves"] },
   { key:"traps",      label:"Traps",       keywords:["shrug","trap","farmer","upright row"],
     ant:[],                                  post:["trapezius"] },
