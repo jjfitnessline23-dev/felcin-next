@@ -126,13 +126,12 @@ export default function AdminPortalPage() {
     return () => unsubs.forEach((u) => u());
   }, [isOwner]);
 
-  useEffect(() => {
-    if (workoutsLoaded || loadingWorkouts) return;
-    if (!user || !OWNER_UIDS.includes(user.uid)) return;
-    if (users.length === 0) return;
+  const loadWorkouts = (userList: typeof users) => {
+    if (loadingWorkouts || userList.length === 0) return;
     setLoadingWorkouts(true);
+    setWorkoutLogs([]);
     Promise.all(
-      users.map((u) =>
+      userList.map((u) =>
         getDocs(query(collection(db, "users", u.id, "workoutLogs"), orderBy("date", "desc"), limit(100)))
           .then((snap) => snap.docs.map((d) => {
             const data = d.data();
@@ -146,7 +145,15 @@ export default function AdminPortalPage() {
       setWorkoutLogs(all);
     })
     .finally(() => { setLoadingWorkouts(false); setWorkoutsLoaded(true); });
-  }, [users.length]); // eslint-disable-line
+  };
+
+  // Auto-load workouts once users are ready
+  useEffect(() => {
+    if (workoutsLoaded || loadingWorkouts) return;
+    if (!user || !OWNER_UIDS.includes(user.uid)) return;
+    if (users.length === 0) return;
+    loadWorkouts(users);
+  }, [users.length, workoutsLoaded]); // eslint-disable-line
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
@@ -742,7 +749,7 @@ export default function AdminPortalPage() {
             <div className="flex items-center justify-between">
               <p className="text-xs" style={{ color: "#444" }}>All users' workout logs</p>
               <button
-                onClick={() => { setWorkoutsLoaded(false); setWorkoutLogs([]); }}
+                onClick={() => { setWorkoutsLoaded(false); loadWorkouts(users); }}
                 disabled={loadingWorkouts}
                 className="flex items-center gap-1 border-none bg-transparent cursor-pointer"
                 style={{ color: "#555" }}>
