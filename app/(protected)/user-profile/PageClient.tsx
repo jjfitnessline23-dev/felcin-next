@@ -282,13 +282,13 @@ export default function UserProfilePage() {
         {/* Avatar anchored to bottom-left */}
         <div className="absolute" style={{ bottom: -52, left: 16 }}>
           <div className="relative inline-block">
-            <div className="rounded-full" style={{ padding: 3, background: "#090909", boxShadow: "0 0 0 1px rgba(167,139,250,0.25), 0 0 24px rgba(124,58,237,0.2)" }}>
+            <div className="rounded-full" style={{ padding: 3, background: "linear-gradient(135deg,#a78bfa,#7C3AED,#4f46e5)", boxShadow: "0 0 0 3px #090909, 0 0 32px rgba(124,58,237,0.5), 0 0 60px rgba(124,58,237,0.2)" }}>
               {profile.photoURL ? (
                 <img src={profile.photoURL} alt="" className="rounded-full object-cover block"
-                  style={{ width: 88, height: 88 }} />
+                  style={{ width: 88, height: 88, border: "3px solid #090909" }} />
               ) : (
                 <div className="rounded-full flex items-center justify-center text-3xl font-bold"
-                  style={{ width: 88, height: 88, background: "linear-gradient(135deg,#2a1a4e,#1a1040)", color: "#888" }}>
+                  style={{ width: 88, height: 88, background: "linear-gradient(135deg,#3b2065,#1e1050)", color: "#c4b5fd" }}>
                   {initial}
                 </div>
               )}
