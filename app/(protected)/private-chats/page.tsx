@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -21,6 +21,7 @@ function timeAgo(s: number) {
 
 export default function PrivateChatsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const withUid = searchParams.get("uid");
   const [chats, setChats] = useState<Chat[]>([]);
@@ -29,7 +30,6 @@ export default function PrivateChatsPage() {
   useEffect(() => {
     if (!user || !withUid || activeChat) return;
     setActiveChat(chatId(user.uid, withUid));
-    // Fetch the other user's profile so the chat header shows their name/photo
     getDoc(doc(db, "users", withUid, "public", "profile")).then((snap) => {
       const data = snap.exists() ? snap.data() : null;
       if (data) { setOtherName(data.displayName || data.username || "User"); setOtherPhoto(data.photoURL || ""); return; }
@@ -38,6 +38,7 @@ export default function PrivateChatsPage() {
       });
     }).catch(() => {});
   }, [user, withUid, activeChat]);
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -48,7 +49,6 @@ export default function PrivateChatsPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Set own presence — also clears on tab close/hide
   useEffect(() => {
     if (!user) return;
     const presenceRef = doc(db, "users", user.uid, "presence", "status");
@@ -64,7 +64,6 @@ export default function PrivateChatsPage() {
     };
   }, [user]);
 
-  // Watch other user's presence when chat is active
   useEffect(() => {
     if (!activeChat || !user) return;
     const otherUid = activeChat.split("_").find((id) => id !== user.uid);
@@ -74,7 +73,7 @@ export default function PrivateChatsPage() {
         setOtherOnline(snap.data().online === true);
         setOtherLastSeen(snap.data().lastSeen?.seconds ?? null);
       }
-    });
+    }, () => {});
   }, [activeChat, user]);
 
   useEffect(() => {
@@ -86,20 +85,14 @@ export default function PrivateChatsPage() {
         const otherId = data.participants.find((p) => p !== user.uid) || "";
         try {
           const pub = await getDoc(doc(db, "users", otherId, "public", "profile"));
-          if (pub.exists()) {
-            const pd = pub.data();
-            return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" };
-          }
+          if (pub.exists()) { const pd = pub.data(); return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" }; }
           const root = await getDoc(doc(db, "users", otherId));
-          if (root.exists()) {
-            const pd = root.data();
-            return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" };
-          }
+          if (root.exists()) { const pd = root.data(); return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" }; }
         } catch {}
         return { ...data, id: d.id };
       }));
       setChats(cs.sort((a, b) => (b.lastAt?.seconds || 0) - (a.lastAt?.seconds || 0)));
-    });
+    }, () => {});
   }, [user]);
 
   useEffect(() => {
@@ -109,7 +102,7 @@ export default function PrivateChatsPage() {
       setMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Msg, "id">) })));
       clearTimeout(scrollTimer.current);
       scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
-    });
+    }, () => {});
     return () => { unsub(); clearTimeout(scrollTimer.current); };
   }, [activeChat]);
 
@@ -119,52 +112,88 @@ export default function PrivateChatsPage() {
     try {
       await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, text: t, createdAt: serverTimestamp() });
       await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp() }, { merge: true });
+      const otherUid = activeChat.split("_").find((id) => id !== user.uid);
+      if (otherUid) {
+        addDoc(collection(db, "notifications"), {
+          recipientId: otherUid, senderId: user.uid,
+          senderName: user.displayName || "Someone",
+          senderPhoto: user.photoURL || "",
+          type: "message",
+          message: t.length > 50 ? t.slice(0, 50) + "…" : t,
+          read: false, createdAt: serverTimestamp(),
+        }).catch(() => {});
+      }
     } catch {}
     setSending(false);
   };
 
   const myInitial = (user?.displayName || user?.email || "U").charAt(0).toUpperCase();
+  const hasText = text.trim().length > 0;
 
   return (
-    <div className="flex overflow-hidden" style={{ height: "100dvh", background: "#090909", maxWidth: "100vw" }}>
-      {/* Chat list */}
-      <div className={`w-full lg:w-80 shrink-0 flex flex-col ${activeChat ? "hidden lg:flex" : "flex"}`}
-        style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <h1 className="font-bold text-lg" style={{ color: "#f2f2f2" }}>Messages</h1>
+    <div className="flex overflow-hidden" style={{ height: "calc(100dvh - env(safe-area-inset-top, 0px))", background: "#090909", maxWidth: "100vw" }}>
+
+      {/* ── Chat list panel ── */}
+      <div className={`shrink-0 flex flex-col ${activeChat ? "hidden lg:flex lg:w-80" : chats.length === 0 ? "w-full flex" : "w-full lg:w-80 flex"}`}
+        style={{ borderRight: chats.length > 0 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+
+        {/* Header */}
+        <div className="relative overflow-hidden shrink-0"
+          style={{ background: "linear-gradient(135deg,#030e14 0%,#061820 100%)", borderBottom: "1px solid rgba(6,182,212,0.15)", paddingTop: "max(12px, env(safe-area-inset-top,12px) + 8px)" }}>
+          <div className="absolute pointer-events-none" style={{ top: "-60%", right: "-20%", width: 240, height: 240, background: "radial-gradient(circle,rgba(6,182,212,0.18) 0%,transparent 70%)", animation: "heroGlow 5s ease-in-out infinite" }} />
+          <div className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none select-none">
+            <img src="/static/logo-nav.svg" alt="" style={{ width: 80, opacity: 0.04, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(160deg)" }} />
+          </div>
+          <div className="relative flex items-center gap-3 px-4 pb-4">
+            <button onClick={() => router.back()} className="icon-btn shrink-0" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
+              <span className="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div>
+              <h1 className="font-black text-lg" style={{ color: "#f2f2f2", letterSpacing: -0.5 }}>Messages</h1>
+              {chats.length > 0 && <p className="text-xs" style={{ color: "#06b6d4" }}>{chats.length} conversation{chats.length !== 1 ? "s" : ""}</p>}
+            </div>
+          </div>
         </div>
 
+        {/* Chat list or empty */}
         {chats.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-center px-6">
-            <div>
-              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(255,255,255,0.04)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#333" }}>chat</span>
+            <div style={{ maxWidth: 400 }}>
+              <div className="ghost-bg w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(6,182,212,0.06)", border: "1px solid rgba(6,182,212,0.15)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#06b6d4", opacity: 0.4 }}>chat</span>
               </div>
-              <p className="font-medium mb-1" style={{ color: "#f2f2f2" }}>No conversations</p>
-              <p className="text-sm" style={{ color: "#444" }}>Start chatting from someone's profile</p>
+              <p className="font-bold text-base mb-2" style={{ color: "#f2f2f2" }}>No messages yet</p>
+              <p className="text-sm" style={{ color: "#555" }}>Go to someone&apos;s profile and tap Message to start a chat.</p>
             </div>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
             {chats.map((c) => {
               const init = (c.otherName || "U").charAt(0).toUpperCase();
+              const isActive = activeChat === c.id;
               return (
                 <button key={c.id}
                   onClick={() => { setActiveChat(c.id); setOtherName(c.otherName || "User"); setOtherPhoto(c.otherPhoto || ""); }}
-                  className="flex items-center gap-3 w-full text-left px-4 py-3 transition-colors"
-                  style={{ background: activeChat === c.id ? "rgba(255,255,255,0.06)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  {c.otherPhoto ? (
-                    <img src={c.otherPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 46, height: 46 }} />
-                  ) : (
-                    <div className="rounded-full flex items-center justify-center font-bold text-sm shrink-0"
-                      style={{ width: 46, height: 46, background: "#222", color: "#aaa" }}>
-                      {init}
-                    </div>
-                  )}
+                  className="flex items-center gap-3 w-full text-left px-4 py-3.5 transition-all"
+                  style={{
+                    background: isActive ? "linear-gradient(135deg,rgba(6,182,212,0.1),rgba(6,182,212,0.05))" : "transparent",
+                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    borderLeft: isActive ? "2px solid #06b6d4" : "2px solid transparent",
+                  }}>
+                  <div className="relative shrink-0">
+                    {c.otherPhoto ? (
+                      <img src={c.otherPhoto} alt="" className="rounded-full object-cover" style={{ width: 46, height: 46, border: isActive ? "2px solid rgba(6,182,212,0.4)" : "2px solid transparent" }} />
+                    ) : (
+                      <div className="rounded-full flex items-center justify-center font-bold text-sm shrink-0"
+                        style={{ width: 46, height: 46, background: isActive ? "rgba(6,182,212,0.15)" : "#1a1a1a", color: isActive ? "#06b6d4" : "#888", border: isActive ? "1px solid rgba(6,182,212,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+                        {init}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
-                      <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{c.otherName || "User"}</p>
-                      {c.lastAt?.seconds && <p className="text-xs" style={{ color: "#444" }}>{timeAgo(c.lastAt.seconds)}</p>}
+                      <p className="font-bold text-sm" style={{ color: isActive ? "#f2f2f2" : "#d0d0d0" }}>{c.otherName || "User"}</p>
+                      {c.lastAt?.seconds && <p className="text-xs" style={{ color: "#333" }}>{timeAgo(c.lastAt.seconds)}</p>}
                     </div>
                     {c.lastMessage && <p className="text-xs truncate" style={{ color: "#555" }}>{c.lastMessage}</p>}
                   </div>
@@ -175,42 +204,68 @@ export default function PrivateChatsPage() {
         )}
       </div>
 
-      {/* Chat window */}
+      {/* ── Chat window ── */}
       {activeChat ? (
         <div className={`flex-1 flex flex-col ${!activeChat ? "hidden lg:flex" : ""}`}>
-          <div className="flex items-center gap-3 px-4 py-3"
-            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)" }}>
-            <button onClick={() => setActiveChat(null)}
-              className="icon-btn lg:hidden" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
+
+          {/* Chat header */}
+          <div className="flex items-center gap-3 px-4 py-3 shrink-0"
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)" }}>
+            <button onClick={() => setActiveChat(null)} className="icon-btn lg:hidden" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
-            {otherPhoto ? (
-              <img src={otherPhoto} alt="" className="rounded-full object-cover" style={{ width: 34, height: 34 }} />
-            ) : (
-              <div className="rounded-full flex items-center justify-center font-bold text-sm"
-                style={{ width: 34, height: 34, background: "#222", color: "#aaa" }}>
-                {otherName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className="relative">
+              {otherPhoto ? (
+                <img src={otherPhoto} alt="" className="rounded-full object-cover" style={{ width: 36, height: 36 }} />
+              ) : (
+                <div className="rounded-full flex items-center justify-center font-bold text-sm"
+                  style={{ width: 36, height: 36, background: "#1a1a1a", color: "#888", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {otherName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {otherOnline && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full" style={{ background: "#22c55e", border: "2px solid #090909" }} />
+              )}
+            </div>
             <div>
-              <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{otherName}</p>
+              <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{otherName}</p>
               {otherOnline
-                ? <p className="text-xs" style={{ color: "#4ade80" }}>Online now</p>
+                ? <p className="text-xs flex items-center gap-1" style={{ color: "#22c55e" }}>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e" }} /> Online now
+                  </p>
                 : otherLastSeen
                   ? <p className="text-xs" style={{ color: "#444" }}>Active {timeAgo(otherLastSeen)}</p>
                   : null}
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-            {messages.map((m) => {
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5">
+            {messages.length === 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="ghost-bg w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 26, color: "#2a2a2a" }}>chat_bubble</span>
+                  </div>
+                  <p className="text-sm" style={{ color: "#444" }}>Say hello 👋</p>
+                </div>
+              </div>
+            )}
+            {messages.map((m, i) => {
               const isMine = m.senderId === user?.uid;
+              const prevSame = i > 0 && messages[i-1].senderId === m.senderId;
               return (
-                <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-[72%] px-4 py-2.5 text-sm" style={{
-                    background: isMine ? "#fff" : "#1a1a1a",
-                    color: isMine ? "#000" : "#f2f2f2",
-                    borderRadius: isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`} style={{ marginTop: prevSame ? 2 : 8 }}>
+                  <div className="max-w-[72%] px-4 py-2.5 text-sm leading-relaxed" style={{
+                    background: isMine
+                      ? "linear-gradient(135deg,#7C3AED,#a855f7)"
+                      : "linear-gradient(135deg,#1a1a2a,#131320)",
+                    color: isMine ? "#fff" : "#e0e0e0",
+                    borderRadius: isMine
+                      ? (prevSame ? "18px 6px 6px 18px" : "18px 18px 6px 18px")
+                      : (prevSame ? "6px 18px 18px 6px" : "18px 18px 18px 6px"),
+                    boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+                    border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
                   }}>
                     {m.text}
                   </div>
@@ -220,36 +275,46 @@ export default function PrivateChatsPage() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="flex items-center gap-3 px-4 py-3"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)" }}>
+          {/* Input bar */}
+          <div className="flex items-center gap-2.5 px-4 pt-3 shrink-0"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 72px)" }}>
             {user?.photoURL ? (
               <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
             ) : (
               <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                style={{ width: 32, height: 32, background: "#222", color: "#aaa" }}>
+                style={{ width: 32, height: 32, background: "#1a1a1a", color: "#888", border: "1px solid rgba(255,255,255,0.08)" }}>
                 {myInitial}
               </div>
             )}
             <input type="text" value={text} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMsg()}
+              onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 350)}
               placeholder="Type a message…"
-              className="flex-1 px-4 py-2.5 rounded-full outline-none"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }} />
-            <button onClick={sendMsg} disabled={!text.trim() || sending}
-              className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer transition-all"
-              style={{ background: text.trim() ? "#fff" : "rgba(255,255,255,0.06)", color: text.trim() ? "#000" : "#555" }}>
+              className="flex-1 px-4 py-2.5 rounded-full outline-none transition-all"
+              style={{
+                background: hasText ? "rgba(124,58,237,0.08)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${hasText ? "rgba(124,58,237,0.3)" : "rgba(255,255,255,0.08)"}`,
+                color: "#f2f2f2", fontSize: 16,
+              }} />
+            <button onClick={sendMsg} disabled={!hasText || sending}
+              className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer transition-all shrink-0"
+              style={{
+                background: hasText ? "linear-gradient(135deg,#7C3AED,#a855f7)" : "rgba(255,255,255,0.05)",
+                boxShadow: hasText ? "0 0 16px rgba(124,58,237,0.4)" : "none",
+                color: hasText ? "#fff" : "#444",
+              }}>
               <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: "'FILL' 1" }}>send</span>
             </button>
           </div>
         </div>
-      ) : (
+      ) : chats.length > 0 ? (
         <div className="hidden lg:flex flex-1 items-center justify-center flex-col gap-3">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#333" }}>chat</span>
+          <div className="ghost-bg w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#2a2a2a" }}>chat</span>
           </div>
-          <p className="font-medium" style={{ color: "#444" }}>Select a conversation</p>
+          <p className="font-medium text-sm" style={{ color: "#333" }}>Select a conversation</p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -22,25 +22,25 @@ function timeAgo(s: number) {
 
 function notifText(n: Notif) {
   switch (n.type) {
-    case "like": return "liked your post";
+    case "like":    return "liked your post";
     case "comment": return "commented on your post";
-    case "follow": return "started following you";
+    case "follow":  return "started following you";
     case "mention": return "mentioned you in a post";
     case "message": return n.message ? `sent you a message: "${n.message}"` : "sent you a message";
-    case "live": return "went live";
-    default: return n.message || "sent you a notification";
+    case "live":    return "went live";
+    default:        return n.message || "sent you a notification";
   }
 }
 
 function notifConfig(type: string) {
   switch (type) {
-    case "like":    return { icon: "favorite",       color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
-    case "comment": return { icon: "chat_bubble",    color: "#60a5fa", bg: "rgba(96,165,250,0.15)" };
-    case "follow":  return { icon: "person_add",     color: "#34d399", bg: "rgba(52,211,153,0.15)" };
-    case "mention": return { icon: "alternate_email",color: "#a78bfa", bg: "rgba(167,139,250,0.15)" };
-    case "message": return { icon: "chat",            color: "#60a5fa", bg: "rgba(96,165,250,0.15)" };
-    case "live":    return { icon: "sensors",        color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
-    default:        return { icon: "notifications",  color: "#888",    bg: "rgba(255,255,255,0.08)" };
+    case "like":    return { icon: "favorite",        color: "#ef4444", bg: "rgba(239,68,68,0.18)",    border: "rgba(239,68,68,0.3)" };
+    case "comment": return { icon: "chat_bubble",     color: "#60a5fa", bg: "rgba(96,165,250,0.18)",   border: "rgba(96,165,250,0.3)" };
+    case "follow":  return { icon: "person_add",      color: "#34d399", bg: "rgba(52,211,153,0.18)",   border: "rgba(52,211,153,0.3)" };
+    case "mention": return { icon: "alternate_email", color: "#a78bfa", bg: "rgba(167,139,250,0.18)",  border: "rgba(167,139,250,0.3)" };
+    case "message": return { icon: "chat",            color: "#06b6d4", bg: "rgba(6,182,212,0.18)",    border: "rgba(6,182,212,0.3)" };
+    case "live":    return { icon: "sensors",         color: "#ef4444", bg: "rgba(239,68,68,0.18)",    border: "rgba(239,68,68,0.3)" };
+    default:        return { icon: "notifications",   color: "#888",    bg: "rgba(255,255,255,0.08)",  border: "rgba(255,255,255,0.12)" };
   }
 }
 
@@ -69,7 +69,7 @@ function groupByDate(notifs: Notif[]) {
 function NotifSkeleton() {
   return (
     <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="skeleton rounded-full shrink-0" style={{ width: 44, height: 44 }} />
+      <div className="skeleton rounded-full shrink-0" style={{ width: 46, height: 46 }} />
       <div className="flex-1 flex flex-col gap-2">
         <div className="skeleton rounded-full" style={{ width: "70%", height: 12 }} />
         <div className="skeleton rounded-full" style={{ width: "35%", height: 10 }} />
@@ -94,10 +94,9 @@ export default function NotificationsPage() {
     );
     return onSnapshot(q,
       (snap) => {
-        const sorted = snap.docs
+        setNotifs(snap.docs
           .map((d) => ({ id: d.id, ...(d.data() as Omit<Notif, "id">) }))
-          .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-        setNotifs(sorted);
+          .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
         setLoading(false);
       },
       () => setLoading(false)
@@ -120,87 +119,121 @@ export default function NotificationsPage() {
       <PageHeader title="Notifications" right={
         unreadCount > 0 && (
           <button onClick={markAll}
-            className="text-sm font-semibold border-none cursor-pointer px-4 py-2 rounded-full"
-            style={{ color: "#000", background: "#fff" }}>
+            className="btn-glass text-sm font-semibold border-none cursor-pointer px-4 py-2 rounded-full"
+            style={{ color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" }}>
             Mark all read
           </button>
         )
       } />
-      <div className="px-4 pt-4">
 
-      {loading ? (
-        <div className="flex flex-col gap-2">
-          {[1,2,3,4,5].map((i) => <NotifSkeleton key={i} />)}
+      {/* Cinematic Hero */}
+      <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
+        style={{ background: "linear-gradient(135deg,#0a0614 0%,#110a20 50%,#0a0614 100%)", border: "1px solid rgba(167,139,250,0.2)", minHeight: 120 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.35),transparent)", animation: "scanLine 6s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-40%", left: "50%", transform: "translateX(-50%)", width: 360, height: 360, background: "radial-gradient(ellipse at center,rgba(167,139,250,0.22) 0%,transparent 65%)", animation: "heroGlow 5s ease-in-out infinite" }} />
+        <div className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none select-none">
+          <img src="/static/logo-nav.svg" alt="" style={{ width: 110, opacity: 0.05, filter: "grayscale(1) brightness(3)", animation: "floatLogo 9s ease-in-out infinite" }} />
         </div>
-      ) : notifs.length === 0 ? (
-        <div className="ghost-bg text-center py-24 rounded-3xl">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#2a2a2a" }}>notifications</span>
-          </div>
-          <p className="font-semibold mb-2" style={{ color: "#f2f2f2" }}>All caught up</p>
-          <p className="text-sm" style={{ color: "#555" }}>Likes, comments and follows will appear here.</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-5">
-          {groups.map((group) => (
-            <div key={group.label}>
-              <p className="text-xs font-bold mb-2 px-1 tracking-wide" style={{ color: "#444" }}>{group.label.toUpperCase()}</p>
-              <div className="flex flex-col gap-1.5">
-                {group.items.map((n) => {
-                  const { icon, color, bg } = notifConfig(n.type);
-                  const href = n.type === "message" ? `/private-chats?uid=${n.senderId}` : n.postId ? `/comments?postId=${n.postId}` : n.senderId ? `/user-profile?uid=${n.senderId}` : "#";
-                  return (
-                    <Link key={n.id} href={href}
-                      onClick={() => !n.read && updateDoc(doc(db, "notifications", n.id), { read: true })}
-                      className="flex items-center gap-3 p-3.5 rounded-2xl transition-all"
-                      style={{
-                        background: n.read ? "#111" : "#181818",
-                        border: `1px solid ${n.read ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)"}`,
-                      }}>
-                      {/* Avatar + icon badge */}
-                      <div className="relative shrink-0">
-                        {n.senderPhoto ? (
-                          <img src={n.senderPhoto} alt="" className="rounded-full object-cover" style={{ width: 46, height: 46 }} />
-                        ) : (
-                          <div className="rounded-full flex items-center justify-center" style={{ width: 46, height: 46, background: "#1a1a1a" }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#444" }}>person</span>
-                          </div>
-                        )}
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: bg, border: "2px solid #111" }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 13, color, fontVariationSettings: "'FILL' 1" }}>{icon}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm leading-snug" style={{ color: n.read ? "#999" : "#e0e0e0" }}>
-                          <span className="font-semibold" style={{ color: n.read ? "#ccc" : "#f2f2f2" }}>{n.senderName || "Someone"} </span>
-                          {notifText(n)}
-                        </p>
-                        {n.createdAt?.seconds && (
-                          <p className="text-xs mt-0.5" style={{ color: "#3a3a3a" }}>{timeAgo(n.createdAt.seconds)}</p>
-                        )}
-                      </div>
-
-                      {!n.read && (
-                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#fff" }} />
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
+        <div className="relative z-10 p-5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "rgba(167,139,250,0.2)", border: "1px solid rgba(167,139,250,0.35)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 12, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>notifications</span>
             </div>
-          ))}
-        {hasMore && (
-          <button
-            onClick={() => setDisplayLimit((l) => l + 30)}
-            className="w-full py-3 rounded-2xl text-sm font-semibold mt-4 border-none cursor-pointer"
-            style={{ background: "rgba(255,255,255,0.05)", color: "#888" }}>
-            Load more
-          </button>
-        )}
+            <span className="text-xs font-black tracking-widest" style={{ color: "#a78bfa", letterSpacing: "0.18em" }}>NOTIFICATIONS</span>
+          </div>
+          <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.4rem,5vw,1.8rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#c4b5fd 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Activity</h1>
+          {!loading && (
+            <div className="flex items-center gap-4">
+              <div><span className="text-base font-black" style={{ color: unreadCount > 0 ? "#a78bfa" : "#555" }}>{unreadCount}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>unread</span></div>
+              <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} />
+              <div><span className="text-base font-black" style={{ color: "#555" }}>{notifs.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>total</span></div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      <div className="px-4">
+        {loading ? (
+          <div className="flex flex-col gap-2">
+            {[1,2,3,4,5].map((i) => <NotifSkeleton key={i} />)}
+          </div>
+        ) : notifs.length === 0 ? (
+          <div className="ghost-bg text-center py-24 rounded-3xl">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
+              style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#4a3a6a" }}>notifications</span>
+            </div>
+            <p className="font-semibold mb-2" style={{ color: "#f2f2f2" }}>All caught up</p>
+            <p className="text-sm" style={{ color: "#555" }}>Likes, comments and follows will appear here.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {groups.map((group) => (
+              <div key={group.label}>
+                <p className="text-[10px] font-black mb-2.5 px-1 tracking-widest" style={{ color: "#333" }}>{group.label.toUpperCase()}</p>
+                <div className="flex flex-col gap-1.5">
+                  {group.items.map((n) => {
+                    const { icon, color, bg, border } = notifConfig(n.type);
+                    const href = n.type === "message"
+                      ? `/private-chats?uid=${n.senderId}`
+                      : n.postId ? `/comments?postId=${n.postId}`
+                      : n.senderId ? `/user-profile?uid=${n.senderId}` : "#";
+                    return (
+                      <Link key={n.id} href={href}
+                        onClick={() => !n.read && updateDoc(doc(db, "notifications", n.id), { read: true })}
+                        className="flex items-center gap-3 p-3.5 rounded-2xl transition-all relative overflow-hidden"
+                        style={{
+                          background: n.read ? "#0f0f0f" : "#141420",
+                          border: `1px solid ${n.read ? "rgba(255,255,255,0.05)" : border}`,
+                          boxShadow: n.read ? "none" : `0 0 12px ${bg.replace("0.18","0.08")}`,
+                        }}>
+                        {/* Colored left accent for unread */}
+                        {!n.read && (
+                          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: color }} />
+                        )}
+
+                        {/* Avatar + icon badge */}
+                        <div className="relative shrink-0">
+                          {n.senderPhoto ? (
+                            <img src={n.senderPhoto} alt="" className="rounded-full object-cover" style={{ width: 46, height: 46 }} />
+                          ) : (
+                            <div className="rounded-full flex items-center justify-center" style={{ width: 46, height: 46, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.06)" }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#444" }}>person</span>
+                            </div>
+                          )}
+                          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: bg, border: `2px solid ${n.read ? "#0f0f0f" : "#141420"}` }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13, color, fontVariationSettings: "'FILL' 1" }}>{icon}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm leading-snug" style={{ color: n.read ? "#888" : "#e0e0e0" }}>
+                            <span className="font-bold" style={{ color: n.read ? "#aaa" : "#f2f2f2" }}>{n.senderName || "Someone"} </span>
+                            {notifText(n)}
+                          </p>
+                          {n.createdAt?.seconds && (
+                            <p className="text-xs mt-0.5" style={{ color: n.read ? "#333" : "#555" }}>{timeAgo(n.createdAt.seconds)}</p>
+                          )}
+                        </div>
+
+                        {!n.read && (
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {hasMore && (
+              <button onClick={() => setDisplayLimit((l) => l + 30)}
+                className="btn-glass w-full py-3 rounded-2xl text-sm font-semibold mt-2 border-none cursor-pointer"
+                style={{ color: "#666", border: "1px solid rgba(255,255,255,0.08)" }}>
+                Load more
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
