@@ -75,7 +75,7 @@ export default function StoriesPage() {
       }
       setGroups([...groupMap.values()]);
       setLoading(false);
-    });
+    }, () => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function StoriesPage() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="spinner" /></div>
       ) : groups.length === 0 ? (
-        <div className="text-center py-20">
+        <div className="ghost-bg text-center py-20 rounded-3xl">
           <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
             style={{ background: "rgba(255,255,255,0.04)", border: "2px dashed rgba(255,255,255,0.1)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 34, color: "#333" }}>auto_stories</span>

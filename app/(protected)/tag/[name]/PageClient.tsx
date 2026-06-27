@@ -37,7 +37,7 @@ export default function TagPage() {
       {loading ? (
         <div className="flex justify-center py-16"><div className="spinner" /></div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-20">
+        <div className="ghost-bg text-center py-20 rounded-3xl">
           <span className="material-symbols-outlined" style={{ fontSize: 44, display: "block", marginBottom: 12, color: "#222" }}>tag</span>
           <p className="font-semibold mb-1" style={{ color: "#f2f2f2" }}>No posts yet</p>
           <p className="text-sm" style={{ color: "#555" }}>Be the first to use #{name}</p>

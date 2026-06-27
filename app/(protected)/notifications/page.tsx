@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { collection, query, where, limit, onSnapshot, updateDoc, doc, writeBatch } from "firebase/firestore";
+import { collection, query, where, limit, orderBy, onSnapshot, updateDoc, doc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
@@ -26,6 +26,7 @@ function notifText(n: Notif) {
     case "comment": return "commented on your post";
     case "follow": return "started following you";
     case "mention": return "mentioned you in a post";
+    case "message": return n.message ? `sent you a message: "${n.message}"` : "sent you a message";
     case "live": return "went live";
     default: return n.message || "sent you a notification";
   }
@@ -37,6 +38,7 @@ function notifConfig(type: string) {
     case "comment": return { icon: "chat_bubble",    color: "#60a5fa", bg: "rgba(96,165,250,0.15)" };
     case "follow":  return { icon: "person_add",     color: "#34d399", bg: "rgba(52,211,153,0.15)" };
     case "mention": return { icon: "alternate_email",color: "#a78bfa", bg: "rgba(167,139,250,0.15)" };
+    case "message": return { icon: "chat",            color: "#60a5fa", bg: "rgba(96,165,250,0.15)" };
     case "live":    return { icon: "sensors",        color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
     default:        return { icon: "notifications",  color: "#888",    bg: "rgba(255,255,255,0.08)" };
   }
@@ -80,13 +82,15 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
+  const [displayLimit, setDisplayLimit] = useState(30);
 
   useEffect(() => {
     if (!user) return;
     const q = query(
       collection(db, "notifications"),
       where("recipientId", "==", user.uid),
-      limit(60)
+      orderBy("createdAt", "desc"),
+      limit(200)
     );
     return onSnapshot(q,
       (snap) => {
@@ -108,7 +112,8 @@ export default function NotificationsPage() {
   };
 
   const unreadCount = notifs.filter((n) => !n.read).length;
-  const groups = groupByDate(notifs);
+  const groups = groupByDate(notifs.slice(0, displayLimit));
+  const hasMore = notifs.length > displayLimit;
 
   return (
     <div className="max-w-xl mx-auto pb-6">
@@ -128,7 +133,7 @@ export default function NotificationsPage() {
           {[1,2,3,4,5].map((i) => <NotifSkeleton key={i} />)}
         </div>
       ) : notifs.length === 0 ? (
-        <div className="text-center py-24">
+        <div className="ghost-bg text-center py-24 rounded-3xl">
           <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#2a2a2a" }}>notifications</span>
@@ -144,7 +149,7 @@ export default function NotificationsPage() {
               <div className="flex flex-col gap-1.5">
                 {group.items.map((n) => {
                   const { icon, color, bg } = notifConfig(n.type);
-                  const href = n.postId ? `/comments?postId=${n.postId}` : n.senderId ? `/user-profile?uid=${n.senderId}` : "#";
+                  const href = n.type === "message" ? `/private-chats?uid=${n.senderId}` : n.postId ? `/comments?postId=${n.postId}` : n.senderId ? `/user-profile?uid=${n.senderId}` : "#";
                   return (
                     <Link key={n.id} href={href}
                       onClick={() => !n.read && updateDoc(doc(db, "notifications", n.id), { read: true })}
@@ -186,6 +191,14 @@ export default function NotificationsPage() {
               </div>
             </div>
           ))}
+        {hasMore && (
+          <button
+            onClick={() => setDisplayLimit((l) => l + 30)}
+            className="w-full py-3 rounded-2xl text-sm font-semibold mt-4 border-none cursor-pointer"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#888" }}>
+            Load more
+          </button>
+        )}
         </div>
       )}
       </div>

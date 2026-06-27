@@ -58,7 +58,7 @@ export default function FollowingPage() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="spinner" /></div>
       ) : list.length === 0 ? (
-        <div className="text-center py-16">
+        <div className="ghost-bg text-center py-16 rounded-3xl">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(255,255,255,0.04)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#333" }}>group</span>
           </div>

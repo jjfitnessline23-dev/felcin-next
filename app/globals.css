@@ -110,6 +110,23 @@ input, textarea, select, button { font-family: inherit; }
   box-shadow: 0 0 20px rgba(255,255,255,0.15);
 }
 
+/* ── Ghost logo watermark background — drop this on any plain dark section ── */
+.ghost-bg {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.ghost-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/static/logo-nav.svg') center / 260px no-repeat;
+  opacity: 0.045;
+  filter: grayscale(1) brightness(3);
+  pointer-events: none;
+  z-index: -1;
+}
+
 /* ── Cinematic glass button — apply to any plain dark button ── */
 .btn-glass {
   position: relative;

@@ -26,7 +26,7 @@ export default function BookmarksPage() {
       }));
       setPosts(fetched.filter(Boolean) as Post[]);
       setLoading(false);
-    });
+    }, () => setLoading(false));
   }, [user]);
 
   return (
@@ -37,7 +37,7 @@ export default function BookmarksPage() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="spinner" /></div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-20">
+        <div className="ghost-bg text-center py-20 rounded-3xl">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(255,255,255,0.04)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#333" }}>bookmark</span>
           </div>

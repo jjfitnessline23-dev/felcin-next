@@ -1,14 +1,22 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { collection, query, orderBy, limit, getDocs, getDoc, doc, startAfter, QueryDocumentSnapshot, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import PostCard from "@/components/PostCard";
 
 interface Post {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   mediaUrl?: string; contentType?: string; mimeType?: string;
-  thumbnailUrl?: string; likes?: number;
+  thumbnailUrl?: string; likes?: number; isStory?: boolean;
+  status?: string; maxViews?: number | null; viewCount?: number;
+  caption?: string; text?: string; likedBy?: string[]; comments?: number;
+  createdAt?: { seconds: number } | null;
+  collabUid?: string | null; collabName?: string | null; collabPhoto?: string | null;
+  repostCount?: number; isRepost?: boolean; repostOf?: string | null;
+  repostOriginalAuthorName?: string | null;
 }
 interface Creator { uid: string; displayName: string; photoURL?: string; }
 interface GhostWorkout {
@@ -42,6 +50,9 @@ let usersCache: UserResult[] | null = null;
 const PAGE_SIZE = 12;
 
 export default function ExplorePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQ, setSearchQ] = useState("");
   const [searchTab, setSearchTab] = useState<"people" | "tags">("people");
   const [searchUsers, setSearchUsers] = useState<UserResult[]>([]);
@@ -49,6 +60,7 @@ export default function ExplorePage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const fetchingUsers = useRef(false);
 
+  const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
   const [posts, setPosts] = useState<Post[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
   const [ghosts, setGhosts] = useState<GhostWorkout[]>([]);
@@ -59,6 +71,13 @@ export default function ExplorePage() {
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus search when navigated from /search
+  useEffect(() => {
+    if (searchParams.get("tab") === "search") {
+      setTimeout(() => searchInputRef.current?.focus(), 200);
+    }
+  }, [searchParams]);
 
   // ── Search ──────────────────────────────────────────
   useEffect(() => {
@@ -92,12 +111,12 @@ export default function ExplorePage() {
       ? query(collection(db, "posts"), orderBy("createdAt", "desc"), startAfter(after), limit(PAGE_SIZE))
       : query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
     const snap = await getDocs(q);
-    const raw = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) })).filter((p) => p.mediaUrl);
+    const raw = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) })).filter((p) => p.mediaUrl && !p.isStory && p.status !== "scheduled" && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
     setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
     setHasMore(snap.docs.length === PAGE_SIZE);
     const authorIds = [...new Set(raw.map((p) => p.authorId).filter(Boolean))];
     const profileMap = new Map<string, { name: string; photo: string }>();
-    await Promise.all(authorIds.slice(0, 12).map(async (uid) => {
+    await Promise.all(authorIds.map(async (uid) => {
       try {
         const s = await getDoc(doc(db, "users", uid, "public", "profile"));
         if (s.exists()) { const d = s.data(); profileMap.set(uid, { name: d.displayName || "User", photo: d.photoURL || "" }); }
@@ -155,11 +174,19 @@ export default function ExplorePage() {
       <div className="sticky z-10 px-4 pt-4 pb-3"
         style={{ top: "env(safe-area-inset-top,0px)", background: "rgba(9,9,9,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
 
+        <div className="flex items-center gap-2 mb-3">
+          <button onClick={() => router.back()} className="icon-btn shrink-0" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
+          </button>
+          <h1 className="font-bold text-base" style={{ color: "#f2f2f2" }}>Explore</h1>
+        </div>
+
         {/* Search bar */}
         <div className="relative mb-3">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2" style={{ fontSize: 20, color: "#555" }}>search</span>
           <input
             type="text" value={searchQ} onChange={(e) => setSearchQ(e.target.value)}
+            ref={searchInputRef}
             placeholder="Search people, #hashtags…"
             className="w-full pl-10 pr-10 py-2.5 rounded-2xl outline-none text-sm"
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2" }}
@@ -259,7 +286,13 @@ export default function ExplorePage() {
               {creatorsLoading
                 ? Array.from({ length: 6 }).map((_, i) => <CreatorSkeleton key={i} />)
                 : creators.length === 0
-                ? <p className="text-sm py-2" style={{ color: "#444" }}>Be the first to post!</p>
+                ? (
+                  <div className="flex flex-col items-center justify-center py-4 px-2 text-center" style={{ minWidth: 200 }}>
+                    <span className="material-symbols-outlined mb-2" style={{ fontSize: 28, color: "#222" }}>group</span>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "#444" }}>No creators yet</p>
+                    <p className="text-xs" style={{ color: "#333" }}>Be the first — create a post to appear here</p>
+                  </div>
+                )
                 : creators.map((c) => (
                   <Link key={c.uid} href={`/user-profile?uid=${c.uid}`}
                     className="flex flex-col items-center gap-2 shrink-0 no-underline" style={{ width: 76 }}>
@@ -272,82 +305,42 @@ export default function ExplorePage() {
             </div>
           </div>
 
-          {/* Ghost Workouts */}
-          {ghosts.length > 0 && (
-            <div className="px-4 pb-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>
-                  <span style={{ color: "#a78bfa" }}>Ghost</span> Workouts
-                </p>
-                <Link href="/ghost" className="text-xs font-semibold" style={{ color: "#555" }}>See all</Link>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                {ghosts.map((w) => (
-                  <Link key={w.id} href={`/ghost/${w.id}`}
-                    className="shrink-0 p-3 rounded-2xl no-underline"
-                    style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)", width: 180 }}>
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ background: "rgba(167,139,250,0.15)" }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
-                    </div>
-                    <p className="text-sm font-semibold mb-0.5 truncate" style={{ color: "#f2f2f2" }}>{w.title}</p>
-                    <p className="text-xs" style={{ color: "#6d51c4" }}>
-                      {w.exercises ? `${(w.exercises as unknown[]).length} exercises` : "Workout"}
-                      {(w.sessionCount ?? 0) > 0 ? ` · ${w.sessionCount} trained` : ""}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 2 }} />
 
           {/* Post grid */}
           {loading ? (
-            <div className="grid grid-cols-3" style={{ gap: 2 }}><GridSkeleton /></div>
+            <div className="flex flex-col gap-5 px-4">
+              {[1,2,3].map((i) => <div key={i} className="skeleton rounded-2xl" style={{ height: 420 }} />)}
+            </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-20 px-4">
-              <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#222", display: "block", marginBottom: 12 }}>photo_library</span>
-              <p className="text-base font-semibold mb-1" style={{ color: "#f2f2f2" }}>Nothing here yet</p>
-              <p className="text-sm mb-5" style={{ color: "#555" }}>Be the first to post on Felcin.</p>
-              <Link href="/creator" className="px-5 py-2.5 rounded-xl text-sm font-bold no-underline" style={{ background: "#fff", color: "#000" }}>Create a post</Link>
+            <div className="ghost-bg text-center py-16 px-6 rounded-3xl">
+              <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#2a2a2a", fontVariationSettings: "'FILL' 1" }}>photo_library</span>
+              </div>
+              <p className="text-lg font-bold mb-2" style={{ color: "#f2f2f2" }}>Felcin is just getting started</p>
+              <p className="text-sm mb-2" style={{ color: "#555" }}>Be one of the first creators and build your audience from day one.</p>
+              <p className="text-xs mb-6" style={{ color: "#333" }}>Early creators grow fastest — the platform is yours to shape.</p>
+              <div className="flex flex-col gap-3">
+                <Link href="/creator" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold no-underline" style={{ background: "#fff", color: "#000" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+                  Create your first post
+                </Link>
+                <Link href="/ghost" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold no-underline" style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.2)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>sprint</span>
+                  Try a Ghost Workout
+                </Link>
+              </div>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-3" style={{ gap: 2 }}>
-                {filtered.map((post) => {
-                  const type = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
-                  return (
-                    <Link key={post.id} href={`/comments?postId=${post.id}`}
-                      className="relative block group" style={{ aspectRatio: "1", overflow: "hidden", background: "#0f0f0f" }}>
-                      {type === "video" ? (
-                        post.thumbnailUrl
-                          ? <img src={post.thumbnailUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                          : <div className="w-full h-full flex items-center justify-center" style={{ background: "#111" }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#333" }}>play_circle</span>
-                            </div>
-                      ) : (
-                        <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      )}
-                      {post.authorPhoto && (
-                        <div className="absolute bottom-1.5 left-1.5">
-                          <img src={post.authorPhoto} alt="" className="rounded-full object-cover" style={{ width: 22, height: 22, border: "1.5px solid rgba(255,255,255,0.3)" }} />
-                        </div>
-                      )}
-                      {type === "video" && (
-                        <span className="material-symbols-outlined absolute top-2 right-2 text-white" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>play_circle</span>
-                      )}
-                      {(post.likes ?? 0) > 0 && (
-                        <div className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.6)" }}>
-                          <span className="material-symbols-outlined text-white" style={{ fontSize: 10, fontVariationSettings: "'FILL' 1" }}>favorite</span>
-                          <span className="text-white" style={{ fontSize: 9, fontWeight: 700 }}>{post.likes}</span>
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
+              <div className="flex flex-col gap-5 px-4">
+                {filtered
+                  .filter((p) => !blockedUids.has(p.authorId))
+                  .map((post) => (
+                    <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
+                  ))}
               </div>
-              <div ref={sentinelRef} className="flex justify-center py-4">
+              <div ref={sentinelRef} className="flex justify-center py-6">
                 {loadingMore && <div className="spinner" />}
               </div>
             </>

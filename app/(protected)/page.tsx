@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection, query, orderBy, limit, getDocs, onSnapshot,
   doc, getDoc, startAfter, QueryDocumentSnapshot, where, setDoc, deleteDoc, addDoc, serverTimestamp,
@@ -8,6 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
+import AdCard, { Ad } from "@/components/AdCard";
 import { PostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
@@ -33,8 +35,12 @@ interface Post {
   maxViews?: number | null;
   viewCount?: number;
 }
+interface HomeCreator { uid: string; displayName: string; photoURL?: string; }
+interface HomeGhost { id: string; title: string; hostName: string; hostPhoto?: string; sessionCount?: number; exercises?: unknown[]; }
 
 const PAGE_SIZE = 12;
+const FEED_CACHE_KEY = "felcin_home_v3";
+const FEED_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 const authorCache = new Map<string, { name: string; photo: string }>();
 const AUTHOR_CACHE_MAX = 400;
@@ -81,12 +87,33 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+const AD_INJECT_EVERY = 5; // insert one ad every N posts
+
+function buildFeedItems(posts: Post[], ads: Ad[]): (Post | Ad)[] {
+  if (ads.length === 0) return posts;
+  const result: (Post | Ad)[] = [];
+  let adIndex = 0;
+  posts.forEach((post, i) => {
+    result.push(post);
+    if ((i + 1) % AD_INJECT_EVERY === 0 && adIndex < ads.length) {
+      result.push(ads[adIndex % ads.length]);
+      adIndex++;
+    }
+  });
+  return result;
+}
+
 export default function HomePage() {
   const { user } = useAuth();
   const unread = useUnreadCount();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
   const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
   const [blockedByUids, setBlockedByUids] = useState<Set<string>>(new Set());
+  const [activeAds, setActiveAds] = useState<Ad[]>([]);
+  const [boostEnabled, setBoostEnabled] = useState(true);
+  const processedBoostRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -98,6 +125,55 @@ export default function HomePage() {
     }, () => {});
     return () => { unsubBlocked(); unsubBlockedBy(); };
   }, [user]);
+
+  // Load feature flags
+  useEffect(() => {
+    getDoc(doc(db, "config", "features")).then((snap) => {
+      if (snap.exists()) {
+        setBoostEnabled(snap.data().boostEnabled ?? true);
+        const adsOn = snap.data().adsEnabled ?? true;
+        if (adsOn) {
+          getDocs(query(
+            collection(db, "ads"),
+            where("status", "==", "active"),
+            orderBy("createdAt", "desc"),
+            limit(5)
+          )).then((adSnap) => {
+            setActiveAds(adSnap.docs.map((d) => ({ _isAd: true as const, id: d.id, ...(d.data() as Omit<Ad, "_isAd" | "id">) })));
+          }).catch(() => {});
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Handle boost session redirect
+  useEffect(() => {
+    const sessionId = searchParams.get("boost_session_id");
+    if (!sessionId || !user || processedBoostRef.current === sessionId) return;
+    processedBoostRef.current = sessionId;
+    router.replace("/");
+    fetch(`/api/boost-verify?session_id=${encodeURIComponent(sessionId)}`).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
+
+  // Handle premium session return
+  useEffect(() => {
+    const sessionId = searchParams.get("premium_session_id");
+    if (!sessionId || !user) return;
+    router.replace("/");
+    fetch(`/api/premium-verify?session_id=${encodeURIComponent(sessionId)}`).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
+
+  // Featured Creators + Ghost Workouts
+  const [featuredCreators, setFeaturedCreators] = useState<HomeCreator[]>([]);
+  const [featuredGhosts, setFeaturedGhosts] = useState<HomeGhost[]>([]);
+
+  useEffect(() => {
+    getDocs(query(collection(db, "ghostWorkouts"), orderBy("createdAt", "desc"), limit(6)))
+      .then((snap) => setFeaturedGhosts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<HomeGhost, "id">) }))))
+      .catch(() => {});
+  }, []);
 
   // For You feed
   const [posts, setPosts] = useState<Post[]>([]);
@@ -113,19 +189,74 @@ export default function HomePage() {
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // For You: real-time first page
+  // For You: cache-first (show instantly, refresh in background — same strategy as Instagram/X)
   useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
-    return onSnapshot(q, async (snap) => {
-      const raw: Post[] = snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
-        .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
-      const enriched = await enrichWithAuthor(raw);
-      setPosts(enriched);
-      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
-      setHasMore(snap.docs.length === PAGE_SIZE);
-      setLoading(false);
-    });
+    // ── STEP 1: show cached feed instantly, zero network wait ──
+    try {
+      const stored = localStorage.getItem(FEED_CACHE_KEY);
+      if (stored) {
+        const { posts: cached, ts } = JSON.parse(stored) as { posts: Post[]; ts: number };
+        if (Date.now() - ts < FEED_CACHE_TTL && cached.length > 0) {
+          setPosts(cached);
+          setLoading(false);
+          const seen = new Set<string>();
+          const cs: HomeCreator[] = [];
+          for (const p of cached) {
+            if (!seen.has(p.authorId) && p.authorName && p.authorName !== "User") {
+              seen.add(p.authorId);
+              cs.push({ uid: p.authorId, displayName: p.authorName, photoURL: p.authorPhoto });
+              if (cs.length >= 12) break;
+            }
+          }
+          setFeaturedCreators(cs);
+        }
+      }
+    } catch {}
+
+    // ── STEP 2: fetch fresh from Firestore in background ──
+    getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE)))
+      .then(async (snap) => {
+        const raw: Post[] = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
+          .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
+
+        setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        // ── STEP 3: show posts immediately — posts already carry authorName/Photo ──
+        setPosts(raw);
+        setLoading(false);
+        const seen = new Set<string>();
+        const cs: HomeCreator[] = [];
+        for (const p of raw) {
+          if (!seen.has(p.authorId) && p.authorName && p.authorName !== "User") {
+            seen.add(p.authorId);
+            cs.push({ uid: p.authorId, displayName: p.authorName, photoURL: p.authorPhoto });
+            if (cs.length >= 12) break;
+          }
+        }
+        setFeaturedCreators(cs);
+
+        // ── STEP 4: silently enrich author profiles in background ──
+        enrichWithAuthor(raw).then((enriched) => {
+          setPosts(enriched);
+          const seen2 = new Set<string>();
+          const cs2: HomeCreator[] = [];
+          for (const p of enriched) {
+            if (!seen2.has(p.authorId) && p.authorName && p.authorName !== "User") {
+              seen2.add(p.authorId);
+              cs2.push({ uid: p.authorId, displayName: p.authorName, photoURL: p.authorPhoto });
+              if (cs2.length >= 12) break;
+            }
+          }
+          setFeaturedCreators(cs2);
+          // ── STEP 5: save to cache for next open ──
+          try {
+            localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ posts: enriched, ts: Date.now() }));
+          } catch {}
+        }).catch(() => {});
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const loadMore = useCallback(async () => {
@@ -255,6 +386,34 @@ export default function HomePage() {
         <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#6d51c4" }}>chevron_right</span>
       </Link>
 
+      {/* Ghost Workouts carousel */}
+      {featuredGhosts.length > 0 && (
+        <div className="mb-5 -mx-4 px-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>
+              <span style={{ color: "#a78bfa" }}>Ghost</span> Workouts
+            </p>
+            <Link href="/ghost" className="text-xs font-semibold" style={{ color: "#555" }}>See all</Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {featuredGhosts.map((w) => (
+              <Link key={w.id} href={`/ghost/${w.id}`}
+                className="shrink-0 p-3 rounded-2xl no-underline"
+                style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)", width: 160 }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ background: "rgba(167,139,250,0.15)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>sprint</span>
+                </div>
+                <p className="text-sm font-semibold mb-0.5 truncate" style={{ color: "#f2f2f2" }}>{w.title}</p>
+                <p className="text-xs" style={{ color: "#6d51c4" }}>
+                  {w.exercises ? `${(w.exercises as unknown[]).length} exercises` : "Workout"}
+                  {(w.sessionCount ?? 0) > 0 ? ` · ${w.sessionCount} trained` : ""}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* For You */}
       {tab === "foryou" && (
         loading ? (
@@ -300,9 +459,14 @@ export default function HomePage() {
         ) : (
           <>
             <div className="flex flex-col gap-5">
-              {posts.filter((p) => !blockedUids.has(p.authorId) && !blockedByUids.has(p.authorId)).map((post) => (
-                <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
-              ))}
+              {buildFeedItems(
+                posts.filter((p) => !blockedUids.has(p.authorId) && !blockedByUids.has(p.authorId)),
+                activeAds
+              ).map((item, i) =>
+                "_isAd" in item
+                  ? <AdCard key={`ad-${item.id}-${i}`} ad={item as Ad} />
+                  : <PostCard key={item.id} post={item as Post} boostEnabled={boostEnabled} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
+              )}
             </div>
             <div ref={sentinelRef} className="flex justify-center py-6">
               {loadingMore && <div className="spinner" />}
@@ -318,13 +482,13 @@ export default function HomePage() {
             {[1,2,3].map((i) => <PostCardSkeleton key={i} />)}
           </div>
         ) : followingIds?.length === 0 ? (
-          <div className="text-center py-20" style={{ color: "#888" }}>
+          <div className="ghost-bg text-center py-20 rounded-3xl" style={{ color: "#888" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>group</span>
             <p className="text-lg font-semibold" style={{ color: "#f1f1f1" }}>Follow someone first</p>
             <p className="text-sm mt-1">Explore creators and follow them to see their posts here.</p>
           </div>
         ) : followingPosts.length === 0 ? (
-          <div className="text-center py-20" style={{ color: "#888" }}>
+          <div className="ghost-bg text-center py-20 rounded-3xl" style={{ color: "#888" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12 }}>photo_camera</span>
             <p className="text-lg font-semibold" style={{ color: "#f1f1f1" }}>No posts yet</p>
             <p className="text-sm mt-1">People you follow haven&apos;t posted yet.</p>
