@@ -216,23 +216,23 @@ export default function MobileNav() {
         {/* Scrollable menu */}
         <div className="overflow-y-auto flex-1 px-3 py-2">
 
-          {/* FELCIN STUDIO — featured entry */}
-          <Link href="/podcasts" onClick={() => setOpen(false)}
+          {/* DASHBOARD — featured entry */}
+          <Link href="/dashboard" onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-4 relative overflow-hidden"
-            style={{ background: "linear-gradient(135deg,#0d0618,#130a24)", border: "1px solid rgba(124,58,237,0.3)" }}>
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at left, rgba(124,58,237,0.18) 0%, transparent 65%)" }} />
+            style={{ background: "linear-gradient(135deg,#0a0a12,#111128)", border: "1px solid rgba(167,139,250,0.2)" }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at left, rgba(167,139,250,0.12) 0%, transparent 65%)" }} />
             <div className="relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: "rgba(124,58,237,0.25)", border: "1px solid rgba(124,58,237,0.4)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>mic</span>
+              style={{ background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>bar_chart</span>
             </div>
             <div className="relative flex-1 min-w-0">
-              <p className="text-sm font-black" style={{ color: "#f2f2f2" }}>Podcast Studio</p>
-              <p className="text-xs" style={{ color: "#666" }}>Episodes · Live broadcasts</p>
+              <p className="text-sm font-black" style={{ color: "#f2f2f2" }}>Dashboard</p>
+              <p className="text-xs" style={{ color: "#666" }}>Stats · Growth · Analytics</p>
             </div>
             <div className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0"
-              style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 11, color: "#a78bfa" }}>podcasts</span>
-              <span className="text-[10px] font-bold" style={{ color: "#a78bfa" }}>STUDIO</span>
+              style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 11, color: "#a78bfa" }}>trending_up</span>
+              <span className="text-[10px] font-bold" style={{ color: "#a78bfa" }}>STATS</span>
             </div>
           </Link>
 
