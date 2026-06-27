@@ -130,6 +130,34 @@ export default function StoriesPage() {
           Add
         </Link>
       } />
+
+      {/* Cinematic Hero */}
+      <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
+        style={{ background: "linear-gradient(135deg,#130008 0%,#1c0012 50%,#130008 100%)", border: "1px solid rgba(236,72,153,0.2)", minHeight: 160 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(236,72,153,0.4),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(236,72,153,0.25) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        <div className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none select-none">
+          <img src="/static/logo-nav.svg" alt="" style={{ width: 160, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(280deg)", animation: "floatLogo 8s ease-in-out infinite" }} />
+        </div>
+        <div className="relative z-10 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(236,72,153,0.2)", border: "1px solid rgba(236,72,153,0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#ec4899", fontVariationSettings: "'FILL' 1" }}>auto_stories</span>
+            </div>
+            <span className="text-xs font-black tracking-widest" style={{ color: "#ec4899", letterSpacing: "0.18em" }}>STORIES</span>
+          </div>
+          <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.6rem,6vw,2.2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#f9a8d4 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Stories</h1>
+          <p className="text-sm" style={{ color: "#555" }}>Moments that disappear after 24 hours</p>
+          {!loading && (
+            <div className="flex items-center gap-4 mt-3">
+              <div><span className="text-base font-black" style={{ color: "#ec4899" }}>{groups.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>creators live</span></div>
+              <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.07)" }} />
+              <div><span className="text-base font-black" style={{ color: "#ec4899" }}>{groups.reduce((s, g) => s + g.stories.length, 0)}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>stories</span></div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="px-4 pt-4">
 
       {loading ? (

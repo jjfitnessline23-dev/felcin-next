@@ -93,16 +93,36 @@ export default function ChallengesPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#f2f2f2" }}>Challenge Chains</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#555" }}>Complete it. Tag 3. Keep it going.</p>
+      {/* Cinematic Hero */}
+      <div className="relative rounded-3xl overflow-hidden mb-6"
+        style={{ background: "linear-gradient(135deg,#120800 0%,#1c0e00 50%,#120800 100%)", border: "1px solid rgba(245,158,11,0.22)", minHeight: 160 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(245,158,11,0.4),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 420, height: 420, background: "radial-gradient(ellipse at center,rgba(245,158,11,0.28) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        <div className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none select-none">
+          <img src="/static/logo-nav.svg" alt="" style={{ width: 160, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(30deg)", animation: "floatLogo 8s ease-in-out infinite" }} />
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer"
-          style={{ background: "#f2f2f2", color: "#000" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Start Chain
-        </button>
+        <div className="relative z-10 p-5 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.4)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#f59e0b", fontVariationSettings: "'FILL' 1" }}>link</span>
+              </div>
+              <span className="text-xs font-black tracking-widest" style={{ color: "#f59e0b", letterSpacing: "0.18em" }}>CHALLENGE CHAINS</span>
+            </div>
+            <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.6rem,6vw,2.2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#fcd34d 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Challenge Chains</h1>
+            <p className="text-sm" style={{ color: "#555" }}>Complete it. Tag 3. Keep it going.</p>
+            {!loading && (
+              <div className="flex items-center gap-4 mt-3">
+                <div><span className="text-base font-black" style={{ color: "#f59e0b" }}>{challenges.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>active chains</span></div>
+              </div>
+            )}
+          </div>
+          <button onClick={() => setShowCreate(true)}
+            className="btn-glass flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer shrink-0 mt-1"
+            style={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.12)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Start Chain
+          </button>
+        </div>
       </div>
 
       {loading ? (
