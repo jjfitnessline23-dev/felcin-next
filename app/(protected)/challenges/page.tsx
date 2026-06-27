@@ -101,27 +101,20 @@ export default function ChallengesPage() {
         <div className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none select-none">
           <img src="/static/logo-nav.svg" alt="" style={{ width: 160, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(30deg)", animation: "floatLogo 8s ease-in-out infinite" }} />
         </div>
-        <div className="relative z-10 p-5 flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.4)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#f59e0b", fontVariationSettings: "'FILL' 1" }}>link</span>
-              </div>
-              <span className="text-xs font-black tracking-widest" style={{ color: "#f59e0b", letterSpacing: "0.18em" }}>CHALLENGE CHAINS</span>
+        <div className="relative z-10 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#f59e0b", fontVariationSettings: "'FILL' 1" }}>link</span>
             </div>
-            <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.6rem,6vw,2.2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#fcd34d 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Challenge Chains</h1>
-            <p className="text-sm" style={{ color: "#555" }}>Complete it. Tag 3. Keep it going.</p>
-            {!loading && (
-              <div className="flex items-center gap-4 mt-3">
-                <div><span className="text-base font-black" style={{ color: "#f59e0b" }}>{challenges.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>active chains</span></div>
-              </div>
-            )}
+            <span className="text-xs font-black tracking-widest" style={{ color: "#f59e0b", letterSpacing: "0.18em" }}>CHALLENGE CHAINS</span>
           </div>
-          <button onClick={() => setShowCreate(true)}
-            className="btn-glass flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm border-none cursor-pointer shrink-0 mt-1"
-            style={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.12)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Start Chain
-          </button>
+          <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.6rem,6vw,2.2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#fcd34d 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Challenge Chains</h1>
+          <p className="text-sm" style={{ color: "#555" }}>Complete it. Tag 3. Keep it going.</p>
+          {!loading && challenges.length > 0 && (
+            <div className="flex items-center gap-4 mt-3">
+              <div><span className="text-base font-black" style={{ color: "#f59e0b" }}>{challenges.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>active chains</span></div>
+            </div>
+          )}
         </div>
       </div>
 
