@@ -103,7 +103,33 @@ export default function SchedulePage() {
           </button>
         )
       } />
-      <div className="px-4 pt-4">
+
+      {/* Cinematic Hero */}
+      <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
+        style={{ background: "linear-gradient(135deg,#120005 0%,#1c0008 50%,#120005 100%)", border: "1px solid rgba(239,68,68,0.2)", minHeight: 150 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(239,68,68,0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(239,68,68,0.25) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        <div className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none select-none">
+          <img src="/static/logo-nav.svg" alt="" style={{ width: 130, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(300deg)", animation: "floatLogo 9s ease-in-out infinite" }} />
+        </div>
+        <div className="relative z-10 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#ef4444", fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+            </div>
+            <span className="text-xs font-black tracking-widest" style={{ color: "#ef4444", letterSpacing: "0.18em" }}>LIVE SCHEDULE</span>
+          </div>
+          <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.5rem,5vw,2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#fca5a5 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Live Schedule</h1>
+          <p className="text-sm" style={{ color: "#555" }}>Upcoming fitness classes & live workouts</p>
+          {!loading && (
+            <div className="flex items-center gap-4 mt-3">
+              <div><span className="text-base font-black" style={{ color: "#ef4444" }}>{classes.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>upcoming</span></div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 pt-2">
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="spinner" /></div>
