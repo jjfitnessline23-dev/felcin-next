@@ -35,11 +35,17 @@ img, video { max-width: 100%; }
 a { color: inherit; text-decoration: none; }
 input, textarea, select, button { font-family: inherit; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-/* Hide all scrollbars globally */
+/* Scrollbar — hidden on mobile/touch, visible on desktop */
 * { scrollbar-width: none; }
 *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+@media (min-width: 1024px) and (pointer: fine) {
+  * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+  *::-webkit-scrollbar { display: block; width: 4px; height: 4px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 999px; }
+  *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
+}
 
 /* Nav link */
 .nav-link {
@@ -70,16 +76,70 @@ input, textarea, select, button { font-family: inherit; }
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.13s;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  color: #666;
+  transition: all 0.18s;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-top-color: rgba(255,255,255,0.16);
+  background: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+  color: #777;
+  position: relative;
+  overflow: hidden;
 }
-.btn-pill.is-active, .btn-pill:hover {
+.btn-pill::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+  transition: left 0.45s ease;
+  pointer-events: none;
+}
+.btn-pill:hover::before { left: 150%; }
+.btn-pill:hover {
+  background: linear-gradient(135deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.06) 100%);
+  border-color: rgba(255,255,255,0.18);
+  color: #ccc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.1) inset;
+}
+.btn-pill:active { transform: translateY(0); }
+.btn-pill.is-active {
   background: #fff;
   color: #000;
   border-color: #fff;
+  box-shadow: 0 0 20px rgba(255,255,255,0.15);
 }
+
+/* ── Cinematic glass button — apply to any plain dark button ── */
+.btn-glass {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-top-color: rgba(255,255,255,0.18);
+  background: linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 60%, rgba(255,255,255,0.05) 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.07) inset, 0 4px 12px rgba(0,0,0,0.35);
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-glass::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -110%;
+  width: 65%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent);
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+.btn-glass:hover::before { left: 140%; }
+.btn-glass:hover {
+  background: linear-gradient(160deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.08) 100%);
+  border-color: rgba(255,255,255,0.2);
+  border-top-color: rgba(255,255,255,0.28);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset, 0 8px 24px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04);
+  transform: translateY(-1px);
+}
+.btn-glass:active { transform: translateY(0) scale(0.98); }
 
 /* Skeleton shimmer */
 @keyframes shimmer {
@@ -131,21 +191,40 @@ input, textarea, select, button { font-family: inherit; }
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-main { animation: pageFadeIn 0.18s ease-out both; }
+main { animation: pageFadeIn 0.18s ease-out; }
 
 /* Icon button */
 .icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
   border-radius: 50%;
-  transition: background 0.12s;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.15s;
   color: #666;
+  position: relative;
+  overflow: hidden;
 }
-.icon-btn:hover { background: rgba(255,255,255,0.07); color: #ccc; }
+.icon-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -110%;
+  width: 65%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  transition: left 0.45s ease;
+  pointer-events: none;
+}
+.icon-btn:hover::before { left: 140%; }
+.icon-btn:hover {
+  background: linear-gradient(160deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 4px 12px rgba(0,0,0,0.3);
+  color: #ccc;
+  transform: translateY(-1px);
+}
+.icon-btn:active { transform: scale(0.94); }
 
 /* Sidebar: desktop only — explicit media query so Tailwind v4 doesn't interfere */
 .sidebar-desktop { display: none !important; }
@@ -158,3 +237,147 @@ main { animation: pageFadeIn 0.18s ease-out both; }
 @media (min-width: 1024px) {
   .mobile-nav-bar, .mobile-nav-drawer { display: none !important; }
 }
+
+/* Ghost Workout animations */
+@keyframes ghostFloat {
+  0%   { transform: translateY(-50%) perspective(600px) rotateY(-12deg) rotateX(4deg); }
+  25%  { transform: translateY(calc(-50% - 14px)) perspective(600px) rotateY(0deg) rotateX(-2deg); }
+  50%  { transform: translateY(-50%) perspective(600px) rotateY(12deg) rotateX(4deg); }
+  75%  { transform: translateY(calc(-50% - 10px)) perspective(600px) rotateY(0deg) rotateX(-2deg); }
+  100% { transform: translateY(-50%) perspective(600px) rotateY(-12deg) rotateX(4deg); }
+}
+@keyframes ghostFloatBottom {
+  0%   { transform: perspective(500px) rotateY(10deg) rotateX(-3deg); }
+  50%  { transform: translateY(-12px) perspective(500px) rotateY(-10deg) rotateX(3deg); }
+  100% { transform: perspective(500px) rotateY(10deg) rotateX(-3deg); }
+}
+@keyframes ghostIconFloat {
+  0%   { transform: perspective(300px) rotateY(-14deg) rotateX(6deg); }
+  33%  { transform: translateY(-4px) perspective(300px) rotateY(6deg) rotateX(-3deg); }
+  66%  { transform: translateY(-6px) perspective(300px) rotateY(14deg) rotateX(5deg); }
+  100% { transform: perspective(300px) rotateY(-14deg) rotateX(6deg); }
+}
+@keyframes ghostGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.18); }
+}
+/* Exercise demo flip — alternates two static images to simulate motion */
+@keyframes demoImgA {
+  0%, 40% { opacity: 1; }
+  50%, 90% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes demoImgB {
+  0%, 40% { opacity: 0; }
+  50%, 90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.demo-img-a { animation: demoImgA 1.6s ease-in-out infinite; }
+.demo-img-b { animation: demoImgB 1.6s ease-in-out infinite; }
+
+/* ══ Ghost Skeleton Exercise Animations ══
+   Parts: body | lua/rua (upper arm) | lfa/rfa (forearm) | lth/rth (thigh) | lsh/rsh (shin) */
+
+/* generic */
+@keyframes skel-gen-body { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes skel-gen-lua  { 0%,100%{transform:rotate(-6deg)} 50%{transform:rotate(6deg)} }
+@keyframes skel-gen-rua  { 0%,100%{transform:rotate(6deg)}  50%{transform:rotate(-6deg)} }
+@keyframes skel-gen-lfa  { 0%,100%{transform:rotate(0deg)}  50%{transform:rotate(8deg)} }
+@keyframes skel-gen-rfa  { 0%,100%{transform:rotate(0deg)}  50%{transform:rotate(-8deg)} }
+@keyframes skel-gen-lth  { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+@keyframes skel-gen-rth  { 0%,100%{transform:rotate(3deg)}  50%{transform:rotate(-3deg)} }
+@keyframes skel-gen-lsh  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-gen-rsh  { 0%,100%{transform:rotate(0deg)} }
+
+/* squat / lunge / jump */
+@keyframes skel-squat-body { 0%,100%{transform:translateY(0)}    40%,60%{transform:translateY(46px)} }
+@keyframes skel-squat-lua  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(-58deg)} }
+@keyframes skel-squat-rua  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(58deg)} }
+@keyframes skel-squat-lfa  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(18deg)} }
+@keyframes skel-squat-rfa  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(-18deg)} }
+@keyframes skel-squat-lth  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(-38deg)} }
+@keyframes skel-squat-rth  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(38deg)} }
+@keyframes skel-squat-lsh  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(44deg)} }
+@keyframes skel-squat-rsh  { 0%,100%{transform:rotate(0deg)}     40%,60%{transform:rotate(-44deg)} }
+
+/* bicep curl / tricep / bench / push-up */
+@keyframes skel-curl-body  { 0%,100%{transform:translateY(0)} }
+@keyframes skel-curl-lua   { 0%,100%{transform:rotate(8deg)}    50%{transform:rotate(22deg)} }
+@keyframes skel-curl-rua   { 0%,100%{transform:rotate(-8deg)}   50%{transform:rotate(-22deg)} }
+@keyframes skel-curl-lfa   { 0%,100%{transform:rotate(0deg)}    50%{transform:rotate(-118deg)} }
+@keyframes skel-curl-rfa   { 0%,100%{transform:rotate(0deg)}    50%{transform:rotate(118deg)} }
+@keyframes skel-curl-lth   { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-curl-rth   { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-curl-lsh   { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-curl-rsh   { 0%,100%{transform:rotate(0deg)} }
+
+/* shoulder press / overhead / lateral raise / pull-up / row */
+@keyframes skel-spress-body { 0%,100%{transform:translateY(0)} }
+@keyframes skel-spress-lua  { 0%,100%{transform:rotate(0deg)}   50%{transform:rotate(-162deg)} }
+@keyframes skel-spress-rua  { 0%,100%{transform:rotate(0deg)}   50%{transform:rotate(162deg)} }
+@keyframes skel-spress-lfa  { 0%,100%{transform:rotate(-28deg)} 50%{transform:rotate(6deg)} }
+@keyframes skel-spress-rfa  { 0%,100%{transform:rotate(28deg)}  50%{transform:rotate(-6deg)} }
+@keyframes skel-spress-lth  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-spress-rth  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-spress-lsh  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-spress-rsh  { 0%,100%{transform:rotate(0deg)} }
+
+/* bench press / push-up / dip — arms spread wide then push */
+@keyframes skel-bench-body { 0%,100%{transform:translateY(0)} }
+@keyframes skel-bench-lua  { 0%,100%{transform:rotate(-62deg)} 40%,60%{transform:rotate(-18deg)} }
+@keyframes skel-bench-rua  { 0%,100%{transform:rotate(62deg)}  40%,60%{transform:rotate(18deg)} }
+@keyframes skel-bench-lfa  { 0%,100%{transform:rotate(-82deg)} 40%,60%{transform:rotate(0deg)} }
+@keyframes skel-bench-rfa  { 0%,100%{transform:rotate(82deg)}  40%,60%{transform:rotate(0deg)} }
+@keyframes skel-bench-lth  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-bench-rth  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-bench-lsh  { 0%,100%{transform:rotate(0deg)} }
+@keyframes skel-bench-rsh  { 0%,100%{transform:rotate(0deg)} }
+
+/* deadlift / hip hinge */
+@keyframes skel-dead-body  { 0%,100%{transform:translateY(0)} }
+@keyframes skel-dead-lua   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(82deg)} }
+@keyframes skel-dead-rua   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(-82deg)} }
+@keyframes skel-dead-lfa   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(-22deg)} }
+@keyframes skel-dead-rfa   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(22deg)} }
+@keyframes skel-dead-lth   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(-18deg)} }
+@keyframes skel-dead-rth   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(18deg)} }
+@keyframes skel-dead-lsh   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(14deg)} }
+@keyframes skel-dead-rsh   { 0%,100%{transform:rotate(0deg)}  40%,60%{transform:rotate(-14deg)} }
+
+/* running / cardio */
+@keyframes skel-run-body { 0%,100%{transform:translateY(0)}    25%,75%{transform:translateY(-11px)} }
+@keyframes skel-run-lua  { 0%,100%{transform:rotate(-36deg)}   50%{transform:rotate(36deg)} }
+@keyframes skel-run-rua  { 0%,100%{transform:rotate(36deg)}    50%{transform:rotate(-36deg)} }
+@keyframes skel-run-lfa  { 0%,100%{transform:rotate(-16deg)}   50%{transform:rotate(16deg)} }
+@keyframes skel-run-rfa  { 0%,100%{transform:rotate(16deg)}    50%{transform:rotate(-16deg)} }
+@keyframes skel-run-lth  { 0%,100%{transform:rotate(36deg)}    50%{transform:rotate(-48deg)} }
+@keyframes skel-run-rth  { 0%,100%{transform:rotate(-48deg)}   50%{transform:rotate(36deg)} }
+@keyframes skel-run-lsh  { 0%,100%{transform:rotate(-24deg)}   50%{transform:rotate(10deg)} }
+@keyframes skel-run-rsh  { 0%,100%{transform:rotate(10deg)}    50%{transform:rotate(-24deg)} }
+
+/* Muscle body animations */
+@keyframes musclePrimaryPulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(168,85,247,0.9)) drop-shadow(0 0 3px rgba(168,85,247,1)); opacity: 1; }
+  50%       { filter: drop-shadow(0 0 24px rgba(168,85,247,1)) drop-shadow(0 0 14px rgba(216,180,254,0.95)) drop-shadow(0 0 40px rgba(168,85,247,0.55)); opacity: 0.78; }
+}
+@keyframes muscleSecondaryPulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(109,40,217,0.6)); opacity: 1; }
+  50%       { filter: drop-shadow(0 0 14px rgba(109,40,217,0.95)) drop-shadow(0 0 22px rgba(109,40,217,0.45)); opacity: 0.72; }
+}
+@keyframes ekgScroll {
+  0%   { stroke-dashoffset: 120; }
+  100% { stroke-dashoffset: -120; }
+}
+@keyframes eyeGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(168,85,247,1)); }
+  50%       { filter: drop-shadow(0 0 10px rgba(216,180,254,1)) drop-shadow(0 0 18px rgba(168,85,247,0.8)); }
+}
+.muscle-primary-pulse   { animation: musclePrimaryPulse 1.7s ease-in-out infinite; }
+.muscle-secondary-pulse { animation: muscleSecondaryPulse 2.3s ease-in-out infinite; }
+.ekg-animate  { stroke-dasharray: 60 240; animation: ekgScroll 2.4s linear infinite; }
+.ghost-eye-glow { animation: eyeGlow 2.1s ease-in-out infinite; }
+
+.ghost-float { animation: ghostFloat 8s ease-in-out infinite; }
+.ghost-float-bottom { animation: ghostFloatBottom 10s ease-in-out infinite; }
+.ghost-icon-float { animation: ghostIconFloat 5s ease-in-out infinite; }
+.ghost-glow-pulse { animation: ghostGlow 5s ease-in-out infinite; }

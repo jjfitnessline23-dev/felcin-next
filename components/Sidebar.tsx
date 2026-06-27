@@ -195,8 +195,8 @@ export default function Sidebar() {
             </div>
           </Link>
           <button onClick={handleSignOut} title="Sign out"
-            className="icon-btn shrink-0" style={{ width: 30, height: 30 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#444" }}>logout</span>
+            className="icon-btn btn-glass shrink-0" style={{ width: 30, height: 30, borderRadius: "50%" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>logout</span>
           </button>
         </div>
       </div>

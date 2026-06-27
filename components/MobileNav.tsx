@@ -207,8 +207,7 @@ export default function MobileNav() {
               </div>
             </Link>
             <Link href="/settings" onClick={() => setOpen(false)}
-              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: "rgba(255,255,255,0.06)" }}>
+              className="btn-glass w-9 h-9 rounded-full flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>settings</span>
             </Link>
           </div>
@@ -309,8 +308,8 @@ export default function MobileNav() {
         {/* Sign out */}
         <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <button onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border-none cursor-pointer"
-            style={{ background: "rgba(255,255,255,0.05)", color: "#666" }}>
+            className="btn-glass w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border-none cursor-pointer"
+            style={{ color: "#777" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 17 }}>logout</span>
             Sign out
           </button>
