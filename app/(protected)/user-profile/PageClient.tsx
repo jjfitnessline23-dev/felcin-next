@@ -306,8 +306,8 @@ export default function UserProfilePage() {
               };
               const m = BADGE_META[profile.badge] ?? { icon: "workspace_premium", label: profile.badge, color: "#f2f2f2", bg: "rgba(255,255,255,0.1)", border: "rgba(255,255,255,0.25)" };
               return (
-                <div className="absolute left-1/2 -bottom-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap"
-                  style={{ background: m.bg, border: `1px solid ${m.border}`, color: m.color, transform: "translateX(-50%)" }}>
+                <div className="absolute left-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap"
+                  style={{ bottom: -20, background: m.bg, border: `1px solid ${m.border}`, color: m.color, transform: "translateX(-50%)", zIndex: 10, backdropFilter: "blur(6px)" }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 11, fontVariationSettings: "'FILL' 1" }}>{m.icon}</span>
                   {m.label}
                 </div>
