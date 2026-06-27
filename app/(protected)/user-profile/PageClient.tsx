@@ -270,8 +270,8 @@ export default function UserProfilePage() {
       </div>
 
       {/* ── Banner ── */}
-      <div className="relative overflow-hidden" style={{ height: 180, background: "linear-gradient(135deg, #0d0618 0%, #110828 40%, #0a1020 70%, #080810 100%)" }}>
-        {/* Scan line */}
+      <div className="relative" style={{ height: 180, background: "linear-gradient(135deg, #0d0618 0%, #110828 40%, #0a1020 70%, #080810 100%)" }}>
+        {/* Scan line — clipped inside banner, avatar lives outside via z-index */}
         <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.3),transparent)", animation: "scanLine 6s linear infinite", zIndex: 1 }} />
         {/* Radial spotlight */}
         <div className="absolute pointer-events-none" style={{ top: "-30%", left: "30%", transform: "translateX(-50%)", width: 420, height: 420, background: "radial-gradient(ellipse at center,rgba(124,58,237,0.3) 0%,rgba(80,0,180,0.1) 40%,transparent 68%)", animation: "heroGlow 5s ease-in-out infinite" }} />
@@ -282,13 +282,13 @@ export default function UserProfilePage() {
         {/* Avatar anchored to bottom-left */}
         <div className="absolute" style={{ bottom: -52, left: 16 }}>
           <div className="relative inline-block">
-            <div className="rounded-full" style={{ padding: 3, background: "linear-gradient(135deg,#a78bfa,#7C3AED,#4f46e5)", boxShadow: "0 0 0 3px #090909, 0 0 32px rgba(124,58,237,0.5), 0 0 60px rgba(124,58,237,0.2)" }}>
+            <div className="rounded-full" style={{ padding: 4, background: "linear-gradient(135deg,#e9d5ff,#a78bfa,#7C3AED)", boxShadow: "0 0 40px rgba(124,58,237,0.7), 0 0 80px rgba(124,58,237,0.3)" }}>
               {profile.photoURL ? (
                 <img src={profile.photoURL} alt="" className="rounded-full object-cover block"
                   style={{ width: 88, height: 88, border: "3px solid #090909" }} />
               ) : (
                 <div className="rounded-full flex items-center justify-center text-3xl font-bold"
-                  style={{ width: 88, height: 88, background: "linear-gradient(135deg,#3b2065,#1e1050)", color: "#c4b5fd" }}>
+                  style={{ width: 88, height: 88, background: "linear-gradient(135deg,#3b2065,#1e1050)", color: "#e9d5ff", border: "3px solid #090909" }}>
                   {initial}
                 </div>
               )}
