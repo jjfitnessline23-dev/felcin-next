@@ -9,141 +9,319 @@ service cloud.firestore {
       );
     }
 
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function onlyEngagementFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['likes', 'likedBy', 'comments', 'repostCount', 'viewCount']);
+    }
+
     // ── Posts ──
     match /posts/{postId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null
-                    && (request.auth.uid == resource.data.authorId || isAdmin());
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.authorId ||
+        onlyEngagementFields() ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
 
       match /comments/{commentId} {
-        allow read: if true;
-        allow create: if request.auth != null;
-        allow delete: if request.auth != null
-                      && (request.auth.uid == resource.data.authorId || isAdmin());
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+        allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
+        allow update: if false;
       }
 
-      // Story reactions
       match /reactions/{userId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == userId;
       }
     }
 
     // ── Reels ──
     match /reels/{reelId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null
-                    && (request.auth.uid == resource.data.authorId || isAdmin());
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.authorId ||
+        onlyEngagementFields() ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
 
       match /comments/{commentId} {
-        allow read: if true;
-        allow create: if request.auth != null;
-        allow delete: if request.auth != null
-                      && (request.auth.uid == resource.data.authorId || isAdmin());
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+        allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
+        allow update: if false;
       }
     }
 
     // ── Users ──
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      // FIX: require auth to read — prevents unauthenticated access to emails
+      allow read: if isAuth();
+      allow create, update: if isAuth() && request.auth.uid == userId;
+      allow delete: if isAuth() && (request.auth.uid == userId || isAdmin());
 
+      // Public profile — readable by all authenticated users
       match /public/{doc} {
-        allow read: if true;
-        allow create, update: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+        allow read: if isAuth();
+        allow create, update: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow delete: if isAuth() && (request.auth.uid == userId || isAdmin());
       }
 
-      // All other subcollections (following, followers, blocked, workoutLogs, presence, subscriptions, etc.)
-      match /{subcollection}/{docId} {
-        allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-        allow write: if request.auth != null && request.auth.uid == userId;
+      // FIX: Followers — the FOLLOWER (docId) writes their own entry, not the followed user
+      match /followers/{followerId} {
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == followerId;
       }
 
-      // Earnings: creator's earnings written by buyers on subscription purchase
+      // FIX: BlockedBy — the BLOCKER (docId) writes the blocked-by entry
+      match /blockedBy/{blockerId} {
+        allow read: if isAuth() && (request.auth.uid == userId || request.auth.uid == blockerId || isAdmin());
+        allow write: if isAuth() && request.auth.uid == blockerId;
+      }
+
+      // Presence — own user writes, anyone authenticated reads (needed for chat online status)
+      match /presence/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
+      // Settings — strictly private
+      match /settings/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
+      // Subscriptions — buyer writes their own, creator can read theirs
+      match /subscriptions/{creatorId} {
+        allow read: if isAuth() && (request.auth.uid == userId || request.auth.uid == creatorId || isAdmin());
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
+      // Earnings — read by creator/admin; validated client writes (tips, subs) + admin
       match /earnings/{docId} {
-        allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-        allow create: if request.auth != null;
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow create: if isAuth()
+                      && request.resource.data.fromUid == request.auth.uid
+                      && request.resource.data.amountUsd is number
+                      && request.resource.data.amountUsd > 0
+                      && request.resource.data.amountUsd <= 100000;
+        allow update, delete: if isAdmin();
       }
+
+      // Monthly view tracking — any auth user can increment
+      match /monthlyViews/{month} {
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow write: if isAuth();
+      }
+
+      // Private subcollections — owner-only read/write
+      match /blocked/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
+      match /bookmarks/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
+      match /following/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
+      match /pushTokens/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
+      match /workoutLogs/{docId} {
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
+      match /workoutPlan/{docId} {
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
+      // Catch-all: read-only for owner/admin — write is INTENTIONALLY omitted here
+      // so the catch-all never silently bypasses the validated rules above (earnings, etc.)
+      match /{subcollection}/{docId} {
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+
+    // ── Ghost Workouts (FIX: was missing, defaulted to deny) ──
+    match /ghostWorkouts/{workoutId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.hostId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.hostId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sessionCount']) ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.hostId || isAdmin());
+
+      match /sessions/{sessionId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Ads ──
+    match /ads/{adId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.advertiserId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.advertiserId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['impressions', 'clicks']) ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.advertiserId || isAdmin());
     }
 
     // ── Chats ──
     match /chats/{chatId} {
-      allow read: if request.auth != null
-                  && request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null
-                    && request.auth.uid in request.resource.data.participants;
-      allow update: if request.auth != null
-                    && request.auth.uid in resource.data.participants;
+      allow read: if isAuth() && request.auth.uid in resource.data.participants;
+      allow create: if isAuth() && request.auth.uid in request.resource.data.participants;
+      allow update: if isAuth() && request.auth.uid in resource.data.participants;
+      allow delete: if false;
 
       match /messages/{messageId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
+        allow read: if isAuth()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isAuth()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
       }
     }
 
-    // ── Scheduled Classes ──
+    // ── Scheduled Classes (FIX: update now admin-only) ──
     match /scheduledClasses/{classId} {
-      allow read: if request.auth != null;
-      allow create: if isAdmin();
-      allow update: if request.auth != null;
-      allow delete: if isAdmin();
+      allow read: if isAuth();
+      allow create, update, delete: if isAdmin();
 
       match /rsvps/{userId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == userId;
       }
     }
 
     // ── Challenges ──
     match /challenges/{challengeId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
       allow delete: if isAdmin();
 
       match /nodes/{nodeId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update, delete: if false;
       }
     }
 
     // ── Live Streams ──
     match /streams/{streamId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.hostId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.hostId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewerCount']) ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.hostId || isAdmin());
 
-      match /{subcollection}/{docId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+      match /gifts/{docId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if isAdmin();
+      }
+
+      match /pulse/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+
+      match /race/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+
+      match /raceScores/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == docId;
       }
     }
 
     // ── Reports ──
     match /reports/{reportId} {
-      allow create: if request.auth != null;
+      allow create: if isAuth()
+                    && request.resource.data.reporterId == request.auth.uid;
       allow read, update, delete: if isAdmin();
     }
 
     // ── Notifications ──
     match /notifications/{notifId} {
-      allow read: if request.auth != null
-                  && request.auth.uid == resource.data.toUid;
-      allow create: if request.auth != null;
-      allow delete: if request.auth != null
-                    && (request.auth.uid == resource.data.toUid || isAdmin());
+      allow read: if isAuth()
+                  && (request.auth.uid == resource.data.toUid
+                      || request.auth.uid == resource.data.recipientId);
+      allow create: if isAuth()
+                    && (request.resource.data.recipientId is string
+                        || request.resource.data.toUid is string);
+      allow delete: if isAuth()
+                    && (request.auth.uid == resource.data.toUid
+                        || request.auth.uid == resource.data.recipientId
+                        || isAdmin());
+      allow update: if isAuth()
+                    && (request.auth.uid == resource.data.toUid
+                        || request.auth.uid == resource.data.recipientId);
     }
 
-    // ── Config (feature flags, admin settings) ──
+    // ── Trainer Profiles ──
+    match /trainerProfiles/{uid} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.auth.uid == uid;
+    }
+
+    // ── Training Sessions ──
+    match /trainingSessions/{sessionId} {
+      function isParticipant() {
+        return request.auth.uid == resource.data.trainerId
+            || request.auth.uid == resource.data.traineeId;
+      }
+      function isParticipantOnCreate() {
+        return request.auth.uid == request.resource.data.trainerId
+            || request.auth.uid == request.resource.data.traineeId;
+      }
+      allow read: if isAuth() && (isParticipant() || isAdmin());
+      allow create: if isAuth() && isParticipantOnCreate();
+      allow update: if isAuth() && (isParticipant() || isAdmin());
+      allow delete: if isAuth() && (request.auth.uid == resource.data.trainerId || isAdmin());
+    }
+
+    // ── Admin collection group reads ──
+    // Allows admin to query workoutLogs across ALL users in one collectionGroup call
+    match /{path=**}/workoutLogs/{docId} {
+      allow read: if isAdmin();
+    }
+
+    // ── Config (feature flags) ──
     match /config/{docId} {
-      allow read: if request.auth != null;
+      allow read: if isAuth();
       allow write: if isAdmin();
+    }
+
+    // ── Analytics ──
+    match /analytics/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAuth();
     }
   }
 }

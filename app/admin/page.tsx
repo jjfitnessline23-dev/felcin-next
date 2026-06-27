@@ -8,7 +8,7 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import { collection, query, orderBy, limit, getDocs, doc, deleteDoc, updateDoc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { collection, collectionGroup, query, orderBy, limit, getDocs, doc, deleteDoc, updateDoc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
@@ -126,34 +126,31 @@ export default function AdminPortalPage() {
     return () => unsubs.forEach((u) => u());
   }, [isOwner]);
 
-  const loadWorkouts = (userList: typeof users) => {
-    if (loadingWorkouts || userList.length === 0) return;
+  const loadWorkouts = (_userList?: typeof users) => {
+    if (loadingWorkouts) return;
     setLoadingWorkouts(true);
     setWorkoutLogs([]);
-    Promise.all(
-      userList.map((u) =>
-        getDocs(query(collection(db, "users", u.id, "workoutLogs"), orderBy("date", "desc"), limit(100)))
-          .then((snap) => snap.docs.map((d) => {
-            const data = d.data();
-            return { id: d.id, userId: u.id, date: data.date, exercises: data.exercises || [], notes: data.notes, durationMins: data.durationMins } as AdminWorkoutLog;
-          }))
-          .catch(() => [] as AdminWorkoutLog[])
-      )
-    )
-    .then((results) => {
-      const all = results.flat().sort((a, b) => (b.date?.seconds ?? 0) - (a.date?.seconds ?? 0));
-      setWorkoutLogs(all);
-    })
-    .finally(() => { setLoadingWorkouts(false); setWorkoutsLoaded(true); });
+    // Single collection group query — reads ALL users' workoutLogs in one request
+    getDocs(query(collectionGroup(db, "workoutLogs"), orderBy("date", "desc"), limit(500)))
+      .then((snap) => {
+        const all: AdminWorkoutLog[] = snap.docs.map((d) => {
+          const data = d.data();
+          // Extract userId from the document reference path: users/{userId}/workoutLogs/{docId}
+          const userId = d.ref.parent.parent?.id ?? "";
+          return { id: d.id, userId, date: data.date, exercises: data.exercises || [], notes: data.notes, durationMins: data.durationMins };
+        });
+        setWorkoutLogs(all);
+      })
+      .catch((err) => { console.error("workoutLogs collectionGroup error:", err); })
+      .finally(() => { setLoadingWorkouts(false); setWorkoutsLoaded(true); });
   };
 
-  // Auto-load workouts once users are ready
+  // Auto-load workouts once admin is confirmed
   useEffect(() => {
     if (workoutsLoaded || loadingWorkouts) return;
     if (!user || !OWNER_UIDS.includes(user.uid)) return;
-    if (users.length === 0) return;
-    loadWorkouts(users);
-  }, [users.length, workoutsLoaded]); // eslint-disable-line
+    loadWorkouts();
+  }, [!!user, workoutsLoaded]); // eslint-disable-line
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
