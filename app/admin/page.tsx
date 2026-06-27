@@ -131,7 +131,8 @@ export default function AdminPortalPage() {
     setLoadingWorkouts(true);
     setWorkoutLogs([]);
     // Single collection group query — reads ALL users' workoutLogs in one request
-    getDocs(query(collectionGroup(db, "workoutLogs"), orderBy("date", "desc"), limit(500)))
+    // No orderBy here to avoid requiring a collection group index; sort client-side below
+    getDocs(query(collectionGroup(db, "workoutLogs"), limit(500)))
       .then((snap) => {
         const all: AdminWorkoutLog[] = snap.docs.map((d) => {
           const data = d.data();
