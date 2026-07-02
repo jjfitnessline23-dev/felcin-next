@@ -13,7 +13,7 @@ const Model = dynamic(() => import("react-body-highlighter").then(m => m.default
 /* ── Types ── */
 interface LogExercise { name: string; }
 interface WorkoutLog  { date?: { seconds: number }; exercises: LogExercise[]; }
-type MuscleKey = "chest"|"back"|"shoulders"|"biceps"|"triceps"|"core"|"quads"|"hamstrings"|"glutes"|"calves"|"traps";
+type MuscleKey = "chest"|"back"|"shoulders"|"biceps"|"triceps"|"core"|"quads"|"hamstrings"|"glutes"|"calves"|"traps"|"forearms";
 
 /* ── Muscle definitions ── */
 const MUSCLES: { key: MuscleKey; label: string; keywords: string[]; ant: string[]; post: string[] }[] = [
@@ -39,6 +39,8 @@ const MUSCLES: { key: MuscleKey; label: string; keywords: string[]; ant: string[
     ant:["calves"],                          post:["calves"] },
   { key:"traps",      label:"Traps",       keywords:["shrug","trap","farmer","upright row"],
     ant:[],                                  post:["trapezius"] },
+  { key:"forearms",   label:"Forearms",    keywords:["forearm","wrist","reverse curl","wrist curl","wrist extension","grip","farmers walk","farmer carry","wrist roller"],
+    ant:["forearm"],                         post:["forearm"] },
 ];
 
 function matchMuscles(name: string): MuscleKey[] {
