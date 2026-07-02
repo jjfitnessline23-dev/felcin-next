@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.felcin.social",
+      "sha256_cert_fingerprints": [
+        "3A:9F:E3:68:45:A7:76:F3:C0:C5:99:8C:33:59:DC:07:26:04:7E:22:38:0D:12:1F:42:1B:E3:33:EB:2F:5D:B6",
+        "5B:F8:F1:D3:5D:4A:2F:97:C6:B5:E4:16:78:D7:A2:E4:07:D6:05:BA:99:CB:B8:E4:D2:19:C6:26:46:A5:62:16"
+      ]
+    }
+  }
+]
