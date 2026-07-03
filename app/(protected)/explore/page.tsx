@@ -277,8 +277,28 @@ export default function ExplorePage() {
       {/* ── Explore content ── */}
       {!isSearching && (
         <>
+          {/* Cinematic Hero */}
+          <div className="relative mx-4 mt-3 mb-3 rounded-3xl overflow-hidden"
+            style={{ background: "linear-gradient(135deg,#00080f 0%,#001520 50%,#00080f 100%)", border: "1px solid rgba(6,182,212,0.2)", minHeight: 130 }}>
+            <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(6,182,212,0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+            <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(6,182,212,0.18) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+            <div className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none select-none">
+              <img src="/static/logo-nav.svg" alt="" style={{ width: 120, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(160deg)", animation: "floatLogo 9s ease-in-out infinite" }} />
+            </div>
+            <div className="relative z-10 p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(6,182,212,0.2)", border: "1px solid rgba(6,182,212,0.4)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#06b6d4", fontVariationSettings: "'FILL' 1" }}>explore</span>
+                </div>
+                <span className="text-xs font-black tracking-widest" style={{ color: "#06b6d4", letterSpacing: "0.18em" }}>EXPLORE</span>
+              </div>
+              <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.5rem,5vw,2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#67e8f9 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Discover Felcin</h1>
+              <p className="text-sm" style={{ color: "#555" }}>Creators, workouts, challenges &amp; more</p>
+            </div>
+          </div>
+
           {/* Featured Creators */}
-          <div className="px-4 pt-5 pb-4">
+          <div className="px-4 pt-3 pb-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Featured Creators</p>
             </div>

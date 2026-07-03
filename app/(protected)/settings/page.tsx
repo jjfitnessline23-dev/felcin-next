@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import StripeCheckoutModal from "@/components/StripeCheckoutModal";
 
 interface BlockedUser { uid: string; displayName?: string; photoURL?: string; }
 
@@ -61,9 +62,52 @@ function Row({ icon, label, sub, right, danger, onPress, href }: {
   return <div className="first:border-t-0">{inner}</div>;
 }
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  try {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+    document.body.appendChild(el);
+    el.focus(); el.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(el);
+    return ok;
+  } catch {}
+  return false;
+}
+
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const [copied, setCopied] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [premiumLoading, setPremiumLoading] = useState(false);
+  const [premiumSecret, setPremiumSecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, "users", user.uid, "settings", "premium")).then((snap) => {
+      if (snap.exists() && snap.data()?.active) setIsPremium(true);
+    }).catch(() => {});
+  }, [user]);
+
+  const startPremium = async (plan: "monthly" | "yearly") => {
+    if (!user || premiumLoading) return;
+    setPremiumLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/premium-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, token }) });
+      const data = await res.json();
+      if (data.clientSecret) setPremiumSecret(data.clientSecret);
+    } catch {}
+    setPremiumLoading(false);
+  };
 
   // Privacy
   const [privateAccount, setPrivateAccount] = useState(false);
@@ -141,7 +185,107 @@ export default function SettingsPage() {
     <div className="max-w-xl mx-auto pb-10">
       <PageHeader title="Settings" />
 
-      <div className="pt-5">
+      {/* Cinematic Hero */}
+      <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
+        style={{ background: "linear-gradient(135deg,#0a0515 0%,#130a22 50%,#0a0515 100%)", border: "1px solid rgba(167,139,250,0.2)", minHeight: 150 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(167,139,250,0.2) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        <div className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none select-none">
+          <img src="/static/logo-nav.svg" alt="" style={{ width: 130, opacity: 0.05, filter: "grayscale(1) brightness(3)", animation: "floatLogo 9s ease-in-out infinite" }} />
+        </div>
+        <div className="relative z-10 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(167,139,250,0.2)", border: "1px solid rgba(167,139,250,0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>settings</span>
+            </div>
+            <span className="text-xs font-black tracking-widest" style={{ color: "#a78bfa", letterSpacing: "0.18em" }}>SETTINGS</span>
+          </div>
+          <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.5rem,5vw,2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#c4b5fd 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Your Account</h1>
+          <p className="text-sm" style={{ color: "#555" }}>{user?.email || "Manage your Felcin account"}</p>
+          {isPremium && (
+            <div className="flex items-center gap-2 mt-3">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 12, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                <span className="text-xs font-bold" style={{ color: "#fbbf24" }}>Premium Active</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="pt-2">
+
+        {/* Premium */}
+        <div className="mb-6 mx-4">
+          <div className="rounded-2xl p-5" style={{ background: isPremium ? "rgba(251,191,36,0.08)" : "#131313", border: `1px solid ${isPremium ? "rgba(251,191,36,0.3)" : "rgba(255,255,255,0.07)"}` }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.12)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+              </div>
+              <div>
+                <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>Felcin Premium</p>
+                <p className="text-xs" style={{ color: "#555" }}>No ads · Premium badge · Early access</p>
+              </div>
+              {isPremium && <span className="ml-auto text-xs font-bold px-2 py-1 rounded-full" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>Active</span>}
+            </div>
+            {!isPremium && (
+              <div className="flex gap-2">
+                <button onClick={() => startPremium("monthly")} disabled={premiumLoading}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
+                  style={{ background: "rgba(255,255,255,0.07)", color: "#f2f2f2" }}>
+                  $9.99 / mo
+                </button>
+                <button onClick={() => startPremium("yearly")} disabled={premiumLoading}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
+                  style={{ background: "#fbbf24", color: "#000" }}>
+                  $79.99 / yr
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Invite Friends */}
+        <div className="mb-6 mx-4">
+          <div className="rounded-2xl p-5" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(52,211,153,0.12)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#34d399", fontVariationSettings: "'FILL' 1" }}>group_add</span>
+              </div>
+              <div>
+                <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>Invite Friends to Felcin</p>
+                <p className="text-xs" style={{ color: "#555" }}>Share your profile and grow together</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <span className="text-xs flex-1 truncate" style={{ color: "#666" }}>
+                felcin.com/user-profile?uid={user?.uid?.slice(0, 8)}…
+              </span>
+              <button
+                onClick={async () => {
+                  const link = `https://felcin.com/user-profile?uid=${user?.uid}`;
+                  const ok = await copyToClipboard(link);
+                  if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+                }}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg border-none cursor-pointer shrink-0 transition-colors"
+                style={{ background: copied ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.08)", color: copied ? "#34d399" : "#aaa" }}>
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                const link = `https://felcin.com/user-profile?uid=${user?.uid}`;
+                const msg = `Join me on Felcin — the fitness platform where you train together!\n${link}`;
+                if (navigator.share) navigator.share({ text: msg, url: link }).catch(() => {});
+                else navigator.clipboard?.writeText(msg).catch(() => {});
+              }}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer flex items-center justify-center gap-2"
+              style={{ background: "rgba(52,211,153,0.12)", color: "#34d399", border: "1px solid rgba(52,211,153,0.2)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>ios_share</span>
+              Share Invite Link
+            </button>
+          </div>
+        </div>
 
         {/* Account */}
         <Section title="Account">
@@ -189,10 +333,10 @@ export default function SettingsPage() {
 
         {/* Support & Legal */}
         <Section title="Support & Legal">
-          <Row icon="help" label="Help & Support" href="/support" />
-          <Row icon="privacy_tip" label="Privacy Policy" href="/privacy" />
-          <Row icon="description" label="Terms of Service" href="/terms" />
-          <Row icon="rule" label="Community Guidelines" href="/guidelines" />
+          <Row icon="help" label="Help & Support" href="/legal/support" />
+          <Row icon="privacy_tip" label="Privacy Policy" href="/legal/privacy" />
+          <Row icon="description" label="Terms of Service" href="/legal/terms" />
+          <Row icon="rule" label="Community Guidelines" href="/legal/guidelines" />
         </Section>
 
         {/* Danger zone */}
@@ -203,6 +347,21 @@ export default function SettingsPage() {
 
         <p className="text-xs text-center pb-6 mt-2" style={{ color: "#2a2a2a" }}>Felcin © {new Date().getFullYear()}</p>
       </div>
+
+      {premiumSecret && (
+        <StripeCheckoutModal
+          fetchClientSecret={async () => premiumSecret}
+          onClose={() => setPremiumSecret(null)}
+          onComplete={() => {
+            const sessionId = premiumSecret.split("_secret_")[0];
+            setPremiumSecret(null);
+            fetch(`/api/premium-verify?session_id=${sessionId}`)
+              .then((r) => r.json())
+              .then((d) => { if (d.ok) setIsPremium(true); })
+              .catch(() => {});
+          }}
+        />
+      )}
     </div>
   );
 }

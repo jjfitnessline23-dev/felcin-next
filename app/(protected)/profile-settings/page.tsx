@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import { deriveNameFromEmail } from "@/lib/nameUtils";
 
 export default function ProfileSettingsPage() {
   const { user, signOut } = useAuth();
@@ -28,12 +29,12 @@ export default function ProfileSettingsPage() {
 
   useEffect(() => {
     if (!user) return;
-    setDisplayName(user.displayName || "");
+    setDisplayName(user.displayName || deriveNameFromEmail(user.email || ""));
     setPhotoURL(user.photoURL || "");
     getDoc(doc(db, "users", user.uid, "public", "profile")).then((snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        setDisplayName(d.displayName || user.displayName || "");
+        setDisplayName(d.displayName || user.displayName || deriveNameFromEmail(user.email || ""));
         setUsername((d.username || "").toLowerCase());
         setBio(d.bio || "");
         setPhotoURL(d.photoURL || user.photoURL || "");
@@ -99,7 +100,28 @@ export default function ProfileSettingsPage() {
   return (
     <div className="max-w-lg mx-auto pb-6">
       <PageHeader title="Edit Profile" />
-      <div className="px-4 pt-6">
+
+      {/* Cinematic Hero */}
+      <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
+        style={{ background: "linear-gradient(135deg,#0a0515 0%,#130a22 50%,#0a0515 100%)", border: "1px solid rgba(167,139,250,0.2)", minHeight: 130 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(167,139,250,0.2) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        <div className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none select-none">
+          <img src="/static/logo-nav.svg" alt="" style={{ width: 130, opacity: 0.05, filter: "grayscale(1) brightness(3)", animation: "floatLogo 9s ease-in-out infinite" }} />
+        </div>
+        <div className="relative z-10 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(167,139,250,0.2)", border: "1px solid rgba(167,139,250,0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>manage_accounts</span>
+            </div>
+            <span className="text-xs font-black tracking-widest" style={{ color: "#a78bfa", letterSpacing: "0.18em" }}>EDIT PROFILE</span>
+          </div>
+          <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.5rem,5vw,2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#c4b5fd 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{displayName || "Your Profile"}</h1>
+          <p className="text-sm" style={{ color: "#555" }}>{user?.email || "Update your name, photo and bio"}</p>
+        </div>
+      </div>
+
+      <div className="px-4 pt-2">
 
       {/* Avatar section */}
       <div className="flex flex-col items-center mb-8">
