@@ -833,6 +833,28 @@ export default function WorkoutsPage() {
                               </div>
                             ))}
 
+                            {/* Per-exercise rest timer */}
+                            <div className="flex items-center justify-between mt-2 mb-1 px-2 py-1.5 rounded-lg"
+                              style={{ background: restActive ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${restActive ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.05)"}` }}>
+                              <div className="flex items-center gap-1.5">
+                                <span className="material-symbols-outlined" style={{ fontSize: 13, color: restActive ? "#22c55e" : "#333" }}>self_improvement</span>
+                                <span className="text-xs font-bold tabular-nums" style={{ color: restActive ? "#22c55e" : "#444" }}>
+                                  {restActive ? `Rest — ${fmtTimer(restSecs)}` : "Rest timer"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {restActive ? (
+                                  <button onClick={() => { setRestActive(false); setRestSecs(0); }}
+                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full border-none cursor-pointer"
+                                    style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}>Done</button>
+                                ) : (
+                                  <button onClick={() => { setRestSecs(0); setRestActive(true); }}
+                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full border-none cursor-pointer"
+                                    style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>Start</button>
+                                )}
+                              </div>
+                            </div>
+
                             <button onClick={() => addSet(ei)} className="mt-1 flex items-center gap-1 text-xs border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>add</span> Add set
                             </button>
@@ -955,7 +977,7 @@ export default function WorkoutsPage() {
                           {log.date ? fmtDate(log.date.seconds) : "Today"}
                           {log.durationMins && <span className="font-normal ml-2" style={{ color: "#555" }}>{log.durationMins}m</span>}
                         </p>
-                        {hasPr && <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>ðŸ† PR</span>}
+                        {hasPr && <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>🏆 PR</span>}
                       </div>
                       <div className="flex flex-col gap-1.5">
                         {(log.exercises || []).map((ex, i) => {
