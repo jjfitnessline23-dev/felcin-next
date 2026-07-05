@@ -36,8 +36,12 @@ export function canAccessApp(user: User | null): boolean {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [banned, setBanned] = useState(false);
+  // On Capacitor, skip the loading gate — show UI immediately, auth redirects in background
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return !(window as any).Capacitor;
+  });
 
   useEffect(() => {
     // Skip getRedirectResult in Capacitor — redirects never work in WebViews,
