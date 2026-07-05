@@ -40,9 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [banned, setBanned] = useState(false);
 
   useEffect(() => {
-    // Clear any stale redirect state — safe no-op when using browserLocalPersistence
-    getRedirectResult(auth).catch(() => {});
+    // Skip getRedirectResult in Capacitor — redirects never work in WebViews,
+    // calling it delays onAuthStateChanged even with browserLocalPersistence
+    if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD !== "true") {
+      getRedirectResult(auth).catch(() => {});
+    }
+
+    // Safety net: if onAuthStateChanged doesn't fire within 6s, unblock the UI
+    const timeout = setTimeout(() => setLoading(false), 6000);
+
     const unsub = onAuthStateChanged(auth, async (u) => {
+      clearTimeout(timeout);
       setUser(u);
       if (u && !OWNER_UIDS.includes(u.uid)) {
         try {
@@ -56,7 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     });
-    return unsub;
+
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
   }, []);
 
   const signOut = async () => {

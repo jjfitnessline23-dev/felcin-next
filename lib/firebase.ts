@@ -15,14 +15,17 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // iOS WKWebView IndexedDB hangs silently — blocks onAuthStateChanged forever.
-// Capacitor builds use browserLocalPersistence (localStorage) to avoid IndexedDB entirely.
+// Capacitor builds use browserLocalPersistence (localStorage) to avoid IndexedDB.
+// Guard with typeof window so this doesn't throw during Next.js static generation.
 const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 let auth;
-try {
-  auth = isCapacitorBuild
-    ? initializeAuth(app, { persistence: browserLocalPersistence })
-    : getAuth(app);
-} catch {
+if (typeof window !== "undefined" && isCapacitorBuild) {
+  try {
+    auth = initializeAuth(app, { persistence: browserLocalPersistence });
+  } catch {
+    auth = getAuth(app);
+  }
+} else {
   auth = getAuth(app);
 }
 
