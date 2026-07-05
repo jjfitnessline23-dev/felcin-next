@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
       setUser(u);
+      setLoading(false); // unblock UI immediately — Firestore ban check runs async
       if (u && !OWNER_UIDS.includes(u.uid)) {
         try {
           const snap = await getDoc(doc(db, "users", u.uid));
@@ -62,7 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setBanned(false);
       }
-      setLoading(false);
     });
 
     return () => {
