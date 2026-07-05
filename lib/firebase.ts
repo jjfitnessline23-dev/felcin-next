@@ -15,11 +15,18 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Enable offline persistence so cached data is shown when there's no internet
+// Enable offline persistence on client only — IndexedDB is not available on the server.
+// persistentLocalCache stores all Firestore data locally so the app shows last-seen
+// content when there is no internet connection, just like Instagram/X/Facebook.
 let db: ReturnType<typeof getFirestore>;
-try {
-  db = initializeFirestore(app, { localCache: persistentLocalCache() });
-} catch {
+if (typeof window !== "undefined") {
+  try {
+    db = initializeFirestore(app, { localCache: persistentLocalCache() });
+  } catch {
+    // Already initialized (e.g. HMR in dev) — just get the existing instance
+    db = getFirestore(app);
+  }
+} else {
   db = getFirestore(app);
 }
 
