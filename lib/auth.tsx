@@ -5,8 +5,6 @@ import {
   onAuthStateChanged,
   signOut as firebaseSignOut,
   User,
-  setPersistence,
-  browserLocalPersistence,
   getRedirectResult,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -42,11 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [banned, setBanned] = useState(false);
 
   useEffect(() => {
-    setPersistence(auth, browserLocalPersistence).catch(() => {});
-    // Consume any stale signInWithRedirect pending state left from a previous
-    // failed attempt. Without this, Firebase holds onAuthStateChanged until it
-    // processes the pending redirect — which never arrives in Capacitor, so the
-    // user gets stuck on the loading screen forever (auto-login never fires).
+    // Clear any stale redirect state — safe no-op when using browserLocalPersistence
     getRedirectResult(auth).catch(() => {});
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, getFirestore } from "firebase/firestore";
+import { getAuth, initializeAuth, browserLocalPersistence } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -13,17 +13,28 @@ const firebaseConfig = {
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
-// Enable offline persistence on client only — IndexedDB is not available on the server.
-// persistentLocalCache stores all Firestore data locally so the app shows last-seen
-// content when there is no internet connection, just like Instagram/X/Facebook.
+// iOS WKWebView IndexedDB hangs silently — blocks onAuthStateChanged forever.
+// Capacitor builds use browserLocalPersistence (localStorage) to avoid IndexedDB entirely.
+const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
+let auth;
+try {
+  auth = isCapacitorBuild
+    ? initializeAuth(app, { persistence: browserLocalPersistence })
+    : getAuth(app);
+} catch {
+  auth = getAuth(app);
+}
+
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
   try {
-    db = initializeFirestore(app, { localCache: persistentLocalCache() });
+    // persistentLocalCache uses IndexedDB — hangs on iOS WKWebView.
+    // Use memoryLocalCache for Capacitor builds (no offline persistence, but app loads).
+    db = initializeFirestore(app, {
+      localCache: isCapacitorBuild ? memoryLocalCache() : persistentLocalCache(),
+    });
   } catch {
-    // Already initialized (e.g. HMR in dev) — just get the existing instance
     db = getFirestore(app);
   }
 } else {
