@@ -108,6 +108,9 @@ export default function LoginPage() {
         // iOS + Android: use native Capacitor plugin with legacy GoogleSignInClient
         // useCredentialManager: false required — Credential Manager gives error 10 on this setup
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        // Sign out first to clear the native Google Sign-In cache — without this,
+        // the plugin silently re-uses the last account without showing the picker
+        try { await FirebaseAuthentication.signOut(); } catch {}
         const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
         if (!result.credential?.idToken) throw new Error("No ID token returned");
         const credential = GoogleAuthProvider.credential(
