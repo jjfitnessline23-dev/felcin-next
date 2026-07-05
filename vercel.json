@@ -1,1 +1,8 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/cron/creator-fund-payout",
+      "schedule": "0 0 1 * *"
+    }
+  ]
+}

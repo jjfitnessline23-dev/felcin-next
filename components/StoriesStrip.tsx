@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, limit, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 
 interface Story {
@@ -32,6 +33,7 @@ function isVideo(s: Story) {
 const STORY_DURATION = 5000;
 
 export default function StoriesStrip() {
+  const { user } = useAuth();
   const [groups, setGroups] = useState<UserStories[]>([]);
   const [activeGroup, setActiveGroup] = useState<UserStories | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -109,6 +111,18 @@ export default function StoriesStrip() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup, activeIdx]);
 
+  const handleDeleteStory = async (story: Story) => {
+    if (!user || user.uid !== story.authorId) return;
+    if (!confirm("Delete this story?")) return;
+    await deleteDoc(doc(db, "posts", story.id)).catch(() => {});
+    if (activeGroup) {
+      const remaining = activeGroup.stories.filter((s) => s.id !== story.id);
+      if (remaining.length === 0) { closeViewer(); return; }
+      setActiveGroup({ ...activeGroup, stories: remaining });
+      if (activeIdx >= remaining.length) setActiveIdx(remaining.length - 1);
+    }
+  };
+
   const openGroup = (g: UserStories) => { setActiveGroup(g); setActiveIdx(0); };
   const closeViewer = () => {
     setActiveGroup(null);
@@ -168,9 +182,18 @@ export default function StoriesStrip() {
                 </div>
               )}
               <span className="font-semibold text-white text-sm">{current.authorName}</span>
-              <button onClick={closeViewer} className="ml-auto w-8 h-8 flex items-center justify-center rounded-full border-none cursor-pointer" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
-              </button>
+              <div className="ml-auto flex items-center gap-2">
+                {user?.uid === current.authorId && (
+                  <button onClick={() => handleDeleteStory(current)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full border-none cursor-pointer"
+                    style={{ background: "rgba(239,68,68,0.3)", color: "#fff" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                  </button>
+                )}
+                <button onClick={closeViewer} className="w-8 h-8 flex items-center justify-center rounded-full border-none cursor-pointer" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                </button>
+              </div>
             </div>
             <div className="flex-1 flex items-center justify-center">
               {isVideo(current) ? (

@@ -76,6 +76,7 @@ export default function StreamViewerPage() {
   const [showRaceSetup, setShowRaceSetup] = useState(false);
   const [startingRace, setStartingRace] = useState(false);
   const repTapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const processedGiftSessionRef = useRef<string | null>(null);
 
   // Pulse state
   const [pulseTotal, setPulseTotal] = useState(0);
@@ -170,7 +171,8 @@ export default function StreamViewerPage() {
   // After Stripe gift payment
   useEffect(() => {
     const sessionId = searchParams.get("gift_session_id");
-    if (!sessionId || !user) return;
+    if (!sessionId || !user || processedGiftSessionRef.current === sessionId) return;
+    processedGiftSessionRef.current = sessionId;
     router.replace(`/live/${streamId}`);
     fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/gift-verify?session_id=${encodeURIComponent(sessionId)}`)
       .then((r) => r.json())
@@ -194,7 +196,7 @@ export default function StreamViewerPage() {
         triggerFly(data.giftEmoji);
       }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, user]);
 
   function showToast(msg: string) {
     setToast(msg);

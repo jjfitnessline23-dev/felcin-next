@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { OWNER_UIDS, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const primaryLinks = [
   { href: "/", icon: "home", label: "Home" },
@@ -28,6 +28,7 @@ const secondaryLinks = [
 ];
 
 const moreLinks = [
+  { href: "/progress", icon: "compare", label: "Progress Photos" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },
   { href: "/schedule", icon: "calendar_month", label: "Schedule" },
   { href: "/workouts", icon: "fitness_center", label: "Workout Log" },
@@ -42,9 +43,9 @@ export default function Sidebar() {
   const [advertiseEnabled, setAdvertiseEnabled] = useState(true);
 
   useEffect(() => {
-    getDoc(doc(db, "config", "features")).then((snap) => {
+    return onSnapshot(doc(db, "config", "features"), (snap) => {
       if (snap.exists()) setAdvertiseEnabled(snap.data().advertiseEnabled ?? true);
-    }).catch(() => {});
+    });
   }, []);
 
   const handleSignOut = async () => {

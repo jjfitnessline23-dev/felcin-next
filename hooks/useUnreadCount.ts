@@ -16,7 +16,7 @@ export function useUnreadCount() {
     );
     return onSnapshot(q, (snap) => {
       setCount(snap.docs.filter((d) => !d.data().read).length);
-    });
+    }, () => {});
   }, [user]);
 
   return count;

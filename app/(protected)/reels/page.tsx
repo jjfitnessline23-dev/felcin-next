@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,16 @@ import Link from "next/link";
 interface Reel {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   mediaUrl?: string; caption?: string; likes?: number; likedBy?: string[];
-  comments?: number; repostCount?: number;
+  comments?: number; repostCount?: number; mimeType?: string; contentType?: string;
+}
+
+function isVideoReel(reel: Reel): boolean {
+  if (reel.mimeType) return reel.mimeType.startsWith("video/");
+  if (reel.contentType && reel.contentType !== "reel") {
+    return reel.contentType === "video" || reel.contentType.startsWith("video/");
+  }
+  const url = reel.mediaUrl || "";
+  return /\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(url);
 }
 
 export default function ReelsPage() {
@@ -24,6 +33,7 @@ export default function ReelsPage() {
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [repostedIds, setRepostedIds] = useState<Set<string>>(new Set());
   const [repostingId, setRepostingId] = useState<string | null>(null);
+  const [globalMuted, setGlobalMuted] = useState(true);
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
   const [sendingComment, setSendingComment] = useState<string | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
@@ -134,6 +144,13 @@ export default function ReelsPage() {
     setRepostingId(null);
   }
 
+  async function handleDeleteReel(reel: Reel) {
+    if (!user || user.uid !== reel.authorId) return;
+    if (!confirm("Delete this reel? This cannot be undone.")) return;
+    await deleteDoc(doc(db, "reels", reel.id)).catch(() => {});
+    setReels((prev) => prev.filter((r) => r.id !== reel.id));
+  }
+
   async function sendComment(reel: Reel) {
     const text = (commentTexts[reel.id] || "").trim();
     if (!text || !user || sendingComment) return;
@@ -174,18 +191,34 @@ export default function ReelsPage() {
             <div key={reel.id} className="snap-start relative flex-shrink-0" style={{ height: "100%", background: "#000" }}>
 
               {errorIds.has(reel.id) ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                  <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#333" }}>broken_image</span>
-                  <p className="text-sm" style={{ color: "#555" }}>Video unavailable</p>
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
+                  <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#333" }}>videocam_off</span>
+                  <p className="text-sm font-semibold" style={{ color: "#555" }}>Media unavailable</p>
+                  <p className="text-xs" style={{ color: "#333" }}>This format may not be supported. Try uploading as MP4.</p>
+                  <button
+                    onClick={() => {
+                      setErrorIds((prev) => { const n = new Set(prev); n.delete(reel.id); return n; });
+                    }}
+                    style={{ marginTop: 4, fontSize: 12, color: "#555", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 50, padding: "6px 16px", cursor: "pointer" }}>
+                    Retry
+                  </button>
                 </div>
-              ) : (
+              ) : isVideoReel(reel) ? (
                 <>
                   <video
-                    ref={(el) => { videoRefs.current[i] = el; if (el) { el.muted = true; el.setAttribute("muted", ""); } }}
+                    ref={(el) => { videoRefs.current[i] = el; if (el) { el.muted = globalMuted; } }}
                     src={reel.mediaUrl}
-                    loop playsInline muted preload="none"
+                    loop playsInline muted preload="metadata"
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                    onError={() => setErrorIds((prev) => new Set([...prev, reel.id]))}
+                    onError={(e) => {
+                      const v = e.currentTarget;
+                      if (!v.dataset.retried) {
+                        v.dataset.retried = "1";
+                        setTimeout(() => { v.load(); v.play().catch(() => {}); }, 1500);
+                      } else {
+                        setErrorIds((prev) => new Set([...prev, reel.id]));
+                      }
+                    }}
                     onWaiting={() => setBufferingIds((prev) => new Set([...prev, reel.id]))}
                     onPlaying={() => setBufferingIds((prev) => { const n = new Set(prev); n.delete(reel.id); return n; })}
                     onCanPlay={() => setBufferingIds((prev) => { const n = new Set(prev); n.delete(reel.id); return n; })}
@@ -196,6 +229,17 @@ export default function ReelsPage() {
                     </div>
                   )}
                 </>
+              ) : reel.mediaUrl ? (
+                <img
+                  src={reel.mediaUrl}
+                  alt={reel.caption || ""}
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={() => setErrorIds((prev) => new Set([...prev, reel.id]))}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#333" }}>image_not_supported</span>
+                </div>
               )}
 
               {/* Back button — top left */}
@@ -204,6 +248,22 @@ export default function ReelsPage() {
                 style={{ top: "calc(env(safe-area-inset-top, 16px) + 8px)", left: 16, width: 40, height: 40, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: "50%", zIndex: 2 }}>
                 <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>arrow_back</span>
               </button>
+
+              {/* Sound toggle — top right */}
+              {isVideoReel(reel) && (
+                <button
+                  onClick={() => {
+                    const next = !globalMuted;
+                    setGlobalMuted(next);
+                    videoRefs.current.forEach((v) => { if (v) v.muted = next; });
+                  }}
+                  className="absolute flex items-center justify-center border-none cursor-pointer"
+                  style={{ top: "calc(env(safe-area-inset-top, 16px) + 8px)", right: 16, width: 40, height: 40, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: "50%", zIndex: 2 }}>
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: 22 }}>
+                    {globalMuted ? "volume_off" : "volume_up"}
+                  </span>
+                </button>
+              )}
 
               {/* Right side action buttons */}
               <div className="absolute right-4 flex flex-col items-center gap-6" style={{ bottom: "calc(env(safe-area-inset-bottom, 24px) + 80px)", zIndex: 2 }}>
@@ -233,6 +293,13 @@ export default function ReelsPage() {
                 <button onClick={() => handleBookmark(reel)} className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
                   <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#fff", fontVariationSettings: bookmarked ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>bookmark</span>
                 </button>
+                {/* Delete — only shown to the reel author */}
+                {user?.uid === reel.authorId && (
+                  <button onClick={() => handleDeleteReel(reel)}
+                    className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
+                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#ef4444", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>delete</span>
+                  </button>
+                )}
                 {/* Author avatar */}
                 <Link href={`/user-profile?uid=${reel.authorId}`}>
                   {reel.authorPhoto

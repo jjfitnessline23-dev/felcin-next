@@ -1,9 +1,10 @@
-﻿export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
+import { verifyToken, getCreatorStripeId } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rateLimit";
 
-
-const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
+const PLATFORM_FEE_PCT = 30;
 
 const TIERS: Record<string, { label: string; price: number; emoji: string }> = {
   bronze:  { label: "Bronze Badge",  price: 199,  emoji: "ðŸ¥‰" },
@@ -12,17 +13,8 @@ const TIERS: Record<string, { label: string; price: number; emoji: string }> = {
   diamond: { label: "Diamond Badge", price: 1999, emoji: "ðŸ’Ž" },
 };
 
-async function verifyFirebaseToken(idToken: string): Promise<string | null> {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
-  );
-  const data = await res.json();
-  return data?.users?.[0]?.localId ?? null;
-}
-
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe((process.env.STRIPE_SECRET_KEY ?? "").replace(/^﻿/, "").trim(), { httpClient: Stripe.createFetchHttpClient() });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
@@ -32,12 +24,18 @@ export async function POST(req: NextRequest) {
   if (!tierData) return NextResponse.json({ error: "Invalid badge tier" }, { status: 400 });
   if (!toUid || !token) return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
 
-  const fromUid = await verifyFirebaseToken(token);
+  const fromUid = await verifyToken(req.headers.get("authorization"));
   if (!fromUid) return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+  if (!await rateLimit(`badge:${fromUid}`, 5, 60_000)) {
+    return NextResponse.json({ error: "Too many requests â€” slow down" }, { status: 429 });
+  }
   if (fromUid === toUid) return NextResponse.json({ error: "Cannot gift yourself" }, { status: 400 });
 
+  const platformFee = Math.round(tierData.price * PLATFORM_FEE_PCT / 100);
+  const creatorStripeId = await getCreatorStripeId(toUid);
+
   const base = returnUrl.replace(/[/?]+$/, "");
-  const session = await stripe.checkout.sessions.create({
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     payment_method_types: ["card"],
     line_items: [{
       price_data: {
@@ -59,8 +57,18 @@ export async function POST(req: NextRequest) {
       fromUid,
       toUid,
       message: message.slice(0, 500),
+      priceUsd: String(tierData.price),
+      creatorShareUsd: String(tierData.price - platformFee),
     },
-  });
+  };
 
+  if (creatorStripeId) {
+    sessionParams.payment_intent_data = {
+      application_fee_amount: platformFee,
+      transfer_data: { destination: creatorStripeId },
+    };
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
   return NextResponse.json({ url: session.url });
 }

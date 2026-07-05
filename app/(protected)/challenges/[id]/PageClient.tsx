@@ -185,8 +185,8 @@ export default function ChallengePage() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           style={{ background: "rgba(0,0,0,0.8)" }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowJoin(false); }}>
-          <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl p-6"
-            style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-y-auto"
+            style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "85dvh", marginBottom: "calc(env(safe-area-inset-bottom, 0px) + 64px)", padding: "24px 24px calc(env(safe-area-inset-bottom, 16px) + 24px)" }}>
             <p className="text-base font-bold mb-1" style={{ color: "#f2f2f2" }}>Add Your Link</p>
             <p className="text-xs mb-5" style={{ color: "#555" }}>{challenge.title}</p>
             <p className="text-sm mb-5 leading-relaxed" style={{ color: "#666" }}>

@@ -1,15 +1,21 @@
 [
   {
-    "origin": ["https://www.felcin.com", "https://felcin.com", "http://localhost:3000"],
-    "method": ["GET", "HEAD"],
+    "origin": [
+      "https://www.felcin.com",
+      "https://felcin.com"
+    ],
+    "method": [
+      "GET",
+      "HEAD",
+      "OPTIONS"
+    ],
     "maxAgeSeconds": 3600,
     "responseHeader": [
       "Content-Type",
       "Content-Length",
       "Content-Range",
       "Accept-Ranges",
-      "Authorization",
-      "User-Agent"
+      "Cache-Control"
     ]
   }
 ]

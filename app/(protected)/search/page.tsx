@@ -5,6 +5,6 @@ import { useRouter } from "next/navigation";
 
 export default function SearchPage() {
   const router = useRouter();
-  useEffect(() => { router.replace("/explore"); }, [router]);
+  useEffect(() => { router.replace("/explore?tab=search"); }, [router]);
   return <div className="flex justify-center py-20"><div className="spinner" /></div>;
 }

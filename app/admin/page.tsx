@@ -31,6 +31,53 @@ interface AnalyticsData {
   yesterdayActiveUsers: number;
 }
 
+function ReelDiagnostic({ reels }: { reels: { id: string; mediaUrl?: string; caption?: string; createdAt?: { seconds: number } }[] }) {
+  const [results, setResults] = useState<{ id: string; status: string; bucket: string; caption: string; date: string }[]>([]);
+  const [running, setRunning] = useState(false);
+
+  const run = async () => {
+    setRunning(true);
+    const out = await Promise.all(reels.slice(0, 10).map(async (r) => {
+      const date = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleDateString() : "?";
+      if (!r.mediaUrl) return { id: r.id, status: "NO URL", bucket: "—", caption: r.caption || "", date };
+      const bucket = r.mediaUrl.includes("felcin.appspot.com") ? "appspot.com" :
+                     r.mediaUrl.includes("felcin.firebasestorage.app") ? "firebasestorage.app" : "other";
+      try {
+        const res = await fetch(r.mediaUrl, { method: "HEAD" });
+        return { id: r.id, status: `${res.status} ${res.ok ? "OK ✅" : "FAIL ❌"}`, bucket, caption: r.caption || "", date };
+      } catch {
+        return { id: r.id, status: "NETWORK ERROR ❌", bucket, caption: r.caption || "", date };
+      }
+    }));
+    setResults(out);
+    setRunning(false);
+  };
+
+  return (
+    <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#a78bfa", margin: 0 }}>🔍 URL DIAGNOSTIC</p>
+        <button onClick={run} disabled={running} style={{ fontSize: 11, fontWeight: 700, padding: "5px 14px", borderRadius: 50, border: "none", cursor: "pointer", background: "#7C3AED", color: "#fff" }}>
+          {running ? "Testing…" : "Run Test"}
+        </button>
+      </div>
+      {results.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {results.map(r => (
+            <div key={r.id} style={{ background: "#111", borderRadius: 8, padding: "8px 10px", fontSize: 11 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                <span style={{ color: "#888" }}>{r.caption.slice(0, 25) || r.id.slice(0, 8)} · {r.date}</span>
+                <span style={{ fontWeight: 700, color: r.status.includes("✅") ? "#22c55e" : r.status.includes("NO") ? "#f59e0b" : "#ef4444" }}>{r.status}</span>
+              </div>
+              <span style={{ color: "#444" }}>bucket: {r.bucket}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPortalPage() {
   const { user, loading: authLoading } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
@@ -479,6 +526,10 @@ export default function AdminPortalPage() {
         ) : tab === "reels" ? (
           <div className="flex flex-col gap-2">
             <p className="text-xs mb-1" style={{ color: "#444" }}>{reels.length} reels</p>
+
+            {/* URL Diagnostic Tool */}
+            <ReelDiagnostic reels={reels} />
+
             {reels.length === 0 ? (
               <p className="text-center py-10" style={{ color: "#555" }}>No reels</p>
             ) : reels.map((r) => (
@@ -494,6 +545,7 @@ export default function AdminPortalPage() {
                     {r.authorId.slice(0, 8)}…
                     {r.createdAt && ` · ${new Date(r.createdAt.seconds * 1000).toLocaleDateString()}`}
                   </p>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: "#333" }}>{r.mediaUrl ? r.mediaUrl.slice(0, 60) + "…" : "NO URL"}</p>
                 </div>
                 <button onClick={() => deleteReel(r.id)}
                   className="w-8 h-8 flex items-center justify-center rounded-full border-none cursor-pointer shrink-0"

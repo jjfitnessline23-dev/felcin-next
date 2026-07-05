@@ -1,10 +1,10 @@
-﻿export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
+import { verifyToken, getCreatorStripeId } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rateLimit";
 
 
-const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
-const FIREBASE_PROJECT_ID = "felcin";
 const PLATFORM_FEE_PCT = 30;
 
 const GIFTS: Record<string, { emoji: string; label: string; price: number }> = {
@@ -18,24 +18,8 @@ const GIFTS: Record<string, { emoji: string; label: string; price: number }> = {
   diamond: { emoji: "ðŸ’Ž", label: "Diamond", price: 999 },
 };
 
-async function verifyFirebaseToken(idToken: string): Promise<string | null> {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
-  );
-  const data = await res.json();
-  return data?.users?.[0]?.localId ?? null;
-}
-
-async function getCreatorStripeId(hostId: string): Promise<string | null> {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${hostId}/public/profile?key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  return data?.fields?.stripeAccountId?.stringValue ?? null;
-}
-
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe((process.env.STRIPE_SECRET_KEY ?? "").replace(/^﻿/, "").trim(), { httpClient: Stripe.createFetchHttpClient() });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
@@ -45,8 +29,11 @@ export async function POST(req: NextRequest) {
   if (!gift) return NextResponse.json({ error: "Invalid gift type" }, { status: 400 });
   if (!streamId || !hostId || !token) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-  const fromUid = await verifyFirebaseToken(token);
+  const fromUid = await verifyToken(req.headers.get("authorization"));
   if (!fromUid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  if (!await rateLimit(`gift:${fromUid}`, 10, 60_000)) {
+    return NextResponse.json({ error: "Too many requests — slow down" }, { status: 429 });
+  }
   if (fromUid === hostId) return NextResponse.json({ error: "Cannot gift yourself" }, { status: 400 });
 
   const platformFee = Math.round(gift.price * PLATFORM_FEE_PCT / 100);

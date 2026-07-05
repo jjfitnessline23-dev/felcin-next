@@ -1,42 +1,50 @@
-﻿export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
+import { verifyToken, getCreatorStripeId } from "@/lib/firebaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { rateLimit } from "@/lib/rateLimit";
 
 
-const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
+const PLATFORM_FEE_PCT = 30;
 
 const TIERS: Record<string, { name: string; amount: number }> = {
   basic: { name: "Basic Support (30 days)", amount: 399 },
   pro:   { name: "Pro Support (30 days)",   amount: 999 },
 };
 
-async function verifyFirebaseToken(idToken: string): Promise<string | null> {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
-  );
-  const data = await res.json();
-  return data?.users?.[0]?.localId ?? null;
-}
-
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe((process.env.STRIPE_SECRET_KEY ?? "").replace(/^﻿/, "").trim(), { httpClient: Stripe.createFetchHttpClient() });
   try {
     const { tier, creatorUid, creatorName = "Creator", token } = await req.json();
     const tierData = TIERS[tier];
     if (!tierData || !creatorUid || !token) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
-    const buyerUid = await verifyFirebaseToken(token);
+    const buyerUid = await verifyToken(req.headers.get("authorization"));
     if (!buyerUid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    if (!await rateLimit(`subscribe:${buyerUid}`, 5, 60_000)) {
+      return NextResponse.json({ error: "Too many requests â€” slow down" }, { status: 429 });
+    }
+
+    const platformFee = Math.round(tierData.amount * PLATFORM_FEE_PCT / 100);
+    const creatorStripeId = await getCreatorStripeId(creatorUid);
 
     const origin = req.headers.get("origin") || "https://felcin.com";
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
-      line_items: [{ price_data: { currency: "usd", unit_amount: tierData.amount, product_data: { name: `${tierData.name} â€” ${creatorName}` } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: "usd", unit_amount: tierData.amount, product_data: { name: `${tierData.name} â€“ ${creatorName}` } }, quantity: 1 }],
       success_url: `${origin}/subscribe/${creatorUid}?sub_session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/user-profile?uid=${creatorUid}`,
       metadata: { buyerUid, creatorUid, tier },
-    });
+    };
+
+    if (creatorStripeId) {
+      sessionParams.payment_intent_data = {
+        application_fee_amount: platformFee,
+        transfer_data: { destination: creatorStripeId },
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
     return NextResponse.json({ url: session.url });
   } catch (e: unknown) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

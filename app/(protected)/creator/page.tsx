@@ -51,9 +51,14 @@ export default function CreatorPage() {
   const [status, setStatus] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+  const [bgUploading, setBgUploading] = useState(false);
+  const [bgPct, setBgPct] = useState(0);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const uploadPromiseRef = useRef<Promise<string> | null>(null);
   const [scheduled, setScheduled] = useState(false);
   const [schedTime, setSchedTime] = useState("");
   const [maxViews, setMaxViews] = useState<number | "">("");
+  const [ppvPrice, setPpvPrice] = useState<number | "">("");
   const [collabUser, setCollabUser] = useState<CollabUser | null>(null);
   const [collabSearch, setCollabSearch] = useState("");
   const [collabResults, setCollabResults] = useState<CollabUser[]>([]);
@@ -91,14 +96,30 @@ export default function CreatorPage() {
     const mime = f.type || "";
     const fname = f.name.toLowerCase();
     const video = mime.startsWith("video/") || /\.(mp4|mov|avi|webm|mkv|m4v|3gp)$/.test(fname);
-    setFile(f); setIsVideo(video); setStatus(null); setActiveFilter(FILTERS[0]);
+    // Warn about HEVC/MOV format — not supported by most browsers
+    if (video && (mime === "video/quicktime" || fname.endsWith(".mov") || mime === "video/hevc")) {
+      setStatus({ msg: "⚠️ MOV/HEVC may not play on all devices. Convert to MP4 for best results.", type: "info" });
+    } else {
+      setStatus(null);
+    }
+    setFile(f); setIsVideo(video); setActiveFilter(FILTERS[0]);
+    setUploadedUrl(null); setBgUploading(true); setBgPct(0);
+    uploadPromiseRef.current = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(f));
-  }, [previewUrl]);
+    // Start upload immediately in background while user writes caption
+    if (user) {
+      const promise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
+      uploadPromiseRef.current = promise;
+      promise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
+             .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
+    }
+  }, [previewUrl, user]);
 
   const clearFile = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null); setPreviewUrl(null); setIsVideo(false); setActiveFilter(FILTERS[0]); setStatus(null);
+    setUploadedUrl(null); setBgUploading(false); setBgPct(0); uploadPromiseRef.current = null;
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -111,8 +132,15 @@ export default function CreatorPage() {
         mimeType = file.type || "";
         const fname = file.name.toLowerCase();
         contentType = (mimeType.startsWith("video/") || /\.(mp4|mov|avi|webm|mkv|m4v|3gp)$/.test(fname)) ? "video" : "image";
-        setStatus({ msg: "Uploading…", type: "info" });
-        mediaUrl = await uploadFile(file, user.uid, (pct) => { setUploadPct(pct); setStatus({ msg: `Uploading ${pct}%…`, type: "info" }); });
+        if (uploadedUrl) {
+          mediaUrl = uploadedUrl;
+        } else if (uploadPromiseRef.current) {
+          setStatus({ msg: "Finishing upload…", type: "info" });
+          mediaUrl = await uploadPromiseRef.current;
+        } else {
+          setStatus({ msg: "Uploading…", type: "info" });
+          mediaUrl = await uploadFile(file, user.uid, (pct) => { setUploadPct(pct); setStatus({ msg: `Uploading ${pct}%…`, type: "info" }); });
+        }
       }
       setStatus({ msg: "Saving…", type: "info" });
       const col = mode === "reel" ? "reels" : "posts";
@@ -129,6 +157,7 @@ export default function CreatorPage() {
         scheduledAt: scheduledAt ? Timestamp.fromDate(scheduledAt) : null,
         expiresAt: mode === "story" ? Timestamp.fromDate(new Date(Date.now() + 24 * 3600 * 1000)) : null,
         maxViews: mode === "post" && maxViews !== "" ? Number(maxViews) : null,
+        ppvPrice: ppvPrice !== "" ? Math.round(Number(ppvPrice) * 100) : null,
         viewCount: 0, tags,
         collabUid: mode === "post" && collabUser ? collabUser.uid : null,
         collabName: mode === "post" && collabUser ? collabUser.displayName : null,
@@ -208,6 +237,21 @@ export default function CreatorPage() {
               style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
             </button>
+            {bgUploading && (
+              <div className="absolute bottom-0 left-0 right-0 px-3 pb-3">
+                <div className="rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", height: 4 }}>
+                  <div className="h-full rounded-full transition-all duration-300" style={{ width: `${bgPct}%`, background: "#a78bfa" }} />
+                </div>
+                <p className="text-xs text-center mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>Uploading {bgPct}%…</p>
+              </div>
+            )}
+            {!bgUploading && uploadedUrl && (
+              <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full"
+                style={{ background: "rgba(0,0,0,0.6)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: "#4ade80" }}>check_circle</span>
+                <span className="text-xs" style={{ color: "#4ade80" }}>Ready to post</span>
+              </div>
+            )}
             <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer"
               style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}>
               <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
@@ -285,6 +329,24 @@ export default function CreatorPage() {
               />
             </div>
           )}
+
+          <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#fbbf24" }}>lock</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium" style={{ color: "#888" }}>Pay-per-view price</p>
+              <p className="text-xs" style={{ color: "#444" }}>Charge viewers to unlock this post</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-sm" style={{ color: "#555" }}>$</span>
+              <input
+                type="number" min={0.99} max={999} step={0.01} placeholder="Free"
+                value={ppvPrice}
+                onChange={(e) => setPpvPrice(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                className="text-sm rounded-lg px-3 py-1.5 outline-none text-center"
+                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "#f2f2f2", width: 72 }}
+              />
+            </div>
+          </div>
 
           {mode === "post" && (
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>

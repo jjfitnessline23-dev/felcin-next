@@ -59,6 +59,7 @@ export default function CommentsPage() {
   const [dotMenu, setDotMenu] = useState(false);
   const [reportModal, setReportModal] = useState(false);
   const [reportDone, setReportDone] = useState(false);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState(false);
   const [postDeleted, setPostDeleted] = useState(false);
   const [imgLightbox, setImgLightbox] = useState(false);
   const [prevPostId, setPrevPostId] = useState<string | null>(null);
@@ -81,14 +82,25 @@ export default function CommentsPage() {
       setLikeCount(p.likes ?? 0);
       if (user) setLiked(p.likedBy?.includes(user.uid) ?? false);
 
-      if (!isReel && p.maxViews != null && user?.uid !== p.authorId) {
+      if (user?.uid !== p.authorId) {
         const viewedKey = `viewed_${postId}`;
         const alreadyViewed = typeof window !== "undefined" && sessionStorage.getItem(viewedKey);
         if (!alreadyViewed) {
           if (typeof window !== "undefined") sessionStorage.setItem(viewedKey, "1");
-          const newCount = (p.viewCount ?? 0) + 1;
-          if (newCount >= p.maxViews) { await deleteDoc(postRef); router.replace("/"); return; }
-          else await updateDoc(postRef, { viewCount: increment(1) });
+          // maxViews auto-delete
+          if (!isReel && p.maxViews != null) {
+            const newCount = (p.viewCount ?? 0) + 1;
+            if (newCount >= p.maxViews) { await deleteDoc(postRef); router.replace("/"); return; }
+          }
+          // Track view for creator fund
+          const month = new Date().toISOString().slice(0, 7);
+          await Promise.all([
+            updateDoc(postRef, { viewCount: increment(1) }),
+            ...(p.authorId ? [
+              updateDoc(doc(db, "users", p.authorId), { totalViews: increment(1) }),
+              setDoc(doc(db, "users", p.authorId, "monthlyViews", month), { views: increment(1) }, { merge: true }),
+            ] : []),
+          ]).catch(() => {});
         }
       }
 
@@ -160,17 +172,21 @@ export default function CommentsPage() {
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, col, postId), { comments: increment(1) });
-      // Notify post author (not if commenting on own post)
       if (post && post.authorId && post.authorId !== user.uid) {
+        addDoc(collection(db, "notifications"), {
+          recipientId: post.authorId,
+          senderId: user.uid,
+          senderName: user.displayName || user.email || "Someone",
+          senderPhoto: user.photoURL || "",
+          type: "comment",
+          postId,
+          read: false,
+          createdAt: serverTimestamp(),
+        }).catch(() => {});
         fetch("/api/notify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipientUid: post.authorId,
-            type: "comment",
-            senderName: user.displayName || "Someone",
-            postId,
-          }),
+          body: JSON.stringify({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", postId }),
         }).catch(() => {});
       }
     } catch {}
@@ -224,10 +240,14 @@ export default function CommentsPage() {
     setReportDone(true);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!post || !user) return;
-    if (!confirm("Delete this post?")) return;
     setDotMenu(false);
+    setDeleteConfirmModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteConfirmModal(false);
     await deleteDoc(doc(db, col, postId)).catch(() => {});
     setPostDeleted(true);
     router.replace("/");
@@ -460,6 +480,31 @@ export default function CommentsPage() {
           <button onClick={() => setDotMenu(false)}
             className="flex items-center justify-center w-full py-4 border-none cursor-pointer font-semibold text-sm"
             style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.08)", color: "#555" }}>
+            Cancel
+          </button>
+        </div>
+      </>
+    )}
+
+    {/* Delete confirmation modal */}
+    {deleteConfirmModal && (
+      <>
+        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.6)", zIndex: 90 }} onClick={() => setDeleteConfirmModal(false)} />
+        <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden"
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 95 }}>
+          <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-4" style={{ background: "rgba(255,255,255,0.15)" }} />
+          <div className="px-5 pb-3 text-center">
+            <p className="font-bold text-base mb-1" style={{ color: "#f2f2f2" }}>Delete Post?</p>
+            <p className="text-sm" style={{ color: "#555" }}>This can't be undone.</p>
+          </div>
+          <button onClick={confirmDelete}
+            className="flex items-center justify-center w-full py-4 border-none cursor-pointer font-semibold text-sm"
+            style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.08)", color: "#f87171" }}>
+            Delete
+          </button>
+          <button onClick={() => setDeleteConfirmModal(false)}
+            className="flex items-center justify-center w-full py-4 border-none cursor-pointer font-semibold text-sm"
+            style={{ background: "transparent", borderTop: "1px solid rgba(255,255,255,0.06)", color: "#555" }}>
             Cancel
           </button>
         </div>

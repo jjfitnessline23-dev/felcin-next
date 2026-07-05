@@ -115,10 +115,10 @@ service cloud.firestore {
         allow update, delete: if isAdmin();
       }
 
-      // Monthly view tracking — any auth user can increment
+      // Monthly view tracking — only the owner or admin can write
       match /monthlyViews/{month} {
         allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
-        allow write: if isAuth();
+        allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
       }
 
       // Private subcollections — owner-only read/write

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useAuth } from "@/lib/auth";
 import { OWNER_UIDS, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const quickActions = [
   { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },
@@ -38,6 +38,7 @@ const moreGroups = [
   {
     label: "Fitness Tools",
     items: [
+      { href: "/progress", icon: "compare", label: "Progress Photos" },
       { href: "/muscle-map", icon: "accessibility_new", label: "Muscle Map" },
       { href: "/recovery", icon: "monitor_heart", label: "Recovery" },
       { href: "/nemesis", icon: "sports_mma", label: "Nemesis" },
@@ -70,9 +71,9 @@ export default function MobileNav() {
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Profile";
 
   useEffect(() => {
-    getDoc(doc(db, "config", "features")).then((snap) => {
+    return onSnapshot(doc(db, "config", "features"), (snap) => {
       if (snap.exists()) setAdvertiseEnabled(snap.data().advertiseEnabled ?? true);
-    }).catch(() => {});
+    });
   }, []);
 
   const photoURL = user?.photoURL;
@@ -291,6 +292,25 @@ export default function MobileNav() {
               </div>
             </div>
           ))}
+
+          {/* Advertise — shown when enabled */}
+          {advertiseEnabled && (
+            <div className="mb-4">
+              <p className="text-[10px] font-bold tracking-widest px-1 mb-1.5" style={{ color: "#333" }}>GROW</p>
+              <Link href="/advertise" onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-4 py-3.5 rounded-2xl relative overflow-hidden"
+                style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.1), rgba(168,85,247,0.08))", border: "1px solid rgba(124,58,237,0.2)" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>ads_click</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Advertise</p>
+                  <p className="text-xs" style={{ color: "#666" }}>Reach thousands of fitness users</p>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(124,58,237,0.15)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)" }}>NEW</span>
+              </Link>
+            </div>
+          )}
 
           {/* Admin Panel — same structure as original, no overflow-hidden wrapper */}
           {isOwner && (

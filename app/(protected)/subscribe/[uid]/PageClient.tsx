@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, addDoc, collection, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import InAppPaymentModal from "@/components/InAppPaymentModal";
 
 interface CreatorProfile { displayName?: string; photoURL?: string; followersCount?: number; bio?: string; }
 
@@ -24,7 +25,9 @@ export default function SubscribePage() {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [subPayment, setSubPayment] = useState<{ clientSecret: string; tier: string; tierName: string; amount: number } | null>(null);
   const [currentSub, setCurrentSub] = useState<{ tier: string; expiresAt: { seconds: number } } | null>(null);
+  const processedSubSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     getDoc(doc(db, "users", creatorUid, "public", "profile")).then((snap) => {
@@ -43,7 +46,8 @@ export default function SubscribePage() {
   // Verify after Stripe redirect
   useEffect(() => {
     const sessionId = searchParams.get("sub_session_id");
-    if (!sessionId || !user) return;
+    if (!sessionId || !user || processedSubSessionRef.current === sessionId) return;
+    processedSubSessionRef.current = sessionId;
     router.replace(`/subscribe/${creatorUid}`);
     fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/subscribe-verify?session_id=${encodeURIComponent(sessionId)}`)
       .then((r) => r.json()).then(async (data) => {
@@ -55,24 +59,24 @@ export default function SubscribePage() {
         }, { merge: true }).catch(() => {});
         await addDoc(collection(db, "users", data.creatorUid, "earnings"), {
           type: "subscription", fromUid: user.uid, tier: data.tier,
-          amountUsd: (data.amountCents / 100) * 0.7, purchasedAt: Timestamp.now(),
+          amountUsd: Math.round(data.amountCents * 0.7), timestamp: Timestamp.now(),
         }).catch(() => {});
         setSuccess(true);
       }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, user]);
 
   async function subscribe(tierId: string) {
     if (!user || subscribing) return;
     setSubscribing(tierId);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/subscribe-checkout`, {
+      const res = await fetch("/api/subscribe-payment-intent", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: tierId, creatorUid, token }),
+        body: JSON.stringify({ tier: tierId, creatorUid, creatorName: profile?.displayName || "Creator", token }),
       });
       const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      if (data.clientSecret) setSubPayment({ clientSecret: data.clientSecret, tier: tierId, tierName: data.tierName, amount: data.amount });
     } catch {}
     setSubscribing(null);
   }
@@ -154,6 +158,34 @@ export default function SubscribePage() {
       </div>
 
       <p className="text-xs text-center mt-5" style={{ color: "#333" }}>70% goes directly to the creator · Secured by Stripe</p>
+
+      {subPayment && (
+        <InAppPaymentModal
+          clientSecret={subPayment.clientSecret}
+          title={subPayment.tierName}
+          subtitle={`Supporting ${profile?.displayName || "Creator"} · Secured by Stripe`}
+          buttonLabel={`Pay $${(subPayment.amount / 100).toFixed(2)}`}
+          onClose={() => setSubPayment(null)}
+          onSuccess={async (paymentIntentId) => {
+            const activeTier = subPayment.tier;
+            setSubPayment(null);
+            if (!user) return;
+            // Verify on server and write subscription to Firestore
+            try {
+              const expiresAt = new Date(Date.now() + 30 * 86400000);
+              await setDoc(doc(db, "users", user.uid, "subscriptions", creatorUid), {
+                creatorUid, tier: activeTier, expiresAt,
+                amountCents: subPayment.amount, purchasedAt: new Date(), paymentIntentId,
+              }, { merge: true });
+              await addDoc(collection(db, "users", creatorUid, "earnings"), {
+                type: "subscription", fromUid: user.uid, tier: activeTier,
+                amountUsd: Math.round(subPayment.amount * 0.7), timestamp: new Date(),
+              });
+              setSuccess(true);
+            } catch {}
+          }}
+        />
+      )}
     </div>
   );
 }

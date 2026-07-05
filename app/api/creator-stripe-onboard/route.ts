@@ -1,28 +1,53 @@
-﻿export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
+import { verifyToken } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
 
-const FIREBASE_API_KEY = "AIzaSyCKmWO04sVRhxZv3EuK_j_53yup9K_LEeE";
 
-async function verifyFirebaseToken(idToken: string): Promise<string | null> {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
-  );
+async function getStripeAccountId(uid: string): Promise<string | null> {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}/public/profile?key=${FIREBASE_API_KEY}`;
+  const res = await fetch(url);
   const data = await res.json();
-  return data?.users?.[0]?.localId ?? null;
+  return data?.fields?.stripeAccountId?.stringValue ?? null;
 }
 
+// Check whether a creator's Stripe account is fully onboarded
+export async function GET(req: NextRequest) {
+  if (!process.env.STRIPE_SECRET_KEY) return NextResponse.json({ connected: false });
+  const stripe = new Stripe((process.env.STRIPE_SECRET_KEY ?? "").replace(/^﻿/, "").trim(), { httpClient: Stripe.createFetchHttpClient() });
+  const token = req.nextUrl.searchParams.get("token");
+  if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
+
+  const uid = await verifyToken(req.headers.get("authorization"));
+  if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+
+  const accountId = await getStripeAccountId(uid);
+  if (!accountId) return NextResponse.json({ connected: false });
+
+  try {
+    const account = await stripe.accounts.retrieve(accountId);
+    return NextResponse.json({
+      connected: true,
+      payoutsEnabled: account.payouts_enabled ?? false,
+      chargesEnabled: account.charges_enabled ?? false,
+      accountId,
+    });
+  } catch {
+    return NextResponse.json({ connected: false });
+  }
+}
+
+// Create or resume Stripe Connect onboarding
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe((process.env.STRIPE_SECRET_KEY ?? "").replace(/^﻿/, "").trim(), { httpClient: Stripe.createFetchHttpClient() });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
   const { token, existingAccountId } = body;
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  const uid = await verifyFirebaseToken(token);
+  const uid = await verifyToken(req.headers.get("authorization"));
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
   let accountId = existingAccountId || null;

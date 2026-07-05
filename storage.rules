@@ -1,11 +1,34 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // All uploaded media — public read, authenticated write up to 200 MB
-    match /uploads/{allPaths=**} {
+
+    // Avatar uploads — only the owner can write, 10 MB max, images only
+    match /uploads/avatars/{userId}/{fileName} {
       allow read: if true;
       allow write: if request.auth != null
-                   && request.resource.size < 200 * 1024 * 1024;
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // User media uploads — only the owner can write to their own folder
+    match /uploads/media/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 200 * 1024 * 1024
+                   && (request.resource.contentType.matches('image/.*')
+                       || request.resource.contentType.matches('video/.*'));
+    }
+
+    // Ad media uploads — only the advertiser can write to their folder
+    match /ads/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 200 * 1024 * 1024
+                   && (request.resource.contentType.matches('image/.*')
+                       || request.resource.contentType.matches('video/.*'));
     }
   }
 }
