@@ -3,17 +3,21 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth, canAccessApp } from "@/lib/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc, increment } from "firebase/firestore";
+import { db, OWNER_UIDS } from "@/lib/firebase";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
+import OfflineBanner from "@/components/OfflineBanner";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { deriveNameFromEmail } from "@/lib/nameUtils";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, banned, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const onboardingChecked = useRef(false);
+  const userCountedToday = useRef(false);
+  const profileEnsured = useRef(false);
   usePushNotifications();
 
   useEffect(() => {
@@ -30,6 +34,27 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       router.replace("/login?verify=1");
       return;
     }
+    // Ensure user document exists in Firestore (covers owner accounts + Google users who skipped profile setup)
+    if (!profileEnsured.current) {
+      profileEnsured.current = true;
+      const isOwner = OWNER_UIDS.includes(user.uid);
+      getDoc(doc(db, "users", user.uid)).then((snap) => {
+        if (!snap.exists() || isOwner) {
+          const profile = {
+            displayName: user.displayName || deriveNameFromEmail(user.email || ""),
+            photoURL: user.photoURL || "",
+            email: user.email || "",
+            ...(isOwner ? { verified: true, badge: "⭐" } : {}),
+          };
+          setDoc(doc(db, "users", user.uid), profile, { merge: true }).catch(() => {});
+          setDoc(doc(db, "users", user.uid, "public", "profile"), profile, { merge: true }).catch(() => {});
+          if (isOwner) {
+            setDoc(doc(db, "users", user.uid, "settings", "onboarding"), { completed: true, interests: [] }, { merge: true }).catch(() => {});
+          }
+        }
+      }).catch(() => {});
+    }
+
     // Check onboarding once per session, skip if already on onboarding page
     if (!onboardingChecked.current && pathname !== "/onboarding") {
       onboardingChecked.current = true;
@@ -41,6 +66,24 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [user, loading, banned, signOut, router, pathname]);
 
+  useEffect(() => {
+    if (!user) return;
+    const today = new Date().toISOString().split("T")[0];
+    setDoc(doc(db, "analytics", `daily-${today}`), { pageViews: increment(1) }, { merge: true }).catch(() => {});
+    setDoc(doc(db, "analytics", "totals"), { pageViews: increment(1) }, { merge: true }).catch(() => {});
+    if (!userCountedToday.current) {
+      userCountedToday.current = true;
+      const userDayRef = doc(db, "analytics", `session-${user.uid}-${today}`);
+      getDoc(userDayRef).then((snap) => {
+        if (!snap.exists()) {
+          setDoc(userDayRef, { uid: user.uid, date: today }).catch(() => {});
+          setDoc(doc(db, "analytics", `daily-${today}`), { activeUsers: increment(1) }, { merge: true }).catch(() => {});
+          setDoc(doc(db, "analytics", "totals"), { activeUsers: increment(1) }, { merge: true }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [user, pathname]);
+
   if (loading || !user || banned || !canAccessApp(user)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#090909" }}>
@@ -51,6 +94,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ background: "#090909", minHeight: "100dvh" }}>
+      <OfflineBanner />
       <Sidebar />
       <main className="lg:pl-60 pb-16 lg:pb-0 min-h-screen" style={{ width: "100%", paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className="w-full lg:max-w-[430px] lg:mx-auto">
