@@ -54,6 +54,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" style={{ background: "#000", colorScheme: "dark" }}>
       <head>
         <meta name="apple-itunes-app" content="app-id=6763660775" />
+        {/* Google Ads conversion tracking — replace AW-XXXXXXXXXX with your Google Ads tag ID */}
+        {process.env.NEXT_PUBLIC_GOOGLE_ADS_ID && (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID}`} />
+            <script dangerouslySetInnerHTML={{ __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID}');
+            ` }} />
+          </>
+        )}
         <script dangerouslySetInnerHTML={{ __html: `
           document.documentElement.style.background='#000';
           window.addEventListener('pagehide',function(){document.documentElement.style.background='#000';if(document.body)document.body.style.background='#000';});

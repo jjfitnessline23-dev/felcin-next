@@ -8,6 +8,7 @@ import { signOut } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
+import { trackSignUp } from "@/lib/gtag";
 
 const INTERESTS = [
   { id: "strength", icon: "fitness_center", label: "Strength" },
@@ -70,6 +71,7 @@ export default function OnboardingPage() {
           completed: true, interests, completedAt: serverTimestamp(),
         }),
       ]);
+      trackSignUp();
       router.replace(destination);
     } catch {
       setSaveError(true);

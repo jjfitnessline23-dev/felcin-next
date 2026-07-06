@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
@@ -39,4 +40,10 @@ const nextConfig: NextConfig = {
   }),
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  org: "felcin",
+  project: "felcin-next",
+  disableLogger: true,
+  hideSourceMaps: true,
+});
