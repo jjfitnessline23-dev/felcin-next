@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Skip getRedirectResult in Capacitor — redirects never work in WebViews,
     // calling it delays onAuthStateChanged even with browserLocalPersistence
-    if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD !== "true") {
+    if (!(window as any).Capacitor) {
       getRedirectResult(auth).catch(() => {});
     }
 
