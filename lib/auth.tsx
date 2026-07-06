@@ -37,10 +37,13 @@ export function canAccessApp(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
-  // On Capacitor, skip the loading gate — show UI immediately, auth redirects in background
+  // On Capacitor: show loading only if a Firebase token exists in localStorage
+  // (avoids flash to login when user is already signed in, but doesn't block new users)
   const [loading, setLoading] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
-    return !(window as any).Capacitor;
+    if (!(window as any).Capacitor) return true;
+    const hasCachedUser = Object.keys(localStorage).some(k => k.startsWith("firebase:authUser:"));
+    return hasCachedUser;
   });
 
   useEffect(() => {
