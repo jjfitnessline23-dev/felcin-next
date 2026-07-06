@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, initializeAuth, browserLocalPersistence } from "firebase/auth";
+import { getAuth, initializeAuth, browserLocalPersistence, type Auth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -18,7 +18,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 // Capacitor builds use browserLocalPersistence (localStorage) to avoid IndexedDB.
 // Guard with typeof window so this doesn't throw during Next.js static generation.
 const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
-let auth;
+let auth: Auth;
 if (typeof window !== "undefined" && isCapacitorBuild) {
   try {
     auth = initializeAuth(app, { persistence: browserLocalPersistence });

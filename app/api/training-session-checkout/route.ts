@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import { verifyToken } from "@/lib/firebaseAdmin";
+import { verifyToken, getAdminApp } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rateLimit";
@@ -7,16 +7,14 @@ import { rateLimit } from "@/lib/rateLimit";
 const PLATFORM_FEE_PCT = 20;
 
 async function getTrainerData(uid: string): Promise<{ stripeAccountId?: string; displayName?: string; ratePerSession?: number } | null> {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/trainerProfiles/${uid}?key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (!data.fields) return null;
-  return {
-    stripeAccountId: data.fields.stripeAccountId?.stringValue,
-    displayName: data.fields.displayName?.stringValue,
-    ratePerSession: data.fields.ratePerSession?.integerValue ? Number(data.fields.ratePerSession.integerValue) : undefined,
-  };
+  const app = getAdminApp();
+  if (!app) return null;
+  try {
+    const snap = await app.firestore().doc(`trainerProfiles/${uid}`).get();
+    if (!snap.exists) return null;
+    const d = snap.data()!;
+    return { stripeAccountId: d.stripeAccountId, displayName: d.displayName, ratePerSession: d.ratePerSession };
+  } catch { return null; }
 }
 
 export async function POST(req: NextRequest) {

@@ -44,6 +44,4 @@ export default withSentryConfig(nextConfig, {
   silent: true,
   org: "felcin",
   project: "felcin-next",
-  disableLogger: true,
-  hideSourceMaps: true,
 });

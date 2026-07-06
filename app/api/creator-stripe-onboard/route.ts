@@ -1,16 +1,7 @@
 export const dynamic = "force-dynamic";
-import { verifyToken } from "@/lib/firebaseAdmin";
+import { verifyToken, getCreatorStripeId } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
-
-
-
-async function getStripeAccountId(uid: string): Promise<string | null> {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}/public/profile?key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  return data?.fields?.stripeAccountId?.stringValue ?? null;
-}
 
 // Check whether a creator's Stripe account is fully onboarded
 export async function GET(req: NextRequest) {
@@ -22,7 +13,7 @@ export async function GET(req: NextRequest) {
   const uid = await verifyToken(req.headers.get("authorization"));
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-  const accountId = await getStripeAccountId(uid);
+  const accountId = await getCreatorStripeId(uid);
   if (!accountId) return NextResponse.json({ connected: false });
 
   try {
