@@ -131,7 +131,7 @@ export default function PrivateChatsPage() {
   const hasText = text.trim().length > 0;
 
   return (
-    <div className="flex overflow-hidden" style={{ height: "calc(100dvh - env(safe-area-inset-top, 0px))", background: "#090909", maxWidth: "100vw" }}>
+    <div className="private-chats-root flex overflow-hidden" style={{ background: "#090909" }}>
 
       {/* ── Chat list panel ── */}
       <div className={`shrink-0 flex flex-col ${activeChat ? "hidden lg:flex lg:w-80" : chats.length === 0 ? "w-full flex" : "w-full lg:w-80 flex"}`}
