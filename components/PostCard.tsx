@@ -102,6 +102,26 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const isOwner = user && OWNER_UIDS.includes(user.uid);
   const canDelete = user && (user.uid === post.authorId || isOwner);
 
+  const handleDownload = async () => {
+    if (!post.mediaUrl) return;
+    setDotMenu(false);
+    try {
+      const res = await fetch(post.mediaUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ext = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video" ? "mp4" : "jpg";
+      a.href = url;
+      a.download = `felcin-${post.id}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(post.mediaUrl, "_blank");
+    }
+  };
+
   useEffect(() => {
     setLiked(post.likedBy?.includes(user?.uid || "") ?? false);
     setLikeCount(post.likes ?? 0);
@@ -518,6 +538,9 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           {[
             { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); }, danger: false },
             { icon: "link", label: "Copy link", action: copyLink, danger: false },
+            ...(post.mediaUrl && (isOwner || user?.uid === post.authorId) ? [
+              { icon: "download", label: "Download media", action: handleDownload, danger: false },
+            ] : []),
             ...(!canDelete && user?.uid !== post.authorId ? [
               { icon: "flag", label: "Report", action: () => { setDotMenu(false); setReportModal(true); setReportDone(false); }, danger: true },
               { icon: "block", label: "Block user", action: handleBlock, danger: true },
