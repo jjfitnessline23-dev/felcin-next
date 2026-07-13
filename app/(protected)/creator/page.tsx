@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { useRouter, useSearchParams } from "next/navigation";
 import { collection, addDoc, serverTimestamp, Timestamp, getDocs, limit, query } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -21,6 +23,24 @@ const FILTERS = [
 ];
 
 type Mode = "post" | "reel" | "story";
+
+const NEEDS_CONVERSION = /\.(mov|hevc|avi|mkv|wmv|flv|3gp|m4v|ts|mts|webm)$/i;
+const FFMPEG_CORE = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js";
+const FFMPEG_WASM = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm";
+
+async function convertToMp4(file: File, onProgress: (pct: number) => void): Promise<File> {
+  const ffmpeg = new FFmpeg();
+  const coreURL = await toBlobURL(FFMPEG_CORE, "text/javascript");
+  const wasmURL = await toBlobURL(FFMPEG_WASM, "application/wasm");
+  await ffmpeg.load({ coreURL, wasmURL });
+  ffmpeg.on("progress", ({ progress }) => onProgress(Math.round(progress * 100)));
+  const inputName = "input" + file.name.slice(file.name.lastIndexOf("."));
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+  await ffmpeg.exec(["-i", inputName, "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", "-y", "output.mp4"]);
+  const data = await ffmpeg.readFile("output.mp4") as Uint8Array;
+  const outName = file.name.replace(/\.[^.]+$/, ".mp4");
+  return new File([data.buffer], outName, { type: "video/mp4" });
+}
 
 async function uploadFile(file: File, uid: string, onProgress: (pct: number) => void): Promise<string> {
   const ext = file.name.split(".").pop() || "bin";
@@ -53,6 +73,8 @@ export default function CreatorPage() {
   const [uploadPct, setUploadPct] = useState(0);
   const [bgUploading, setBgUploading] = useState(false);
   const [bgPct, setBgPct] = useState(0);
+  const [converting, setConverting] = useState(false);
+  const [convertPct, setConvertPct] = useState(0);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const uploadPromiseRef = useRef<Promise<string> | null>(null);
   const [scheduled, setScheduled] = useState(false);
@@ -91,24 +113,49 @@ export default function CreatorPage() {
     return () => clearTimeout(t);
   }, [collabSearch, allUsers, user?.uid]);
 
-  const handleFile = useCallback((f: File) => {
-    if (f.size > 200 * 1024 * 1024) { setStatus({ msg: "File too large — max 200MB", type: "error" }); return; }
+  const handleFile = useCallback(async (f: File) => {
+    if (f.size > 500 * 1024 * 1024) { setStatus({ msg: "File too large — max 500MB", type: "error" }); return; }
     const mime = f.type || "";
     const fname = f.name.toLowerCase();
-    const video = mime.startsWith("video/") || /\.(mp4|mov|avi|webm|mkv|m4v|3gp)$/.test(fname);
-    // Warn about HEVC/MOV format — not supported by most browsers
-    if (video && (mime === "video/quicktime" || fname.endsWith(".mov") || mime === "video/hevc")) {
-      setStatus({ msg: "⚠️ MOV/HEVC may not play on all devices. Convert to MP4 for best results.", type: "info" });
-    } else {
-      setStatus(null);
-    }
+    const video = mime.startsWith("video/") || /\.(mp4|mov|avi|webm|mkv|m4v|3gp|hevc|ts|mts|wmv|flv)$/.test(fname);
+    setStatus(null);
     setFile(f); setIsVideo(video); setActiveFilter(FILTERS[0]);
-    setUploadedUrl(null); setBgUploading(true); setBgPct(0);
+    setUploadedUrl(null); setBgUploading(false); setBgPct(0);
     uploadPromiseRef.current = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(f));
-    // Start upload immediately in background while user writes caption
-    if (user) {
+
+    if (!user) return;
+
+    // Auto-convert non-MP4/non-WebM videos to MP4 for universal compatibility
+    const needsConvert = video && NEEDS_CONVERSION.test(fname);
+    if (needsConvert) {
+      setConverting(true); setConvertPct(0);
+      setStatus({ msg: "Converting video to MP4 for best compatibility…", type: "info" });
+      try {
+        const converted = await convertToMp4(f, (pct) => setConvertPct(pct));
+        setConverting(false);
+        setStatus({ msg: "Converted! Uploading…", type: "info" });
+        // Update preview with converted file
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(URL.createObjectURL(converted));
+        setFile(converted);
+        setBgUploading(true); setBgPct(0);
+        const promise = uploadFile(converted, user.uid, (pct) => setBgPct(pct));
+        uploadPromiseRef.current = promise;
+        promise.then((url) => { setUploadedUrl(url); setBgUploading(false); setStatus(null); })
+               .catch(() => { setBgUploading(false); setStatus({ msg: "Upload failed. Try again.", type: "error" }); uploadPromiseRef.current = null; });
+      } catch {
+        setConverting(false);
+        setStatus({ msg: "Conversion failed — uploading original format.", type: "info" });
+        setBgUploading(true);
+        const promise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
+        uploadPromiseRef.current = promise;
+        promise.then((url) => { setUploadedUrl(url); setBgUploading(false); setStatus(null); })
+               .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
+      }
+    } else {
+      setBgUploading(true); setBgPct(0);
       const promise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
       uploadPromiseRef.current = promise;
       promise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
@@ -237,7 +284,17 @@ export default function CreatorPage() {
               style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
             </button>
-            {bgUploading && (
+            {converting && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: "rgba(0,0,0,0.75)" }}>
+                <div className="spinner" />
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Converting to MP4… {convertPct}%</p>
+                <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${convertPct}%`, background: "#a78bfa" }} />
+                </div>
+                <p className="text-xs" style={{ color: "#666" }}>Making it compatible with all devices</p>
+              </div>
+            )}
+            {!converting && bgUploading && (
               <div className="absolute bottom-0 left-0 right-0 px-3 pb-3">
                 <div className="rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", height: 4 }}>
                   <div className="h-full rounded-full transition-all duration-300" style={{ width: `${bgPct}%`, background: "#a78bfa" }} />
