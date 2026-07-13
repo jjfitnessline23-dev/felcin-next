@@ -276,8 +276,8 @@ export default function PrivateChatsPage() {
           </div>
 
           {/* Input bar */}
-          <div className="flex items-center gap-2.5 px-4 pt-3 shrink-0"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 72px)" }}>
+          <div className="flex items-center gap-2.5 px-4 pt-3 pb-3 lg:pb-4 shrink-0 nav-composer"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)" }}>
             {user?.photoURL ? (
               <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
             ) : (

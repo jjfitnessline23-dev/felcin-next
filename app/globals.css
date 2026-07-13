@@ -263,6 +263,14 @@ main { animation: pageFadeIn 0.18s ease-out; }
   .mobile-nav-bar, .mobile-nav-drawer { display: none !important; }
 }
 
+/* Compose bar: add bottom padding on mobile to clear the nav bar */
+.nav-composer {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+}
+@media (min-width: 1024px) {
+  .nav-composer { padding-bottom: 16px; }
+}
+
 /* Ghost Workout animations */
 @keyframes ghostFloat {
   0%   { transform: translateY(-50%) perspective(600px) rotateY(-12deg) rotateX(4deg); }
