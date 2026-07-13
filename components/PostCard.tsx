@@ -138,15 +138,34 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     if (!v || !post.mediaUrl) return;
     v.muted = true;
     v.setAttribute("muted", "");
-    const obs = new IntersectionObserver(
+
+    // Start loading when video is 200px away from viewport, play when 50% visible
+    const loadObs = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) v.play().catch(() => {});
-        else v.pause();
+        if (entry.isIntersecting) {
+          if (v.preload === "none") v.preload = "auto";
+        } else {
+          v.preload = "none";
+        }
       },
-      { threshold: 0.25 }
+      { rootMargin: "200px", threshold: 0 }
     );
-    obs.observe(v);
-    return () => { obs.disconnect(); v.pause(); };
+
+    const playObs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          v.play().catch(() => {});
+        } else {
+          v.pause();
+          v.currentTime = 0;
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    loadObs.observe(v);
+    playObs.observe(v);
+    return () => { loadObs.disconnect(); playObs.disconnect(); v.pause(); };
   }, [post.mediaUrl]);
 
   const mediaType = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
@@ -435,7 +454,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
               <video
                 ref={videoRef}
                 src={post.mediaUrl}
-                muted loop playsInline preload="metadata"
+                muted loop playsInline preload="none"
                 className="w-full h-full object-cover cursor-pointer"
                 onClick={() => openLightbox(true)}
               />
