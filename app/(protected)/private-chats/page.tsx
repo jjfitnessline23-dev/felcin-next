@@ -110,8 +110,10 @@ export default function PrivateChatsPage() {
     if (!text.trim() || !user || !activeChat || sending) return;
     setSending(true); const t = text.trim(); setText("");
     try {
-      await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, text: t, createdAt: serverTimestamp() });
+      // Ensure chat document exists with participants BEFORE adding message
+      // (Firestore rules check get(chats/{chatId}).data.participants on message create)
       await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp() }, { merge: true });
+      await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, text: t, createdAt: serverTimestamp() });
       const otherUid = activeChat.split("_").find((id) => id !== user.uid);
       if (otherUid) {
         addDoc(collection(db, "notifications"), {
