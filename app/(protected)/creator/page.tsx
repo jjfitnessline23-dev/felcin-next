@@ -37,10 +37,12 @@ async function convertToMp4(file: File, onProgress: (pct: number) => void): Prom
   const inputName = "input" + file.name.slice(file.name.lastIndexOf("."));
   await ffmpeg.writeFile(inputName, await fetchFile(file));
   await ffmpeg.exec(["-i", inputName, "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", "-y", "output.mp4"]);
-  const data = await ffmpeg.readFile("output.mp4");
+  const raw = await ffmpeg.readFile("output.mp4");
   const outName = file.name.replace(/\.[^.]+$/, ".mp4");
-  const blob = new Blob([data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer)], { type: "video/mp4" });
-  return new File([blob], outName, { type: "video/mp4" });
+  const src = typeof raw === "string" ? new TextEncoder().encode(raw) : raw;
+  const plainBuffer = new ArrayBuffer(src.byteLength);
+  new Uint8Array(plainBuffer).set(src);
+  return new File([plainBuffer], outName, { type: "video/mp4" });
 }
 
 async function uploadFile(file: File, uid: string, onProgress: (pct: number) => void): Promise<string> {
