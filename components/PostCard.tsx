@@ -106,21 +106,22 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     if (!post.mediaUrl) return;
     setDotMenu(false);
     const isVid = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
+    const proxied = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
+
     try {
-      const res = await fetch(post.mediaUrl);
+      const res = await fetch(proxied);
+      if (!res.ok) throw new Error("proxy failed");
       const blob = await res.blob();
 
       if (isVid) {
-        // Videos: download as-is (watermark via FFmpeg is too heavy client-side)
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url; a.download = `felcin-${post.id}.mp4`;
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
       } else {
-        // Images: burn Felcin watermark onto canvas before download
+        // Draw image on canvas and burn watermark
         const img = new Image();
-        img.crossOrigin = "anonymous";
         img.src = URL.createObjectURL(blob);
         await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = reject; });
 
@@ -129,25 +130,25 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0);
 
-        // Watermark config
         const pad = Math.round(canvas.width * 0.03);
-        const fontSize = Math.max(18, Math.round(canvas.width * 0.04));
-        ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        const fontSize = Math.max(16, Math.round(canvas.width * 0.038));
+        ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
         const text = "felcin.com";
         const tw = ctx.measureText(text).width;
-        const th = fontSize;
-        const bx = canvas.width - tw - pad * 2;
-        const by = canvas.height - th - pad * 2;
+        const bx = canvas.width - tw - pad * 2.5;
+        const by = canvas.height - fontSize - pad * 2.5;
 
-        // Background pill
-        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        // Shadow pill background
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.beginPath();
-        ctx.roundRect(bx - pad * 0.5, by - pad * 0.5, tw + pad, th + pad, 8);
+        ctx.roundRect(bx - pad * 0.6, by - pad * 0.6, tw + pad * 1.2, fontSize + pad * 1.2, 10);
         ctx.fill();
 
-        // Text
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.fillText(text, bx, by + th * 0.85);
+        // White text
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.fillText(text, bx, by + fontSize * 0.82);
+
+        URL.revokeObjectURL(img.src);
 
         canvas.toBlob((b) => {
           if (!b) return;
@@ -156,9 +157,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           a.href = url; a.download = `felcin-${post.id}.jpg`;
           document.body.appendChild(a); a.click();
           document.body.removeChild(a); URL.revokeObjectURL(url);
-        }, "image/jpeg", 0.92);
-
-        URL.revokeObjectURL(img.src);
+        }, "image/jpeg", 0.93);
       }
     } catch {
       window.open(post.mediaUrl, "_blank");
