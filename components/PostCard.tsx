@@ -105,18 +105,61 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const handleDownload = async () => {
     if (!post.mediaUrl) return;
     setDotMenu(false);
+    const isVid = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
     try {
       const res = await fetch(post.mediaUrl);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const ext = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video" ? "mp4" : "jpg";
-      a.href = url;
-      a.download = `felcin-${post.id}.${ext}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      if (isVid) {
+        // Videos: download as-is (watermark via FFmpeg is too heavy client-side)
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `felcin-${post.id}.mp4`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      } else {
+        // Images: burn Felcin watermark onto canvas before download
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = URL.createObjectURL(blob);
+        await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = reject; });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0);
+
+        // Watermark config
+        const pad = Math.round(canvas.width * 0.03);
+        const fontSize = Math.max(18, Math.round(canvas.width * 0.04));
+        ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        const text = "felcin.com";
+        const tw = ctx.measureText(text).width;
+        const th = fontSize;
+        const bx = canvas.width - tw - pad * 2;
+        const by = canvas.height - th - pad * 2;
+
+        // Background pill
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.beginPath();
+        ctx.roundRect(bx - pad * 0.5, by - pad * 0.5, tw + pad, th + pad, 8);
+        ctx.fill();
+
+        // Text
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillText(text, bx, by + th * 0.85);
+
+        canvas.toBlob((b) => {
+          if (!b) return;
+          const url = URL.createObjectURL(b);
+          const a = document.createElement("a");
+          a.href = url; a.download = `felcin-${post.id}.jpg`;
+          document.body.appendChild(a); a.click();
+          document.body.removeChild(a); URL.revokeObjectURL(url);
+        }, "image/jpeg", 0.92);
+
+        URL.revokeObjectURL(img.src);
+      }
     } catch {
       window.open(post.mediaUrl, "_blank");
     }
