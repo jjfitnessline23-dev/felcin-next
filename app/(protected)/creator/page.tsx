@@ -130,8 +130,8 @@ export default function CreatorPage() {
 
     if (!user) return;
 
-    // Auto-convert non-MP4/non-WebM videos to MP4 for universal compatibility
-    const needsConvert = video && NEEDS_CONVERSION.test(fname);
+    // Auto-convert non-MP4 videos to MP4 — skip if file > 80MB (FFmpeg.wasm crashes on large files)
+    const needsConvert = video && NEEDS_CONVERSION.test(fname) && f.size < 80 * 1024 * 1024;
     if (needsConvert) {
       setConverting(true); setConvertPct(0);
       setStatus({ msg: "Converting video to MP4 for best compatibility…", type: "info" });
@@ -139,7 +139,6 @@ export default function CreatorPage() {
         const converted = await convertToMp4(f, (pct) => setConvertPct(pct));
         setConverting(false);
         setStatus({ msg: "Converted! Uploading…", type: "info" });
-        // Update preview with converted file
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(URL.createObjectURL(converted));
         setFile(converted);
@@ -150,7 +149,6 @@ export default function CreatorPage() {
                .catch(() => { setBgUploading(false); setStatus({ msg: "Upload failed. Try again.", type: "error" }); uploadPromiseRef.current = null; });
       } catch {
         setConverting(false);
-        setStatus({ msg: "Conversion failed — uploading original format.", type: "info" });
         setBgUploading(true);
         const promise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
         uploadPromiseRef.current = promise;
