@@ -134,7 +134,11 @@ export default function PrivateChatsPage() {
     <div className="private-chats-root flex overflow-hidden" style={{ background: "#090909" }}>
 
       {/* ── Chat list panel ── */}
-      <div className={`shrink-0 flex flex-col ${activeChat ? "hidden lg:flex lg:w-80" : chats.length === 0 ? "w-full flex" : "w-full lg:w-80 flex"}`}
+      <div className={`shrink-0 flex flex-col ${
+        activeChat
+          ? chats.length > 0 ? "hidden lg:flex lg:w-80" : "hidden"
+          : chats.length === 0 ? "w-full flex" : "w-full lg:w-80 flex"
+      }`}
         style={{ borderRight: chats.length > 0 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
 
         {/* Header */}
