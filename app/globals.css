@@ -271,6 +271,12 @@ main { animation: pageFadeIn 0.18s ease-out; }
   .nav-composer { padding-bottom: 16px; }
 }
 
+/* Ghost pulse for chat empty state */
+@keyframes ghostPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
 /* Ghost Workout animations */
 @keyframes ghostFloat {
   0%   { transform: translateY(-50%) perspective(600px) rotateY(-12deg) rotateX(4deg); }

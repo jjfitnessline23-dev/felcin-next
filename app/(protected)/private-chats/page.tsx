@@ -240,14 +240,55 @@ export default function PrivateChatsPage() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5">
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5 relative">
+
+            {/* Ghost watermark background */}
+            <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center overflow-hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" style={{ width: 260, height: 260, opacity: 0.03, filter: "blur(1px)" }}>
+                <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="white"/>
+                <circle cx="24" cy="29" r="4.5" fill="#090909"/>
+                <circle cx="40" cy="29" r="4.5" fill="#090909"/>
+                <path d="M 0,36 L 14,36 L 16,34 L 18,36 L 20,36 L 21,38 L 24,20 L 27,39 L 30,34 L 32,36 C 34,36 35,31 37,36 L 64,36"
+                  fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
             {messages.length === 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="ghost-bg w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 26, color: "#2a2a2a" }}>chat_bubble</span>
+              <div className="flex-1 flex items-center justify-center relative z-10">
+                <div className="text-center px-6">
+                  {/* Ghost icon */}
+                  <div className="mx-auto mb-5 relative" style={{ width: 80, height: 80 }}>
+                    <div className="absolute inset-0 rounded-full" style={{ background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)", animation: "ghostPulse 3s ease-in-out infinite" }} />
+                    <div className="w-full h-full rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(168,85,247,0.2)" }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="44" height="44">
+                        <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="rgba(168,85,247,0.6)"/>
+                        <circle cx="24" cy="29" r="4.5" fill="#090909"/>
+                        <circle cx="40" cy="29" r="4.5" fill="#090909"/>
+                        <path d="M 0,36 L 14,36 L 16,34 L 18,36 L 20,36 L 21,38 L 24,20 L 27,39 L 30,34 L 32,36 C 34,36 35,31 37,36 L 64,36"
+                          fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
                   </div>
-                  <p className="text-sm" style={{ color: "#444" }}>Say hello 👋</p>
+
+                  <p className="font-bold text-base mb-1" style={{ color: "#f2f2f2" }}>
+                    {otherName}
+                  </p>
+                  <p className="text-sm mb-6" style={{ color: "#555" }}>Say hello 👋</p>
+
+                  {/* Ghost sayings */}
+                  <div className="flex flex-col gap-2 max-w-[260px] mx-auto">
+                    {[
+                      { emoji: "👻", text: "The Ghost is listening..." },
+                      { emoji: "⚡", text: "Train together, even apart." },
+                      { emoji: "🔥", text: "Every great session starts with a message." },
+                    ].map((s) => (
+                      <div key={s.text} className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-left"
+                        style={{ background: "rgba(168,85,247,0.05)", border: "1px solid rgba(168,85,247,0.1)" }}>
+                        <span style={{ fontSize: 15 }}>{s.emoji}</span>
+                        <span className="text-xs" style={{ color: "#555" }}>{s.text}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
