@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
@@ -97,9 +97,14 @@ export default function PrivateChatsPage() {
 
   useEffect(() => {
     if (!activeChat) { setMessages([]); return; }
-    const q = query(collection(db, "chats", activeChat, "messages"), orderBy("createdAt", "asc"));
+    // No orderBy — serverTimestamp() causes pending docs to be excluded from ordered queries
+    // Sort client-side so messages appear immediately on send
+    const q = query(collection(db, "chats", activeChat, "messages"));
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Msg, "id">) })));
+      const sorted = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<Msg, "id">) }))
+        .sort((a, b) => (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0));
+      setMessages(sorted);
       clearTimeout(scrollTimer.current);
       scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
     }, () => {});
@@ -332,7 +337,7 @@ export default function PrivateChatsPage() {
               </div>
             )}
             <input type="text" value={text} onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMsg()}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }}
               onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 350)}
               placeholder="Type a message…"
               className="flex-1 px-4 py-2.5 rounded-full outline-none transition-all"
@@ -341,7 +346,7 @@ export default function PrivateChatsPage() {
                 border: `1px solid ${hasText ? "rgba(124,58,237,0.3)" : "rgba(255,255,255,0.08)"}`,
                 color: "#f2f2f2", fontSize: 16,
               }} />
-            <button onClick={sendMsg} disabled={!hasText || sending}
+            <button type="button" onClick={(e) => { e.preventDefault(); sendMsg(); }} disabled={!hasText || sending}
               className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer transition-all shrink-0"
               style={{
                 background: hasText ? "linear-gradient(135deg,#7C3AED,#a855f7)" : "rgba(255,255,255,0.05)",
