@@ -106,61 +106,68 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     if (!post.mediaUrl) return;
     setDotMenu(false);
     const isVid = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
-    const proxied = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
+    const ext = isVid ? "mp4" : "jpg";
+    const filename = `felcin-${post.id}.${ext}`;
+    const proxyUrl = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}&filename=${filename}&dl=1`;
 
+    if (isVid) {
+      // Videos: direct proxy download with Content-Disposition header
+      const a = document.createElement("a");
+      a.href = proxyUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    // Images: fetch via proxy then burn watermark on canvas
     try {
-      const res = await fetch(proxied);
+      const res = await fetch(proxyUrl.replace("&dl=1", ""));
       if (!res.ok) throw new Error("proxy failed");
       const blob = await res.blob();
 
-      if (isVid) {
-        const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.src = URL.createObjectURL(blob);
+      await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = reject; });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(img.src);
+
+      // Watermark
+      const pad = Math.round(canvas.width * 0.03);
+      const fontSize = Math.max(16, Math.round(canvas.width * 0.038));
+      ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      const text = "felcin.com";
+      const tw = ctx.measureText(text).width;
+      const bx = canvas.width - tw - pad * 2.5;
+      const by = canvas.height - fontSize - pad * 2.5;
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.beginPath();
+      ctx.roundRect(bx - pad * 0.6, by - pad * 0.6, tw + pad * 1.2, fontSize + pad * 1.2, 10);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.fillText(text, bx, by + fontSize * 0.82);
+
+      canvas.toBlob((b) => {
+        if (!b) return;
+        const url = URL.createObjectURL(b);
         const a = document.createElement("a");
-        a.href = url; a.download = `felcin-${post.id}.mp4`;
+        a.href = url; a.download = filename;
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
-      } else {
-        // Draw image on canvas and burn watermark
-        const img = new Image();
-        img.src = URL.createObjectURL(blob);
-        await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = reject; });
-
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(img, 0, 0);
-
-        const pad = Math.round(canvas.width * 0.03);
-        const fontSize = Math.max(16, Math.round(canvas.width * 0.038));
-        ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-        const text = "felcin.com";
-        const tw = ctx.measureText(text).width;
-        const bx = canvas.width - tw - pad * 2.5;
-        const by = canvas.height - fontSize - pad * 2.5;
-
-        // Shadow pill background
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.beginPath();
-        ctx.roundRect(bx - pad * 0.6, by - pad * 0.6, tw + pad * 1.2, fontSize + pad * 1.2, 10);
-        ctx.fill();
-
-        // White text
-        ctx.fillStyle = "rgba(255,255,255,0.95)";
-        ctx.fillText(text, bx, by + fontSize * 0.82);
-
-        URL.revokeObjectURL(img.src);
-
-        canvas.toBlob((b) => {
-          if (!b) return;
-          const url = URL.createObjectURL(b);
-          const a = document.createElement("a");
-          a.href = url; a.download = `felcin-${post.id}.jpg`;
-          document.body.appendChild(a); a.click();
-          document.body.removeChild(a); URL.revokeObjectURL(url);
-        }, "image/jpeg", 0.93);
-      }
+      }, "image/jpeg", 0.93);
     } catch {
-      window.open(post.mediaUrl, "_blank");
+      // Fallback: direct proxy download without watermark
+      const a = document.createElement("a");
+      a.href = proxyUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 
