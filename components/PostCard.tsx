@@ -102,15 +102,111 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const isOwner = user && OWNER_UIDS.includes(user.uid);
   const canDelete = user && (user.uid === post.authorId || isOwner);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!post.mediaUrl) return;
     setDotMenu(false);
+
     const isVid = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
     const ext = isVid ? "mp4" : "jpg";
     const filename = `felcin-${post.id}.${ext}`;
-    const proxyUrl = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}&filename=${encodeURIComponent(filename)}&dl=1`;
-    // setTimeout ensures menu is closed before popup — prevents popup blocker on mobile
-    setTimeout(() => window.open(proxyUrl, "_blank"), 100);
+    const proxyBase = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
+    const proxyDl = `${proxyBase}&filename=${encodeURIComponent(filename)}&dl=1`;
+
+    // Videos — download directly (video watermark requires FFmpeg, too heavy)
+    if (isVid) {
+      setTimeout(() => window.open(proxyDl, "_blank"), 100);
+      return;
+    }
+
+    // Images — fetch via proxy, burn logo + text watermark, then share/download
+    try {
+      const res = await fetch(proxyBase);
+      if (!res.ok) throw new Error("proxy");
+      const blob = await res.blob();
+
+      // Load the original image onto canvas
+      const img = new Image();
+      const imgObjUrl = URL.createObjectURL(blob);
+      img.src = imgObjUrl;
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; });
+      URL.revokeObjectURL(imgObjUrl);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      // ── Watermark layout ──────────────────────────────────────
+      const cw = canvas.width;
+      const ch = canvas.height;
+      const pad     = Math.round(cw * 0.028);
+      const logoSz  = Math.round(cw * 0.08);
+      const fontSize = Math.max(14, Math.round(cw * 0.036));
+      const gap     = Math.round(cw * 0.016);
+
+      ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+      const label  = "felcin.com";
+      const textW  = ctx.measureText(label).width;
+      const rowH   = Math.max(logoSz, fontSize * 1.2);
+      const boxW   = pad + logoSz + gap + textW + pad;
+      const boxH   = pad * 0.8 + rowH + pad * 0.8;
+      const boxX   = cw - boxW - pad;
+      const boxY   = ch - boxH - pad;
+
+      // Semi-transparent dark pill background
+      ctx.save();
+      ctx.globalAlpha = 0.72;
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 14);
+      ctx.fill();
+      ctx.restore();
+
+      // ── Felcin ghost logo (SVG → Image → canvas) ──────────────
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${logoSz}" height="${logoSz}">
+        <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="white"/>
+        <circle cx="24" cy="29" r="4.5" fill="#111"/>
+        <circle cx="40" cy="29" r="4.5" fill="#111"/>
+        <path d="M0,36 L14,36 L16,34 L18,36 L20,36 L21,38 L24,20 L27,39 L30,34 L32,36 C34,36 35,31 37,36 L64,36"
+          fill="none" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+      const svgBlob = new Blob([svgStr], { type: "image/svg+xml" });
+      const svgUrl  = URL.createObjectURL(svgBlob);
+      const logoImg = new Image(logoSz, logoSz);
+      logoImg.src   = svgUrl;
+      await new Promise<void>((res) => { logoImg.onload = () => res(); logoImg.onerror = () => res(); });
+      URL.revokeObjectURL(svgUrl);
+
+      // Draw logo centered vertically in box
+      const logoY = boxY + (boxH - logoSz) / 2;
+      ctx.drawImage(logoImg, boxX + pad, logoY, logoSz, logoSz);
+
+      // Draw "felcin.com" text
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.fillText(label, boxX + pad + logoSz + gap, boxY + boxH / 2 + fontSize * 0.36);
+
+      // ── Export & share/download ────────────────────────────────
+      canvas.toBlob(async (wmBlob) => {
+        if (!wmBlob) { setTimeout(() => window.open(proxyDl, "_blank"), 100); return; }
+
+        const file = new File([wmBlob], filename, { type: "image/jpeg" });
+
+        // Web Share API (iOS Share Sheet → Save to Photos; Android)
+        if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file], title: "Felcin" }); return; } catch { /* cancelled or denied */ }
+        }
+
+        // Fallback: open blob URL in new tab — user can long-press → Save
+        const dlUrl = URL.createObjectURL(wmBlob);
+        window.open(dlUrl, "_blank");
+        setTimeout(() => URL.revokeObjectURL(dlUrl), 10000);
+      }, "image/jpeg", 0.93);
+
+    } catch {
+      // If anything fails, fall back to plain proxy download
+      setTimeout(() => window.open(proxyDl, "_blank"), 100);
+    }
   };
 
   useEffect(() => {
