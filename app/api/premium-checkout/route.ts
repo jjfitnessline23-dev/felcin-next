@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const { plan, token } = body;
     if (!plan || !token || !PLANS[plan]) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-    const uid = await verifyToken(req.headers.get("authorization"));
+    const uid = await verifyToken(req.headers.get("authorization") ?? body?.token);
     if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!await rateLimit(`premium:${uid}`, 3, 60_000)) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 

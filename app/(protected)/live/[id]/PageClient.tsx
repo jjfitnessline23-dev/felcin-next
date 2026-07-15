@@ -10,16 +10,43 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import AgoraVideo from "@/components/AgoraVideo";
+import GhostGiftReveal, { type GhostVariant } from "@/components/GhostGiftReveal";
 
 const GIFTS = [
-  { id: "rose",    emoji: "🌹", label: "Rose",    cents: 99  },
-  { id: "heart",   emoji: "❤️",  label: "Heart",   cents: 99  },
-  { id: "clap",    emoji: "👏", label: "Clap",    cents: 99  },
-  { id: "fire",    emoji: "🔥", label: "Fire",    cents: 199 },
-  { id: "star",    emoji: "⭐",  label: "Star",    cents: 199 },
-  { id: "rocket",  emoji: "🚀", label: "Rocket",  cents: 299 },
-  { id: "crown",   emoji: "👑", label: "Crown",   cents: 499 },
-  { id: "diamond", emoji: "💎", label: "Diamond", cents: 999 },
+  // Tier 1 — $0.99
+  { id: "rose",          emoji: "🌹", label: "Rose",          cents: 99   },
+  { id: "heart",         emoji: "❤️",  label: "Heart",         cents: 99   },
+  { id: "clap",          emoji: "👏", label: "Clap",          cents: 99   },
+  { id: "muscle",        emoji: "💪", label: "Muscle",        cents: 99   },
+  { id: "wave",          emoji: "🌊", label: "Wave",          cents: 99   },
+  { id: "confetti",      emoji: "🎊", label: "Confetti",      cents: 99   },
+  { id: "snowflake",     emoji: "❄️",  label: "Snowflake",     cents: 99   },
+  { id: "shooting_star", emoji: "💫", label: "Shooting Star", cents: 99   },
+  // Tier 2 — $1.99
+  { id: "fire",          emoji: "🔥", label: "Fire",          cents: 199  },
+  { id: "star",          emoji: "⭐",  label: "Star",          cents: 199  },
+  { id: "dumbbell",      emoji: "🏋️", label: "Dumbbell",      cents: 199  },
+  { id: "medal",         emoji: "🏅", label: "Medal",         cents: 199  },
+  { id: "lightning",     emoji: "⚡", label: "Lightning",     cents: 199  },
+  { id: "party",         emoji: "🎉", label: "Party",         cents: 199  },
+  { id: "football",      emoji: "🏈", label: "Football",      cents: 199  },
+  { id: "basketball",    emoji: "🏀", label: "Basketball",    cents: 199  },
+  // Tier 3 — $2.99–$4.99
+  { id: "bouquet",       emoji: "💐", label: "Bouquet",       cents: 299  },
+  { id: "rocket",        emoji: "🚀", label: "Rocket",        cents: 299  },
+  { id: "target",        emoji: "🎯", label: "Target",        cents: 299  },
+  { id: "fireworks",     emoji: "🎆", label: "Fireworks",     cents: 399  },
+  { id: "crown",         emoji: "👑", label: "Crown",         cents: 499  },
+  { id: "lion",          emoji: "🦁", label: "Lion",          cents: 499  },
+  { id: "unicorn",       emoji: "🦄", label: "Unicorn",       cents: 499  },
+  // Tier 4 — $9.99–$14.99
+  { id: "diamond",       emoji: "💎", label: "Diamond",       cents: 999  },
+  { id: "trophy",        emoji: "🏆", label: "Trophy",        cents: 1499 },
+  // Ghost gifts — premium
+  { id: "fire_ghost",    emoji: "👻", label: "Fire Ghost",    cents: 1999, ghost: "fire"     as const },
+  { id: "champ_ghost",   emoji: "👻", label: "Champ Ghost",   cents: 3499, ghost: "champion" as const },
+  { id: "golden_ghost",  emoji: "👻", label: "Golden Ghost",  cents: 4999, ghost: "gold"     as const },
+  { id: "diamond_ghost", emoji: "👻", label: "Diamond Ghost", cents: 9999, ghost: "diamond"  as const },
 ];
 
 const BADGE_LABELS: Record<string, { label: string; color: string }> = {
@@ -44,7 +71,7 @@ interface GiftEvent {
   id: string; senderId: string; senderName: string; senderPhoto?: string;
   badgeId?: string; giftType: string; giftEmoji: string; ts: number;
 }
-interface FlyingGift { key: string; emoji: string; x: number; }
+interface FlyingGift { key: string; emoji: string; x: number; isGold?: boolean; isFire?: boolean; isChamp?: boolean; }
 interface RaceDoc { active: boolean; exerciseName: string; repTarget?: number; }
 interface RaceScore { uid: string; userName: string; userPhoto?: string; reps: number; }
 
@@ -58,6 +85,7 @@ export default function StreamViewerPage() {
   const [stream, setStream] = useState<Stream | null>(null);
   const [gifts, setGifts] = useState<GiftEvent[]>([]);
   const [flying, setFlying] = useState<FlyingGift[]>([]);
+  const [ghostReveal, setGhostReveal] = useState<{ variant: GhostVariant; senderName: string } | null>(null);
   const [sending, setSending] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessChecked, setAccessChecked] = useState(false);
@@ -126,8 +154,9 @@ export default function StreamViewerPage() {
       orderBy("timestamp", "desc"),
       limit(50)
     );
+    let initialized = false;
     return onSnapshot(q, (snap) => {
-      setGifts(snap.docs.map((d) => {
+      const mapped = snap.docs.map((d) => {
         const data = d.data();
         return {
           id: d.id, senderId: data.senderId ?? "",
@@ -138,7 +167,27 @@ export default function StreamViewerPage() {
           giftEmoji: data.giftEmoji ?? "🌹",
           ts: data.timestamp?.seconds ?? 0,
         };
-      }));
+      });
+      // Trigger ghost reveal for new ghost gifts (skip initial load)
+      if (initialized) {
+        snap.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const gt = change.doc.data().giftType ?? "";
+            const ghostMap: Record<string, GhostVariant> = {
+                fire_ghost: "fire", champ_ghost: "champion",
+                golden_ghost: "gold", diamond_ghost: "diamond",
+              };
+              if (ghostMap[gt]) {
+              setGhostReveal({
+                variant: ghostMap[gt],
+                senderName: change.doc.data().senderName ?? "Someone",
+              });
+            }
+          }
+        });
+      }
+      initialized = true;
+      setGifts(mapped);
     });
   }, [streamId]);
 
@@ -193,7 +242,7 @@ export default function StreamViewerPage() {
           });
         }
         showToast(`${data.giftEmoji} Gift sent!`);
-        triggerFly(data.giftEmoji);
+        triggerFly(data.giftEmoji, data.giftType);
       }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user]);
@@ -203,10 +252,15 @@ export default function StreamViewerPage() {
     setTimeout(() => setToast(null), 2500);
   }
 
-  function triggerFly(emoji: string) {
+  function triggerFly(emoji: string, giftId?: string) {
     const key = `${Date.now()}-${Math.random()}`;
     const x = 10 + Math.random() * 75;
-    setFlying((prev) => [...prev, { key, emoji, x }]);
+    setFlying((prev) => [...prev, {
+      key, emoji, x,
+      isGold:  giftId === "golden_ghost",
+      isFire:  giftId === "fire_ghost",
+      isChamp: giftId === "champ_ghost",
+    }]);
     setTimeout(() => setFlying((prev) => prev.filter((f) => f.key !== key)), 2200);
   }
 
@@ -334,6 +388,13 @@ export default function StreamViewerPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4">
+      {ghostReveal && (
+        <GhostGiftReveal
+          variant={ghostReveal.variant}
+          senderName={ghostReveal.senderName}
+          onDone={() => setGhostReveal(null)}
+        />
+      )}
       <style>{`
         @keyframes giftFly {
           0%   { transform: translateY(0) scale(1);   opacity: 1; }
@@ -381,7 +442,14 @@ export default function StreamViewerPage() {
         {flying.map((f) => (
           <div key={f.key} className="absolute pointer-events-none select-none"
             style={{ left: `${f.x}%`, bottom: 16, fontSize: 30, lineHeight: 1, animation: "giftFly 2.2s ease-out forwards" }}>
-            {f.emoji}
+            {f.emoji === "👻" ? (
+              <img src="/static/logo-nav.svg" alt="ghost" style={{ width: 40, height: 40,
+                filter: f.isGold
+                  ? "sepia(1) saturate(6) hue-rotate(5deg) brightness(1.3)"
+                  : f.isFire ? "sepia(1) saturate(8) hue-rotate(-30deg) brightness(1.3)"
+                  : f.isChamp ? "hue-rotate(100deg) saturate(5) brightness(1.4)"
+                  : "hue-rotate(200deg) saturate(4) brightness(1.5)" }} />
+            ) : f.emoji}
           </div>
         ))}
       </div>
@@ -451,8 +519,9 @@ export default function StreamViewerPage() {
         <div className="rounded-2xl p-4 mb-4"
           style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
           <p className="text-xs font-semibold mb-3" style={{ color: "#666" }}>SEND A GIFT</p>
-          <div className="grid grid-cols-4 gap-2">
-            {GIFTS.map((gift) => (
+          {/* Regular gifts — 4 column grid */}
+          <div className="grid grid-cols-4 gap-2 mb-2">
+            {GIFTS.filter(g => !g.ghost).map((gift) => (
               <button key={gift.id} onClick={() => sendGift(gift)} disabled={!!sending}
                 className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border-none cursor-pointer"
                 style={{
@@ -466,6 +535,33 @@ export default function StreamViewerPage() {
                 <span className="text-xs" style={{ color: "#555" }}>${(gift.cents / 100).toFixed(2)}</span>
               </button>
             ))}
+          </div>
+          {/* Ghost gifts — premium 2-column row */}
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            {GIFTS.filter(g => g.ghost).map((gift) => {
+              const styles: Record<string, { bg: string; border: string; label: string; price: string; filter: string; shadow: string }> = {
+                fire:     { bg: "linear-gradient(135deg,#1a0500,#2a0a00)", border: "1px solid rgba(249,115,22,0.35)", label: "#f97316", price: "#ea580c", filter: "sepia(1) saturate(8) hue-rotate(-30deg) brightness(1.3)", shadow: "0 0 16px rgba(249,115,22,0.15)" },
+                champion: { bg: "linear-gradient(135deg,#001a0a,#002a10)", border: "1px solid rgba(74,222,128,0.35)", label: "#4ade80", price: "#16a34a", filter: "hue-rotate(100deg) saturate(5) brightness(1.4)", shadow: "0 0 16px rgba(74,222,128,0.15)" },
+                gold:     { bg: "linear-gradient(135deg,#1a1200,#2a1e00)", border: "1px solid rgba(251,191,36,0.35)", label: "#fbbf24", price: "#d97706", filter: "sepia(1) saturate(6) hue-rotate(5deg) brightness(1.3)", shadow: "0 0 16px rgba(251,191,36,0.1)" },
+                diamond:  { bg: "linear-gradient(135deg,#0a0d1a,#0d1428)", border: "1px solid rgba(99,179,237,0.35)", label: "#93c5fd", price: "#3b82f6", filter: "hue-rotate(200deg) saturate(4) brightness(1.5) contrast(1.1)", shadow: "0 0 16px rgba(99,179,237,0.1)" },
+              };
+              const s = styles[gift.ghost!] ?? styles.gold;
+              return (
+                <button key={gift.id} onClick={() => sendGift(gift)} disabled={!!sending}
+                  className="flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl border-none cursor-pointer"
+                  style={{
+                    background: s.bg, border: s.border,
+                    opacity: sending && sending !== gift.id ? 0.5 : 1,
+                    transition: "all 0.15s", transform: sending === gift.id ? "scale(0.94)" : "scale(1)",
+                    boxShadow: s.shadow,
+                  }}>
+                  <img src="/static/logo-nav.svg" alt={gift.label}
+                    style={{ width: 36, height: 36, filter: s.filter, objectFit: "contain" }} />
+                  <span className="text-xs font-bold" style={{ color: s.label }}>{gift.label}</span>
+                  <span className="text-xs font-semibold" style={{ color: s.price }}>${(gift.cents / 100).toFixed(2)}</span>
+                </button>
+              );
+            })}
           </div>
           <p className="text-xs text-center mt-3" style={{ color: "#444" }}>70% goes directly to the creator</p>
         </div>

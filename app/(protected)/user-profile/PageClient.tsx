@@ -100,6 +100,12 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     if (!uid) return;
+    setProfile(null);
+    setLoading(true);
+    setPosts([]);
+    setFollowing(false);
+    setBlocked(false);
+    setBlockedByThem(false);
 
     // Try /public/profile first; fall back to root user doc (some users only have root doc)
     getDoc(doc(db, "users", uid, "public", "profile"))
@@ -373,34 +379,70 @@ export default function UserProfilePage() {
             <h3 className="text-lg font-bold mb-1" style={{ color: "#f2f2f2" }}>Support {profile?.displayName || "this creator"}</h3>
             <p className="text-sm mb-5" style={{ color: "#555" }}>Choose how you'd like to support</p>
 
+            {/* Monetization lock notice */}
+            {(profile?.followersCount ?? 0) < 10_000 && (
+              <div className="flex items-center gap-3 p-3 rounded-2xl mb-1" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#555", fontVariationSettings: "'FILL' 1" }}>lock</span>
+                <p className="text-xs" style={{ color: "#555" }}>
+                  Monetization unlocks at 10K followers · {(profile?.followersCount ?? 0).toLocaleString()} / 10,000
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
               {/* Subscribe */}
-              <Link href={`/subscribe/${uid}`} onClick={() => setSupportModal(false)}
-                className="flex items-center gap-4 p-4 rounded-2xl no-underline"
-                style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(167,139,250,0.15)" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>star</span>
+              {(profile?.followersCount ?? 0) >= 10_000 ? (
+                <Link href={`/subscribe/${uid}`} onClick={() => setSupportModal(false)}
+                  className="flex items-center gap-4 p-4 rounded-2xl no-underline"
+                  style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)" }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(167,139,250,0.15)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>star</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>Subscribe</p>
+                    <p className="text-xs" style={{ color: "#666" }}>Get exclusive content &amp; support monthly</p>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#444" }}>chevron_right</span>
+                </Link>
+              ) : (
+                <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", opacity: 0.45 }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(167,139,250,0.08)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#555", fontVariationSettings: "'FILL' 1" }}>star</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm" style={{ color: "#555" }}>Subscribe</p>
+                    <p className="text-xs" style={{ color: "#444" }}>Requires 10K followers</p>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#333" }}>lock</span>
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>Subscribe</p>
-                  <p className="text-xs" style={{ color: "#666" }}>Get exclusive content &amp; support monthly</p>
-                </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#444" }}>chevron_right</span>
-              </Link>
+              )}
 
               {/* Tip */}
-              <button onClick={() => { setSupportModal(false); setTipModal(true); }}
-                className="flex items-center gap-4 p-4 rounded-2xl border-none cursor-pointer text-left"
-                style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.15)" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>payments</span>
+              {(profile?.followersCount ?? 0) >= 10_000 ? (
+                <button onClick={() => { setSupportModal(false); setTipModal(true); }}
+                  className="flex items-center gap-4 p-4 rounded-2xl border-none cursor-pointer text-left"
+                  style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.15)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>payments</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>Send a tip</p>
+                    <p className="text-xs" style={{ color: "#666" }}>One-time payment — any amount you choose</p>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#444" }}>chevron_right</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", opacity: 0.45 }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.08)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#555", fontVariationSettings: "'FILL' 1" }}>payments</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm" style={{ color: "#555" }}>Send a tip</p>
+                    <p className="text-xs" style={{ color: "#444" }}>Requires 10K followers</p>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#333" }}>lock</span>
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>Send a tip</p>
-                  <p className="text-xs" style={{ color: "#666" }}>One-time payment — any amount you choose</p>
-                </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#444" }}>chevron_right</span>
-              </button>
+              )}
 
               {/* Badges */}
               <Link href="/badges" onClick={() => setSupportModal(false)}
@@ -544,9 +586,14 @@ export default function UserProfilePage() {
                 {type === "video" ? (
                   p.thumbnailUrl
                     ? <img src={p.thumbnailUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    : <div className="w-full h-full flex items-center justify-center" style={{ background: "#111" }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#333" }}>play_circle</span>
-                      </div>
+                    : <video
+                        src={p.mediaUrl ? `${p.mediaUrl}#t=0.5` : undefined}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover"
+                        style={{ pointerEvents: "none" }}
+                      />
                 ) : (
                   <img src={p.mediaUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
                 )}

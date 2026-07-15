@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  const uid = await verifyToken(req.headers.get("authorization"));
+  const uid = await verifyToken(req.headers.get("authorization") ?? token);
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
   const accountId = await getCreatorStripeId(uid);
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const { token, existingAccountId } = body;
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  const uid = await verifyToken(req.headers.get("authorization"));
+  const uid = await verifyToken(req.headers.get("authorization") ?? body?.token);
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
   let accountId = existingAccountId || null;

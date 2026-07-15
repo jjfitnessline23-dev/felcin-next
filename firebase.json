@@ -1,4 +1,8 @@
 {
+  "functions": {
+    "source": "functions",
+    "codebase": "user-triggers"
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

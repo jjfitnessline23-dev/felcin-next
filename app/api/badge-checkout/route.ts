@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (!tierData) return NextResponse.json({ error: "Invalid badge tier" }, { status: 400 });
   if (!toUid || !token) return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
 
-  const fromUid = await verifyToken(req.headers.get("authorization"));
+  const fromUid = await verifyToken(req.headers.get("authorization") ?? body?.token);
   if (!fromUid) return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
   if (!await rateLimit(`badge:${fromUid}`, 5, 60_000)) {
     return NextResponse.json({ error: "Too many requests â€” slow down" }, { status: 429 });

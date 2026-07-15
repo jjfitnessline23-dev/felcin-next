@@ -88,6 +88,7 @@ function useVoiceover() {
 function useRecorder(onStartAd: () => void) {
   const [recording, setRecording] = useState(false);
   const [recDone, setRecDone] = useState(false);
+  const [recFile, setRecFile] = useState<string>("felcin-promo.mp4");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -97,24 +98,30 @@ function useRecorder(onStartAd: () => void) {
         getDisplayMedia: (c: object) => Promise<MediaStream>;
       }).getDisplayMedia({ video: { frameRate: 30 }, audio: true, preferCurrentTab: true } as object);
 
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-        ? "video/webm;codecs=vp9"
-        : "video/webm";
+      // Try MP4 first — works on Safari and some Chrome builds.
+      // Google Ads and YouTube both accept MP4; webm requires conversion.
+      const mimeType =
+        MediaRecorder.isTypeSupported("video/mp4")              ? "video/mp4" :
+        MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" :
+                                                                   "video/webm";
+      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+      const filename = `felcin-promo.${ext}`;
 
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "felcin-promo.webm";
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         stream.getTracks().forEach((t) => t.stop());
+        setRecFile(filename);
         setRecording(false);
         setRecDone(true);
       };
@@ -124,19 +131,16 @@ function useRecorder(onStartAd: () => void) {
       setRecording(true);
       setRecDone(false);
 
-      // Give user 2 seconds to switch back to the tab before ad starts
       setTimeout(() => {
         onStartAd();
-        setTimeout(() => {
-          recorder.stop();
-        }, TOTAL_DURATION + 800);
+        setTimeout(() => recorder.stop(), TOTAL_DURATION + 800);
       }, 2000);
     } catch {
       // User cancelled screen share
     }
   };
 
-  return { recording, recDone, startRecording };
+  return { recording, recDone, recFile, startRecording };
 }
 
 export default function PromoPage() {
@@ -153,7 +157,7 @@ export default function PromoPage() {
 
   const handleReplay = () => { stop(); start(); setTimeout(() => startVoiceover(), 3000); };
 
-  const { recording, recDone, startRecording } = useRecorder(handleStart);
+  const { recording, recDone, recFile, startRecording } = useRecorder(handleStart);
 
   /* Stop speech when ad ends */
   useEffect(() => {
@@ -352,16 +356,47 @@ export default function PromoPage() {
           </div>
 
           {done && (
-            <div style={{ display: "flex", gap: 10, marginTop: 8, opacity: fade(p5, 0.55, 0.25) }}>
-              <button onClick={handleReplay} style={{ padding: "10px 24px", borderRadius: 50, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#888", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                ↺ Replay
-              </button>
-              <button
-                onClick={startRecording}
-                disabled={recording}
-                style={{ padding: "10px 24px", borderRadius: 50, background: recording ? "rgba(167,139,250,0.12)" : "rgba(167,139,250,0.2)", border: "1px solid rgba(167,139,250,0.4)", color: recording ? "#888" : "#a78bfa", fontSize: 13, fontWeight: 600, cursor: recording ? "not-allowed" : "pointer" }}>
-                {recording ? "Recording…" : recDone ? "✓ Downloaded" : "⬇ Download"}
-              </button>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 8, opacity: fade(p5, 0.55, 0.25) }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={handleReplay} style={{ padding: "10px 24px", borderRadius: 50, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#888", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  ↺ Replay
+                </button>
+                <button onClick={startRecording} disabled={recording}
+                  style={{ padding: "10px 24px", borderRadius: 50, background: recording ? "rgba(167,139,250,0.12)" : "rgba(167,139,250,0.2)", border: "1px solid rgba(167,139,250,0.4)", color: recording ? "#888" : "#a78bfa", fontSize: 13, fontWeight: 600, cursor: recording ? "not-allowed" : "pointer" }}>
+                  {recording ? "Recording…" : recDone ? "✓ Downloaded" : "⬇ Download"}
+                </button>
+              </div>
+
+              {recDone && (
+                <div style={{ marginTop: 8, padding: "16px 20px", borderRadius: 14, background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", maxWidth: 340, textAlign: "left" }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#a78bfa", margin: "0 0 10px", letterSpacing: "0.06em" }}>
+                    ✓ {recFile} saved — next steps for Google Ads:
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[
+                      { n: "1", text: "Upload the file to YouTube (can be Unlisted)", link: "https://youtube.com/upload", label: "Open YouTube Upload" },
+                      { n: "2", text: "Copy the YouTube URL after it finishes processing", link: null, label: null },
+                      { n: "3", text: "In Google Ads → your App campaign → Video assets → paste the YouTube URL", link: "https://ads.google.com", label: "Open Google Ads" },
+                    ].map((s) => (
+                      <div key={s.n} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(124,58,237,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: "#a78bfa" }}>{s.n}</span>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 11, color: "#888", margin: "0 0 3px", lineHeight: 1.4 }}>{s.text}</p>
+                          {s.link && <a href={s.link} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>{s.label} →</a>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {recFile.endsWith(".webm") && (
+                    <p style={{ fontSize: 10, color: "#555", margin: "10px 0 0", lineHeight: 1.5 }}>
+                      Got a .webm file? YouTube accepts it. If you need MP4, use{" "}
+                      <a href="https://cloudconvert.com/webm-to-mp4" target="_blank" rel="noreferrer" style={{ color: "#a78bfa" }}>cloudconvert.com</a> to convert first.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -405,8 +440,8 @@ export default function PromoPage() {
               style={{ padding: "12px 36px", borderRadius: 50, background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.35)", color: "#a78bfa", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
               ⬇ Record & Download
             </button>
-            <p style={{ fontSize: 11, color: "#333", margin: 0, textAlign: "center", maxWidth: 260 }}>
-              Download will ask you to share this tab, then auto-record the full 47s ad and save it as a .webm file.
+            <p style={{ fontSize: 11, color: "#333", margin: 0, textAlign: "center", maxWidth: 280, lineHeight: 1.6 }}>
+              Records the full 57s ad and saves it as MP4 (or WebM on Chrome). Then upload to YouTube and paste the link into Google Ads.
             </p>
           </div>
         </div>

@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import { verifyToken, getCreatorStripeId } from "@/lib/firebaseAdmin";
+import { verifyToken, getCreatorStripeId, getCreatorFollowersCount, MONETIZATION_FOLLOWER_THRESHOLD } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rateLimit";
@@ -18,12 +18,17 @@ export async function POST(req: NextRequest) {
     const tierData = TIERS[tier];
     if (!tierData || !creatorUid || !token) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
-    const buyerUid = await verifyToken(req.headers.get("authorization"));
+    const buyerUid = await verifyToken(req.headers.get("authorization") ?? token);
     if (!buyerUid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     if (!await rateLimit(`sub-pi:${buyerUid}`, 5, 60_000)) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
+    const [followers, creatorStripeId] = await Promise.all([
+      getCreatorFollowersCount(creatorUid),
+      getCreatorStripeId(creatorUid),
+    ]);
+    if (followers < MONETIZATION_FOLLOWER_THRESHOLD) return NextResponse.json({ error: "Creator not eligible for monetization" }, { status: 403 });
+
     const platformFee = Math.round(tierData.amount * PLATFORM_FEE_PCT / 100);
-    const creatorStripeId = await getCreatorStripeId(creatorUid);
 
     const params: Stripe.PaymentIntentCreateParams = {
       amount: tierData.amount,

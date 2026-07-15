@@ -189,6 +189,52 @@ export default function EarningsPage() {
         <p className="text-xs" style={{ color: "#444" }}>70% of gifts, subscriptions, and view bonuses</p>
       </div>
 
+      {/* Monetization Status — always visible */}
+      <div className="rounded-2xl p-5 mb-4" style={{ background: "#131313", border: `1px solid ${followersCount >= FUND_FOLLOWER_THRESHOLD ? "rgba(167,139,250,0.25)" : "rgba(255,255,255,0.07)"}` }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: followersCount >= FUND_FOLLOWER_THRESHOLD ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${followersCount >= FUND_FOLLOWER_THRESHOLD ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}` }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 22, color: followersCount >= FUND_FOLLOWER_THRESHOLD ? "#a78bfa" : "#555", fontVariationSettings: "'FILL' 1" }}>
+              {followersCount >= FUND_FOLLOWER_THRESHOLD ? "lock_open" : "lock"}
+            </span>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Creator Monetization</p>
+            <p className="text-xs" style={{ color: "#555" }}>Tips · Subscriptions · PPV · Live Gifts</p>
+          </div>
+          {followersCount >= FUND_FOLLOWER_THRESHOLD ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)" }}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#a78bfa" }} />
+              <span className="text-xs font-semibold" style={{ color: "#a78bfa" }}>Unlocked</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <span className="text-xs font-semibold" style={{ color: "#555" }}>Locked</span>
+            </div>
+          )}
+        </div>
+
+        {followersCount >= FUND_FOLLOWER_THRESHOLD ? (
+          <div className="rounded-xl p-3.5" style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.12)" }}>
+            <p className="text-sm font-medium mb-0.5" style={{ color: "#a78bfa" }}>All monetization features active</p>
+            <p className="text-xs" style={{ color: "#555" }}>Fans can now tip, subscribe, and send live gifts</p>
+          </div>
+        ) : (
+          <div>
+            <div className="flex justify-between mb-1.5">
+              <span className="text-xs" style={{ color: "#555" }}>Followers</span>
+              <span className="text-xs font-semibold" style={{ color: "#f2f2f2" }}>{followersCount.toLocaleString()} / 10,000</span>
+            </div>
+            <div className="rounded-full overflow-hidden mb-3" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((followersCount / 10_000) * 100, 100)}%`, background: "linear-gradient(90deg,#7C3AED,#a855f7)" }} />
+            </div>
+            <p className="text-xs" style={{ color: "#444" }}>
+              {(10_000 - followersCount).toLocaleString()} more followers needed to unlock monetization
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Creator Fund — only visible once creator has 10K followers */}
       {followersCount >= FUND_FOLLOWER_THRESHOLD && <div className="rounded-2xl p-5 mb-4"
         style={{ background: "#131313", border: `1px solid ${fundEligible ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.07)"}` }}>

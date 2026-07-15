@@ -275,6 +275,7 @@ export default function RecoveryPage() {
                 ))}
               </div>
             </div>
+
           </>
         ) : (
           <div className="ghost-bg flex flex-col items-center py-20 gap-4 text-center rounded-3xl">

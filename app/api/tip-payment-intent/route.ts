@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!creatorUid || !amountCents || !token) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (amountCents < 100 || amountCents > 100000) return NextResponse.json({ error: "Amount out of range" }, { status: 400 });
 
-    const fromUid = await verifyToken(req.headers.get("authorization"));
+    const fromUid = await verifyToken(req.headers.get("authorization") ?? body?.token);
     if (!fromUid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!await rateLimit(`tip-pi:${fromUid}`, 5, 60_000)) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     if (fromUid === creatorUid) return NextResponse.json({ error: "Cannot tip yourself" }, { status: 400 });

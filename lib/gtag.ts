@@ -21,10 +21,11 @@ export function trackSignUp() {
 }
 
 // Fire this when a user makes a purchase
-export function trackPurchase(valueCents: number, currency = "USD") {
-  gtagEvent("purchase", {
+export function trackPurchase(valueCents: number, currency = "USD", transactionId?: string) {
+  gtagEvent("conversion", {
+    send_to: "AW-18302008959/ePDgCKKjvcscEP_8iZdE",
     value: valueCents / 100,
     currency,
-    transaction_id: Date.now().toString(),
+    transaction_id: transactionId ?? Date.now().toString(),
   });
 }

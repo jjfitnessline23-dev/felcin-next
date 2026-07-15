@@ -12,7 +12,7 @@ const BADGES = [
   {
     id: "verified",
     name: "Verified",
-    price: "$1.99",
+    price: "$2.99",
     period: "/mo",
     icon: "verified",
     grad: "linear-gradient(135deg,#1d4ed8,#1e40af)",
@@ -189,8 +189,8 @@ export default function BadgesPage() {
       const token = await user.getIdToken();
       const res = await fetch("/api/badge-payment-intent", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ badgeId, token }),
+        headers: { "Content-Type": "application/json", "authorization": `Bearer ${token}` },
+        body: JSON.stringify({ badgeId }),
       });
       const data = await res.json();
       if (data.clientSecret) {

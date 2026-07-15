@@ -35,6 +35,7 @@ interface Post {
   repostOf?: string | null;
   repostOriginalAuthorName?: string | null;
   ppvPrice?: number | null;
+  mediaUrlDownload?: string | null;
 }
 
 function resolveMediaType(contentType?: string, mimeType?: string, url?: string): "video" | "image" {
@@ -50,6 +51,55 @@ function timeAgo(seconds: number): string {
   if (diff < 3600) return Math.floor(diff / 60) + "m";
   if (diff < 86400) return Math.floor(diff / 3600) + "h";
   return Math.floor(diff / 86400) + "d";
+}
+
+async function buildWatermarkCanvas(cw: number, ch: number): Promise<HTMLCanvasElement> {
+  const wm   = document.createElement("canvas");
+  wm.width   = cw;
+  wm.height  = ch;
+  const ctx  = wm.getContext("2d")!;
+  const pad      = Math.round(cw * 0.028);
+  const logoSz   = Math.round(cw * 0.08);
+  const fontSize = Math.max(14, Math.round(cw * 0.036));
+  const gap      = Math.round(cw * 0.016);
+
+  ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  const label = "felcin.com";
+  const textW = ctx.measureText(label).width;
+  const rowH  = Math.max(logoSz, fontSize * 1.2);
+  const boxW  = pad + logoSz + gap + textW + pad;
+  const boxH  = pad * 0.8 + rowH + pad * 0.8;
+  const boxX  = cw - boxW - pad;
+  const boxY  = ch - boxH - pad;
+
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 14);
+  ctx.fill();
+  ctx.restore();
+
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${logoSz}" height="${logoSz}">
+    <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="white"/>
+    <circle cx="24" cy="29" r="4.5" fill="#111"/>
+    <circle cx="40" cy="29" r="4.5" fill="#111"/>
+    <path d="M0,36 L14,36 L16,34 L18,36 L20,36 L21,38 L24,20 L27,39 L30,34 L32,36 C34,36 35,31 37,36 L64,36"
+      fill="none" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  const svgBlob = new Blob([svgStr], { type: "image/svg+xml" });
+  const svgUrl  = URL.createObjectURL(svgBlob);
+  const logoImg = new Image(logoSz, logoSz);
+  logoImg.src   = svgUrl;
+  await new Promise<void>(r => { logoImg.onload = () => r(); logoImg.onerror = () => r(); });
+  URL.revokeObjectURL(svgUrl);
+
+  ctx.drawImage(logoImg, boxX + pad, boxY + (boxH - logoSz) / 2, logoSz, logoSz);
+  ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.fillText(label, boxX + pad + logoSz + gap, boxY + boxH / 2 + fontSize * 0.36);
+
+  return wm;
 }
 
 export default function PostCard({ post, onBlock, boostEnabled = true }: { post: Post; onBlock?: (uid: string) => void; boostEnabled?: boolean }) {
@@ -68,6 +118,10 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const [deleted, setDeleted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [vidBlob, setVidBlob] = useState<Blob | null>(null);
+  const [vidReady, setVidReady] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
   const [imgLightbox, setImgLightbox] = useState(false);
   const [videoLightbox, setVideoLightbox] = useState(false);
   const [ppvUnlocked, setPpvUnlocked] = useState(false);
@@ -112,19 +166,68 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     const proxyBase = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
     const proxyDl = `${proxyBase}&filename=${encodeURIComponent(filename)}&dl=1`;
 
-    // Videos — download directly (video watermark requires FFmpeg, too heavy)
     if (isVid) {
-      setTimeout(() => window.open(proxyDl, "_blank"), 100);
+      const vidFilename = `felcin-${post.id}.mp4`;
+      const videoSrc = post.mediaUrlDownload || post.mediaUrl!;
+      const isMobile = navigator.maxTouchPoints > 0;
+
+      // ── Desktop: direct browser download — no blob buffering, native progress bar ──
+      if (!isMobile) {
+        const dlUrl = `/api/proxy-media?url=${encodeURIComponent(videoSrc)}&filename=${encodeURIComponent(vidFilename)}&dl=1`;
+        const a = document.createElement("a");
+        a.href = dlUrl;
+        a.download = vidFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setSavedToast(true);
+        setTimeout(() => setSavedToast(false), 3000);
+        return;
+      }
+
+      // ── Mobile: fetch blob → Web Share API (Save to Photos / share to other apps) ──
+      const videoProxy = `/api/proxy-media?url=${encodeURIComponent(videoSrc)}`;
+
+      // Blob already cached from a previous tap — share immediately (fresh gesture)
+      if (vidBlob) {
+        setVidReady(false);
+        const file = new File([vidBlob], vidFilename, { type: "video/mp4" });
+        if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file], title: "Felcin" }); } catch {}
+        }
+        return;
+      }
+
+      setDownloading(true);
+      setVidReady(false);
+      try {
+        const res = await fetch(videoProxy);
+        if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        setVidBlob(blob);
+        const file = new File([blob], vidFilename, { type: "video/mp4" });
+        if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: "Felcin" });
+            return;
+          } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return;
+            setVidReady(true); // gesture expired → show tap button
+          }
+        } else {
+          setVidReady(true);
+        }
+      } catch { /* fetch failed */ }
+      finally { setDownloading(false); }
       return;
     }
 
-    // Images — fetch via proxy, burn logo + text watermark, then share/download
+    // Images — fetch via proxy, burn watermark, share
     try {
       const res = await fetch(proxyBase);
       if (!res.ok) throw new Error("proxy");
       const blob = await res.blob();
 
-      // Load the original image onto canvas
       const img = new Image();
       const imgObjUrl = URL.createObjectURL(blob);
       img.src = imgObjUrl;
@@ -132,79 +235,26 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
       URL.revokeObjectURL(imgObjUrl);
 
       const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
+      canvas.width  = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
 
-      // ── Watermark layout ──────────────────────────────────────
-      const cw = canvas.width;
-      const ch = canvas.height;
-      const pad     = Math.round(cw * 0.028);
-      const logoSz  = Math.round(cw * 0.08);
-      const fontSize = Math.max(14, Math.round(cw * 0.036));
-      const gap     = Math.round(cw * 0.016);
+      const wmCanvas = await buildWatermarkCanvas(canvas.width, canvas.height);
+      ctx.drawImage(wmCanvas, 0, 0);
 
-      ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-      const label  = "felcin.com";
-      const textW  = ctx.measureText(label).width;
-      const rowH   = Math.max(logoSz, fontSize * 1.2);
-      const boxW   = pad + logoSz + gap + textW + pad;
-      const boxH   = pad * 0.8 + rowH + pad * 0.8;
-      const boxX   = cw - boxW - pad;
-      const boxY   = ch - boxH - pad;
-
-      // Semi-transparent dark pill background
-      ctx.save();
-      ctx.globalAlpha = 0.72;
-      ctx.fillStyle = "#000";
-      ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxW, boxH, 14);
-      ctx.fill();
-      ctx.restore();
-
-      // ── Felcin ghost logo (SVG → Image → canvas) ──────────────
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${logoSz}" height="${logoSz}">
-        <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="white"/>
-        <circle cx="24" cy="29" r="4.5" fill="#111"/>
-        <circle cx="40" cy="29" r="4.5" fill="#111"/>
-        <path d="M0,36 L14,36 L16,34 L18,36 L20,36 L21,38 L24,20 L27,39 L30,34 L32,36 C34,36 35,31 37,36 L64,36"
-          fill="none" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>`;
-      const svgBlob = new Blob([svgStr], { type: "image/svg+xml" });
-      const svgUrl  = URL.createObjectURL(svgBlob);
-      const logoImg = new Image(logoSz, logoSz);
-      logoImg.src   = svgUrl;
-      await new Promise<void>((res) => { logoImg.onload = () => res(); logoImg.onerror = () => res(); });
-      URL.revokeObjectURL(svgUrl);
-
-      // Draw logo centered vertically in box
-      const logoY = boxY + (boxH - logoSz) / 2;
-      ctx.drawImage(logoImg, boxX + pad, logoY, logoSz, logoSz);
-
-      // Draw "felcin.com" text
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      ctx.fillText(label, boxX + pad + logoSz + gap, boxY + boxH / 2 + fontSize * 0.36);
-
-      // ── Export & share/download ────────────────────────────────
       canvas.toBlob(async (wmBlob) => {
         if (!wmBlob) { setTimeout(() => window.open(proxyDl, "_blank"), 100); return; }
-
         const file = new File([wmBlob], filename, { type: "image/jpeg" });
-
-        // Web Share API (iOS Share Sheet → Save to Photos; Android)
         if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], title: "Felcin" }); return; } catch { /* cancelled or denied */ }
+          try { await navigator.share({ files: [file], title: "Felcin" }); return; } catch { /* cancelled */ }
         }
-
-        // Fallback: open blob URL in new tab — user can long-press → Save
         const dlUrl = URL.createObjectURL(wmBlob);
         window.open(dlUrl, "_blank");
         setTimeout(() => URL.revokeObjectURL(dlUrl), 10000);
       }, "image/jpeg", 0.93);
 
     } catch {
-      // If anything fails, fall back to plain proxy download
       setTimeout(() => window.open(proxyDl, "_blank"), 100);
     }
   };
@@ -261,6 +311,29 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const initial = displayName.charAt(0).toUpperCase();
   const timeStr = post.createdAt?.seconds ? timeAgo(post.createdAt.seconds) : "";
   const viewsLeft = post.maxViews != null ? post.maxViews - (post.viewCount ?? 0) : null;
+
+  // Step 2 of video download: called when user taps "Tap to save" — fires navigator.share
+  // within a fresh user gesture so iOS shows the Share Sheet with "Save Video".
+  const handleVidSave = async () => {
+    if (!vidBlob) return;
+    setVidReady(false);
+    const file = new File([vidBlob], `felcin-${post.id}.mp4`, { type: "video/mp4" });
+    const isMobile = navigator.maxTouchPoints > 0;
+    if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "Felcin", text: caption || "" }); } catch {}
+    } else {
+      const a = document.createElement("a");
+      const blobUrl = URL.createObjectURL(vidBlob);
+      a.href = blobUrl;
+      a.download = `felcin-${post.id}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 3000);
+    }
+  };
 
   const openLightbox = (isVid: boolean) => {
     if (isVid) setVideoLightbox(true); else setImgLightbox(true);
@@ -338,14 +411,91 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/comments?postId=${post.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: caption || "Check this out on Felcin", url });
+    const postUrl = `${window.location.origin}/comments?postId=${post.id}`;
+    const shareTitle = caption || "Check this out on Felcin";
+
+    if (post.mediaUrl && navigator.share) {
+      const isVidPost = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
+
+      if (!isVidPost) {
+        // Images — watermark then share (fast, stays within iOS gesture window)
+        const proxyBase = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
+        try {
+          const res = await fetch(proxyBase);
+          if (!res.ok) throw new Error();
+          const blob = await res.blob();
+          const img = new Image();
+          const imgObjUrl = URL.createObjectURL(blob);
+          img.src = imgObjUrl;
+          await new Promise<void>((r, j) => { img.onload = () => r(); img.onerror = j; });
+          URL.revokeObjectURL(imgObjUrl);
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0);
+          const wmCanvas = await buildWatermarkCanvas(canvas.width, canvas.height);
+          ctx.drawImage(wmCanvas, 0, 0);
+          canvas.toBlob(async (wmBlob) => {
+            if (!wmBlob) { navigator.share({ title: shareTitle, url: postUrl }).catch(() => {}); return; }
+            const file = new File([wmBlob], `felcin-${post.id}.jpg`, { type: "image/jpeg" });
+            if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+              try { await navigator.share({ files: [file], title: "Felcin", text: shareTitle }); return; } catch {}
+            }
+            navigator.share({ title: shareTitle, url: postUrl }).catch(() => {});
+          }, "image/jpeg", 0.93);
+          return;
+        } catch { /* fall through to URL share */ }
+      } else {
+        // Videos — same smart blob flow as download (reuses cached blob)
+        if (vidBlob) {
+          setVidReady(false);
+          const file = new File([vidBlob], `felcin-${post.id}.mp4`, { type: "video/mp4" });
+          const isMobileShare = navigator.maxTouchPoints > 0;
+          if (isMobileShare && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], title: "Felcin", text: shareTitle }); } catch {}
+          } else {
+            const a = document.createElement("a");
+            const blobUrl = URL.createObjectURL(vidBlob);
+            a.href = blobUrl;
+            a.download = `felcin-${post.id}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            setSavedToast(true);
+            setTimeout(() => setSavedToast(false), 3000);
+          }
+          return;
+        }
+        setDownloading(true);
+        setVidReady(false);
+        const videoSrc = post.mediaUrlDownload || post.mediaUrl;
+        const videoProxy = `/api/proxy-media?url=${encodeURIComponent(videoSrc)}`;
+        try {
+          const res = await fetch(videoProxy);
+          if (!res.ok) throw new Error();
+          const blob = await res.blob();
+          setVidBlob(blob);
+          const file = new File([blob], `felcin-${post.id}.mp4`, { type: "video/mp4" });
+          try {
+            await navigator.share({ files: [file], title: "Felcin", text: shareTitle });
+            return;
+          } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return;
+            setVidReady(true); // gesture expired — show tap button
+          }
+        } catch {}
+        finally { setDownloading(false); }
         return;
       }
+    }
+
+    // Fallback: URL-only share / copy link
+    try {
+      if (navigator.share) { await navigator.share({ title: shareTitle, url: postUrl }); return; }
     } catch {}
-    try { await navigator.clipboard.writeText(url); } catch {}
+    try { await navigator.clipboard.writeText(postUrl); } catch {}
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -454,6 +604,34 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }}>
         Link copied
       </div>,
+      document.body
+    )}
+    {/* Downloading toast */}
+    {downloading && mounted && createPortal(
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-full text-sm font-semibold pointer-events-none flex items-center gap-2"
+        style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }}>
+        <div className="spinner" style={{ width: 14, height: 14 }} />
+        Downloading video…
+      </div>,
+      document.body
+    )}
+    {/* Saved to Downloads toast — desktop only */}
+    {savedToast && mounted && createPortal(
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-full text-sm font-semibold pointer-events-none flex items-center gap-2"
+        style={{ background: "rgba(74,222,128,0.15)", backdropFilter: "blur(12px)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+        Saved to Downloads
+      </div>,
+      document.body
+    )}
+    {/* "Tap to save" prompt — appears after blob is ready, user taps to trigger share sheet */}
+    {vidReady && mounted && createPortal(
+      <button onClick={handleVidSave}
+        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-2.5 px-5 py-3 rounded-full text-sm font-bold"
+        style={{ background: "#a855f7", color: "#fff", boxShadow: "0 4px 24px rgba(168,85,247,0.45)" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}>ios_share</span>
+        Tap to share / save video
+      </button>,
       document.body
     )}
     <article style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, overflow: "hidden" }}>

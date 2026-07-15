@@ -28,3 +28,14 @@ export async function getCreatorStripeId(uid: string): Promise<string | null> {
     return snap.data()?.stripeAccountId ?? null;
   } catch { return null; }
 }
+
+export async function getCreatorFollowersCount(uid: string): Promise<number> {
+  const app = getAdminApp();
+  if (!app) return 0;
+  try {
+    const snap = await app.firestore().doc(`users/${uid}`).get();
+    return snap.data()?.followersCount ?? 0;
+  } catch { return 0; }
+}
+
+export const MONETIZATION_FOLLOWER_THRESHOLD = 10_000;

@@ -20,7 +20,7 @@ interface GhostWorkout { id: string; hostId: string; hostName?: string; hostPhot
 interface GhostSession { id: string; userId: string; userName?: string; userPhoto?: string; exercisesCount?: number; totalDurationSecs?: number; completedAt?: { seconds: number }; }
 interface AdminWorkoutLog { id: string; userId: string; date?: { seconds: number }; exercises: { name: string; sets: { reps: number; weight: number }[]; equipment?: string }[]; notes?: string; durationMins?: number; }
 
-type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts";
+type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts" | "marketing";
 
 interface AnalyticsData {
   totalPageViews: number;
@@ -103,6 +103,15 @@ export default function AdminPortalPage() {
   const [togglingAdvertise, setTogglingAdvertise] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<AdminWorkoutLog[]>([]);
+  const [botLogs, setBotLogs] = useState<{ scanned: number; violations: number; bans: { "7d": number; "30d": number; permanent: number }; runAt: { seconds: number } }[]>([]);
+  const [stripeStats, setStripeStats] = useState<{
+    today: { revenue: number; count: number };
+    week: { revenue: number; count: number };
+    month: { revenue: number; count: number };
+    balance: { available: number; pending: number };
+    recent: { id: string; amount: number; status: string; description: string | null; created: number }[];
+  } | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [loadingWorkouts, setLoadingWorkouts] = useState(false);
   const [workoutsLoaded, setWorkoutsLoaded] = useState(false);
 
@@ -169,6 +178,13 @@ export default function AdminPortalPage() {
       setAnalytics({ totalPageViews: 0, totalActiveUsers: 0, todayPageViews: 0, todayActiveUsers: 0, yesterdayPageViews: 0, yesterdayActiveUsers: 0 });
     });
 
+    // Load bot logs (last 10 runs)
+    getDocs(query(collection(db, "botLogs"), orderBy("runAt", "desc"), limit(10)))
+      .then((snap) => {
+        setBotLogs(snap.docs.map((d) => d.data() as { scanned: number; violations: number; bans: { "7d": number; "30d": number; permanent: number }; runAt: { seconds: number } }));
+      })
+      .catch(() => {});
+
     setDataLoading(false);
     return () => unsubs.forEach((u) => u());
   }, [isOwner]);
@@ -199,6 +215,18 @@ export default function AdminPortalPage() {
     if (!user || !OWNER_UIDS.includes(user.uid)) return;
     loadWorkouts();
   }, [!!user, workoutsLoaded]); // eslint-disable-line
+
+  const loadStripeStats = async () => {
+    if (loadingStats) return;
+    setLoadingStats(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/stripe-stats", { headers: { authorization: `Bearer ${token}` } });
+      if (res.ok) setStripeStats(await res.json());
+    } catch { /* silent */ } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
@@ -313,6 +341,7 @@ export default function AdminPortalPage() {
     { key: "ghost", label: "Ghost", icon: "sprint" },
     { key: "workouts", label: "Workouts", icon: "fitness_center" },
     { key: "analytics", label: "Analytics", icon: "analytics" },
+    { key: "marketing", label: "Marketing", icon: "ads_click" },
     { key: "settings", label: "Settings", icon: "settings" },
   ];
 
@@ -1003,6 +1032,159 @@ export default function AdminPortalPage() {
                   style={{ transform: advertiseEnabled ? "translateX(20px)" : "translateX(0)" }} />
               </button>
             </div>
+          </div>
+
+        ) : tab === "marketing" ? (
+          <div className="flex flex-col gap-3">
+            {/* Header + refresh */}
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs" style={{ color: "#444" }}>Live revenue & growth data</p>
+              <button onClick={loadStripeStats} disabled={loadingStats}
+                className="flex items-center gap-1 border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                <span className="text-xs">{loadingStats ? "Loading…" : "Refresh"}</span>
+              </button>
+            </div>
+
+            {/* Revenue */}
+            {stripeStats ? (
+              <>
+                <div className="p-4 rounded-xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <p className="text-[10px] font-bold tracking-widest mb-3" style={{ color: "#444" }}>REVENUE</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Today", cents: stripeStats.today.revenue, count: stripeStats.today.count },
+                      { label: "This week", cents: stripeStats.week.revenue, count: stripeStats.week.count },
+                      { label: "This month", cents: stripeStats.month.revenue, count: stripeStats.month.count },
+                    ].map(({ label, cents, count }) => (
+                      <div key={label} className="text-center">
+                        <p className="text-lg font-bold" style={{ color: "#34d399" }}>${(cents / 100).toFixed(2)}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>{label}</p>
+                        <p className="text-[10px]" style={{ color: "#444" }}>{count} sales</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-4 mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>${(stripeStats.balance.available / 100).toFixed(2)}</p>
+                      <p className="text-[10px]" style={{ color: "#555" }}>Available balance</p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: "#888" }}>${(stripeStats.balance.pending / 100).toFixed(2)}</p>
+                      <p className="text-[10px]" style={{ color: "#555" }}>Pending</p>
+                    </div>
+                  </div>
+                </div>
+
+                {stripeStats.recent.length > 0 && (
+                  <div className="p-4 rounded-xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    <p className="text-[10px] font-bold tracking-widest mb-3" style={{ color: "#444" }}>RECENT TRANSACTIONS</p>
+                    <div className="flex flex-col gap-2">
+                      {stripeStats.recent.map((c) => (
+                        <div key={c.id} className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs" style={{ color: "#f2f2f2" }}>{c.description || "Payment"}</p>
+                            <p className="text-[10px]" style={{ color: "#555" }}>{new Date(c.created * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold" style={{ color: c.status === "succeeded" ? "#34d399" : "#f87171" }}>${(c.amount / 100).toFixed(2)}</p>
+                            <p className="text-[10px]" style={{ color: "#555" }}>{c.status}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="p-4 rounded-xl text-center" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <p className="text-xs mb-3" style={{ color: "#555" }}>Tap refresh to load revenue data</p>
+                <button onClick={loadStripeStats} disabled={loadingStats}
+                  className="text-xs px-4 py-2 rounded-lg border-none cursor-pointer font-semibold"
+                  style={{ background: "rgba(52,211,153,0.1)", color: "#34d399" }}>
+                  {loadingStats ? "Loading…" : "Load Stats"}
+                </button>
+              </div>
+            )}
+
+            {/* User growth from existing data */}
+            {(() => {
+              const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+              const weekStart = new Date(Date.now() - 7 * 86400000);
+              const newToday = users.filter((u) => u.createdAt && u.createdAt.seconds * 1000 >= todayStart.getTime()).length;
+              const newWeek = users.filter((u) => u.createdAt && u.createdAt.seconds * 1000 >= weekStart.getTime()).length;
+              const postsToday = posts.filter((p) => p.createdAt && p.createdAt.seconds * 1000 >= todayStart.getTime()).length;
+              const reelsToday = reels.filter((r) => r.createdAt && r.createdAt.seconds * 1000 >= todayStart.getTime()).length;
+              return (
+                <div className="p-4 rounded-xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <p className="text-[10px] font-bold tracking-widest mb-3" style={{ color: "#444" }}>GROWTH TODAY</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "New users today", value: newToday, sub: `${newWeek} this week`, color: "#60a5fa" },
+                      { label: "Total users", value: users.length, sub: "all time", color: "#a78bfa" },
+                      { label: "Posts today", value: postsToday, sub: `${posts.length} total`, color: "#fb923c" },
+                      { label: "Reels today", value: reelsToday, sub: `${reels.length} total`, color: "#f472b6" },
+                    ].map(({ label, value, sub, color }) => (
+                      <div key={label} className="p-3 rounded-xl text-center" style={{ background: "#0d0d0d" }}>
+                        <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>{label}</p>
+                        <p className="text-[10px]" style={{ color: "#333" }}>{sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Moderation Bot */}
+            <div className="p-4 rounded-xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(251,146,60,0.12)" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#fb923c" }}>smart_toy</span>
+                  </div>
+                  <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Moderation Bot</p>
+                </div>
+                <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(34,197,94,0.1)", color: "#34d399" }}>
+                  Every 30 min
+                </span>
+              </div>
+              <div className="flex flex-col gap-2 mb-3">
+                {([
+                  { label: "Scans", value: "Posts · Reels · Profiles", color: undefined },
+                  { label: "1st violation", value: "7-day ban", color: "#f59e0b" },
+                  { label: "2nd violation", value: "30-day ban", color: "#f97316" },
+                  { label: "3rd violation", value: "Permanent ban", color: "#f87171" },
+                ] as { label: string; value: string; color: string | undefined }[]).map(({ label, value, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-xs" style={{ color: "#555" }}>{label}</span>
+                    <span className="text-xs font-semibold" style={{ color: color ?? "#f2f2f2" }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+              {botLogs.length > 0 && (
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
+                  <p className="text-[10px] font-bold tracking-widest mb-2" style={{ color: "#444" }}>RECENT RUNS</p>
+                  <div className="flex flex-col gap-1.5">
+                    {botLogs.slice(0, 5).map((log, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-xs" style={{ color: "#555" }}>
+                          {new Date(log.runAt.seconds * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <span className="text-xs" style={{ color: "#666" }}>
+                          {log.scanned} scanned · {" "}
+                          <span style={{ color: log.violations > 0 ? "#f87171" : "#34d399" }}>{log.violations} violations</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {botLogs.length === 0 && (
+                <p className="text-xs text-center py-2" style={{ color: "#444" }}>No runs yet — starts after deploy</p>
+              )}
+            </div>
+
           </div>
 
         ) : reports.length === 0 ? (

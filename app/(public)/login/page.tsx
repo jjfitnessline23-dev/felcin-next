@@ -9,7 +9,7 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signInWithCredential,
-  signInWithRedirect,
+  signInWithPopup,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -71,10 +71,10 @@ export default function LoginPage() {
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
         if (age < 17) { setError("You must be at least 17 years old to create an account."); setBusy(false); return; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await sendEmailVerification(cred.user);
-        setInfo("Account created! Please verify your email then log in.");
-        await auth.signOut();
-        setBusy(false); return;
+        sendEmailVerification(cred.user).catch(() => {});
+        // User is already signed in — go straight to onboarding, verify email in background
+        router.replace("/onboarding");
+        return;
       }
       await signInWithEmailAndPassword(auth, email, password);
       router.replace("/");
@@ -121,10 +121,12 @@ export default function LoginPage() {
         const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
         window.location.href = isNew ? "/onboarding" : "/";
       } else {
-        // Web browser: use redirect (avoids popup blocking and SW interception on felcin.firebaseapp.com)
+        // Web browser: popup keeps the user on felcin.com, avoiding the felcin.firebaseapp.com
+        // redirect which iOS/Android intercept as a Universal Link and open the native app
         const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
-        // Page navigates away — getRedirectResult in AuthProvider handles the return
+        const userCred = await signInWithPopup(auth, provider);
+        const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
+        router.replace(isNew ? "/onboarding" : "/");
       }
     } catch (err: unknown) {
       setStep("");

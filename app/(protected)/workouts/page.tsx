@@ -104,6 +104,12 @@ export default function WorkoutsPage() {
   const [restActive, setRestActive] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  /* Exercise search */
+  const [searchOpen, setSearchOpen] = useState<number | null>(null); // exercise index
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ name: string; target: string; equipment: string }[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
   /* Plan */
   const [planKey, setPlanKey] = useState<SplitKey>("ppl");
   const [planDays, setPlanDays] = useState<string[]>(SPLITS.ppl.days.slice());
@@ -286,6 +292,31 @@ export default function WorkoutsPage() {
     }));
   }
   function setExName(ei: number, name: string) { mutate((s) => ({ ...s, exercises: s.exercises.map((e, i) => i !== ei ? e : { ...e, name }) })); }
+
+  function openSearch(ei: number) {
+    setSearchOpen(ei);
+    setSearchQuery("");
+    setSearchResults([]);
+  }
+
+  function closeSearch() { setSearchOpen(null); setSearchQuery(""); setSearchResults([]); }
+
+  function pickExercise(name: string) {
+    if (searchOpen !== null) setExName(searchOpen, name);
+    closeSearch();
+  }
+
+  useEffect(() => {
+    if (searchOpen === null || searchQuery.length < 2) { setSearchResults([]); return; }
+    const t = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const res = await fetch(`/api/exercise-search?q=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) setSearchResults(await res.json());
+      } catch { /* silent */ } finally { setSearchLoading(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, searchOpen]);
   function setEquipment(ei: number, equipment: string) {
     mutate((s) => ({ ...s, exercises: s.exercises.map((e, i) => i !== ei ? e : { ...e, equipment: e.equipment === equipment ? undefined : equipment }) }));
   }
@@ -685,10 +716,22 @@ export default function WorkoutsPage() {
                       <div key={ei} className="p-3 rounded-xl" style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.06)" }}>
                         {/* Name row */}
                         <div className="flex items-center gap-2 mb-2">
-                          <input type="text" placeholder={ex.type === "cardio" ? "Cardio activity" : `Exercise ${ei + 1}`} value={ex.name}
+                          <input
+                            type="text"
+                            placeholder={ex.type === "cardio" ? "Cardio activity" : `Exercise name…`}
+                            value={ex.name}
                             onChange={(e) => setExName(ei, e.target.value)}
                             className="flex-1 px-3 py-2 rounded-lg outline-none text-sm"
-                            style={{ background: "#222", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2" }} />
+                            style={{ background: "#222", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", minWidth: 0 }}
+                          />
+                          {ex.type !== "cardio" && (
+                            <button onClick={() => openSearch(ei)}
+                              className="border-none cursor-pointer shrink-0 flex items-center justify-center rounded-lg"
+                              style={{ width: 32, height: 32, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)" }}
+                              title="Search exercises">
+                              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#a78bfa" }}>search</span>
+                            </button>
+                          )}
                           {(ex.name || "").trim().length > 2 && (
                             <button onClick={() => setDemoExercise(ex.name)}
                               className="border-none cursor-pointer shrink-0 flex items-center justify-center rounded-lg"
@@ -1050,6 +1093,70 @@ export default function WorkoutsPage() {
         )}
 
       </div>
+
+      {/* Exercise search sheet */}
+      {searchOpen !== null && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeSearch(); }}>
+          <div className="mt-auto rounded-t-3xl flex flex-col" style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "80vh" }}>
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="rounded-full" style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)" }} />
+            </div>
+            {/* Search input */}
+            <div className="px-4 pb-3">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#555" }}>search</span>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search exercises or muscle group…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 outline-none bg-transparent text-sm"
+                  style={{ color: "#f2f2f2" }}
+                />
+                {searchQuery.length > 0 && (
+                  <button onClick={() => setSearchQuery("")} className="border-none bg-transparent cursor-pointer p-0">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#555" }}>close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* Results */}
+            <div className="overflow-y-auto px-4 pb-8 flex flex-col gap-1">
+              {searchLoading && (
+                <p className="text-xs text-center py-6" style={{ color: "#555" }}>Searching…</p>
+              )}
+              {searchQuery.length >= 2 && (
+                <button onClick={() => pickExercise(searchQuery)}
+                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl border-none cursor-pointer text-left mb-1"
+                  style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)" }}>
+                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 17, color: "#a78bfa" }}>edit</span>
+                  <p className="text-sm font-semibold" style={{ color: "#a78bfa" }}>Use &quot;{searchQuery}&quot;</p>
+                </button>
+              )}
+              {!searchLoading && searchQuery.length >= 2 && searchResults.length === 0 && (
+                <p className="text-xs text-center py-4" style={{ color: "#555" }}>No matching exercises found</p>
+              )}
+              {!searchLoading && searchQuery.length < 2 && (
+                <p className="text-xs text-center py-6" style={{ color: "#444" }}>Type to search or enter your own exercise name</p>
+              )}
+              {searchResults.map((r) => (
+                <button key={r.name} onClick={() => pickExercise(r.name)}
+                  className="flex items-center justify-between w-full px-3 py-3 rounded-xl border-none cursor-pointer text-left"
+                  style={{ background: "rgba(255,255,255,0.03)" }}>
+                  <div>
+                    <p className="text-sm font-semibold capitalize" style={{ color: "#f2f2f2" }}>{r.name}</p>
+                    <p className="text-xs capitalize mt-0.5" style={{ color: "#555" }}>{r.target} · {r.equipment}</p>
+                  </div>
+                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: "#333" }}>chevron_right</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Exercise demo modal */}
       {demoExercise && (

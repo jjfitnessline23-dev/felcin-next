@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const { trainerId, sessionDate, token, returnUrl = "https://felcin.com/training-sessions" } = body;
   if (!trainerId || !sessionDate || !token) return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
 
-  const traineeId = await verifyToken(req.headers.get("authorization"));
+  const traineeId = await verifyToken(req.headers.get("authorization") ?? body?.token);
   if (!traineeId) return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
   if (!await rateLimit(`training:${traineeId}`, 5, 60_000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });

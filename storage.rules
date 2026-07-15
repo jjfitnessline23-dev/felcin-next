@@ -30,5 +30,15 @@ service firebase.storage {
                    && (request.resource.contentType.matches('image/.*')
                        || request.resource.contentType.matches('video/.*'));
     }
+
+    // Watermarked videos + thumbnails — written by Cloud Functions, read by anyone
+    match /watermarked/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /thumbnails/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

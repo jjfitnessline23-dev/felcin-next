@@ -98,7 +98,7 @@ export default function MuscleMapPage() {
         const now = Date.now();
         const map = Object.fromEntries(MUSCLES.map((m) => [m.key, null])) as Record<MuscleKey, number | null>;
         for (const d of snap.docs) {
-          const log = d.data() as WorkoutLog;
+          const log = d.data({ serverTimestamps: "estimate" }) as WorkoutLog;
           if (!log.date) continue;
           const daysAgo = (now - log.date.seconds * 1000) / 86400000;
           for (const ex of (log.exercises || [])) {

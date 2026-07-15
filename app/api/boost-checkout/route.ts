@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const tierData = BOOST_TIERS[tier];
   if (!tierData) return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
 
-  const uid = await verifyToken(req.headers.get("authorization"));
+  const uid = await verifyToken(req.headers.get("authorization") ?? body?.token);
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   if (!await rateLimit(`boost:${uid}`, 5, 60_000)) {
     return NextResponse.json({ error: "Too many requests â€” slow down" }, { status: 429 });
