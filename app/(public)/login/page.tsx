@@ -21,10 +21,22 @@ type Platform = "ios" | "android" | "web";
 function getPlatform(): Platform {
   if (typeof window === "undefined") return "web";
   const cap = (window as any).Capacitor;
-  if (!cap?.isNativePlatform?.()) return "web";
-  const p = cap.getPlatform?.();
-  if (p === "ios") return "ios";
-  if (p === "android") return "android";
+  // Primary: Capacitor bridge
+  if (cap?.isNativePlatform?.()) {
+    const p = cap.getPlatform?.();
+    if (p === "ios") return "ios";
+    if (p === "android") return "android";
+  }
+  // Fallback: bundled apps serve from a custom scheme (felcin://, capacitor://, ionic://)
+  // In that case use the user agent to identify the platform.
+  try {
+    const proto = window.location.protocol;
+    if (proto !== "http:" && proto !== "https:") {
+      const ua = navigator.userAgent || "";
+      if (/iPhone|iPad|iPod/.test(ua)) return "ios";
+      if (/Android/.test(ua)) return "android";
+    }
+  } catch {}
   return "web";
 }
 
