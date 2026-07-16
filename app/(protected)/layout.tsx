@@ -85,12 +85,19 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [user, pathname]);
 
-  if (loading || !user || banned || !canAccessApp(user)) {
+  if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#090909" }}>
         <div className="spinner" />
       </div>
     );
+  }
+
+  // Not authenticated — redirect is already firing in the useEffect above.
+  // Show a plain dark screen instead of the spinner so the user doesn't see
+  // a stuck spinner while the router.replace('/login') navigation completes.
+  if (!user || banned || !canAccessApp(user)) {
+    return <div className="fixed inset-0" style={{ background: "#090909" }} />;
   }
 
   return (

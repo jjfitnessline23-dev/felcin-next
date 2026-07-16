@@ -37,17 +37,18 @@ export function canAccessApp(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
-  // Always start loading on Capacitor — browserLocalPersistence fires onAuthStateChanged
-  // in <100ms (synchronous localStorage read), so this loading state is imperceptible.
-  // Prevents the login page flash while Firebase restores the session.
+  // On Capacitor, browserLocalPersistence reads from localStorage synchronously —
+  // onAuthStateChanged fires in < 10ms. Starting loading as false prevents a stuck
+  // spinner on iOS when the native bridge initialises slightly after React renders.
   const [loading, setLoading] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
-    return true; // always wait for onAuthStateChanged — it fires near-instantly
+    if (!!(window as any).Capacitor) return false;
+    return true;
   });
 
   useEffect(() => {
-    // Safety net: if onAuthStateChanged doesn't fire within 6s, unblock the UI
-    const timeout = setTimeout(() => setLoading(false), 6000);
+    // Safety net: if onAuthStateChanged doesn't fire within 2s, unblock the UI
+    const timeout = setTimeout(() => setLoading(false), 2000);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
