@@ -37,12 +37,22 @@ export function canAccessApp(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
-  // On Capacitor, browserLocalPersistence reads from localStorage synchronously —
-  // onAuthStateChanged fires in < 10ms. Starting loading as false prevents a stuck
-  // spinner on iOS when the native bridge initialises slightly after React renders.
+  // On Capacitor with browserLocalPersistence, onAuthStateChanged fires from
+  // localStorage in < 10ms. We only hold loading:true if a saved session exists —
+  // this prevents the login-page flash for returning users while giving first-time /
+  // logged-out users an instant login screen with no spinner.
   const [loading, setLoading] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
-    if (!!(window as any).Capacitor) return false;
+    if (!!(window as any).Capacitor) {
+      try {
+        const hasSavedSession = Object.keys(localStorage).some(
+          (k) => k.startsWith("firebase:authUser:")
+        );
+        return hasSavedSession;
+      } catch {
+        return false;
+      }
+    }
     return true;
   });
 
