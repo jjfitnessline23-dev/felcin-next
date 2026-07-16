@@ -14,28 +14,36 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Use window.Capacitor runtime detection (works for both bundled and live-URL Capacitor apps).
-// iOS WKWebView IndexedDB can hang — use browserLocalPersistence + memoryLocalCache instead.
-const isCapacitor = typeof window !== "undefined" && !!(window as any).Capacitor;
+// Detect Capacitor by both the bridge object AND the URL scheme.
+// The scheme check catches bundled builds where capacitor:// is used even
+// if window.Capacitor races with module evaluation.
+function detectCapacitor(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!!(window as any).Capacitor) return true;
+  try { return window.location.protocol === "capacitor:" || window.location.protocol === "ionic:"; }
+  catch { return false; }
+}
+const isCapacitor = detectCapacitor();
 
+// Always use browserLocalPersistence — safe on all platforms and avoids the
+// IndexedDB hang that WKWebView can cause when using the default persistence.
 let auth: Auth;
-if (isCapacitor) {
-  try {
-    auth = initializeAuth(app, { persistence: browserLocalPersistence });
-  } catch {
-    auth = getAuth(app);
-  }
-} else {
+try {
+  auth = initializeAuth(app, { persistence: browserLocalPersistence });
+} catch {
+  // initializeAuth throws if already initialized — return the existing instance.
   auth = getAuth(app);
 }
 
+// Firestore: memoryLocalCache on Capacitor (IndexedDB hangs iOS WKWebView),
+// persistentLocalCache on web (offline support).
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
+  const cache = isCapacitor ? memoryLocalCache() : persistentLocalCache();
   try {
-    db = initializeFirestore(app, {
-      localCache: isCapacitor ? memoryLocalCache() : persistentLocalCache(),
-    });
+    db = initializeFirestore(app, { localCache: cache });
   } catch {
+    // Already initialized — get the existing instance (it has the right cache from the first call).
     db = getFirestore(app);
   }
 } else {

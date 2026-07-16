@@ -37,27 +37,36 @@ export function canAccessApp(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
-  // On Capacitor with browserLocalPersistence, onAuthStateChanged fires from
-  // localStorage in < 10ms. We only hold loading:true if a saved session exists —
-  // this prevents the login-page flash for returning users while giving first-time /
-  // logged-out users an instant login screen with no spinner.
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    if (!!(window as any).Capacitor) {
+  // Always start loading:true — this matches the SSR pre-render and avoids the
+  // React 18 hydration-suppression bug where a useState initializer mismatch
+  // prevents the spinner from ever clearing (re-render is suppressed when the
+  // server said true but client initializer returns false).
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // On Capacitor: if localStorage has no saved Firebase session, unblock the
+    // spinner immediately.  onAuthStateChanged will fire with null — but null→null
+    // is a no-op state update and would never trigger a re-render on its own,
+    // so we must call setLoading(false) explicitly here for logged-out users.
+    const isCapacitorApp =
+      !!(window as any).Capacitor ||
+      window.location.protocol === "capacitor:" ||
+      window.location.protocol === "ionic:";
+
+    if (isCapacitorApp) {
       try {
         const hasSavedSession = Object.keys(localStorage).some(
           (k) => k.startsWith("firebase:authUser:")
         );
-        return hasSavedSession;
+        if (!hasSavedSession) {
+          setLoading(false); // true → false: triggers re-render, clears spinner
+        }
       } catch {
-        return false;
+        setLoading(false);
       }
     }
-    return true;
-  });
 
-  useEffect(() => {
-    // Safety net: if onAuthStateChanged doesn't fire within 2s, unblock the UI
+    // Safety net: unblock after 2s regardless
     const timeout = setTimeout(() => setLoading(false), 2000);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
