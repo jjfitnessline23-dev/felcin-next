@@ -81,7 +81,11 @@ export default function ProfileSettingsPage() {
     setDeleting(true);
     setDeleteError("");
     try {
-      await setDoc(doc(db, "users", user.uid), { deleted: true, deletedAt: new Date() }, { merge: true });
+      const token = await user.getIdToken();
+      await fetch("/api/delete-account", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       await deleteUser(user);
       router.replace("/login");
     } catch (err: unknown) {
