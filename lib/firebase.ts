@@ -20,7 +20,10 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 function detectCapacitor(): boolean {
   if (typeof window === "undefined") return false;
   if (!!(window as any).Capacitor) return true;
-  try { return window.location.protocol === "capacitor:" || window.location.protocol === "ionic:"; }
+  // Catch any custom Capacitor scheme (capacitor://, ionic://, felcin://, etc.)
+  // by excluding standard web protocols. This is the critical fallback for bundled
+  // iOS builds where the custom scheme name (e.g. "Felcin") differs from "capacitor".
+  try { const p = window.location.protocol; return p !== "http:" && p !== "https:"; }
   catch { return false; }
 }
 const isCapacitor = detectCapacitor();
