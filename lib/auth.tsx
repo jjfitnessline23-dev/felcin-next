@@ -50,8 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // so we must call setLoading(false) explicitly here for logged-out users.
     const isCapacitorApp =
       !!(window as any).Capacitor ||
-      window.location.protocol === "capacitor:" ||
-      window.location.protocol === "ionic:";
+      (window.location.protocol !== "http:" && window.location.protocol !== "https:");
 
     if (isCapacitorApp) {
       try {
