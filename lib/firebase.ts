@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, initializeAuth, browserLocalPersistence, type Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache, getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache, getFirestore, disableNetwork } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -54,12 +54,16 @@ if (typeof window !== "undefined") {
     ? persistentLocalCache({ tabManager: persistentSingleTabManager({ forceOwnership: true }) })
     : persistentLocalCache();
   try {
-    db = initializeFirestore(app, {
-      localCache: cache,
-      ...(isCapacitorBuild ? { experimentalAutoDetectLongPolling: true } : {}),
-    });
+    db = initializeFirestore(app, { localCache: cache });
   } catch {
     db = getFirestore(app);
+  }
+  // Capacitor iOS: disable Firestore network immediately at startup.
+  // WKWebView hangs when IndexedDB opens at the same time as network sync.
+  // auth.tsx calls enableFirestoreNetwork() once the loading spinner is gone,
+  // so Firestore syncs online data only after the app has fully rendered.
+  if (isCapacitor || isCapacitorBuild) {
+    disableNetwork(db).catch(() => {});
   }
 } else {
   db = getFirestore(app);

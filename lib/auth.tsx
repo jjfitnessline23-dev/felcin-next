@@ -8,6 +8,16 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, OWNER_UIDS } from "./firebase";
+import { enableNetwork } from "firebase/firestore";
+
+// Re-enable Firestore network after the app has finished its initial render.
+// Only called in Capacitor builds where we disabled it at startup to prevent
+// the WKWebView IndexedDB + network hang.
+function enableFirestoreNetwork() {
+  if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true") {
+    enableNetwork(db).catch(() => {});
+  }
+}
 import { deriveNameFromEmail } from "./nameUtils";
 
 interface AuthContextValue {
@@ -59,7 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           (k) => k.startsWith("firebase:authUser:")
         );
         if (!hasSavedSession) {
-          setLoading(false); // true → false: triggers re-render, clears spinner
+          setLoading(false);
+          enableFirestoreNetwork();
         }
       } catch {
         setLoading(false);
@@ -67,12 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Safety net: unblock after 2s regardless
-    const timeout = setTimeout(() => setLoading(false), 2000);
+    const timeout = setTimeout(() => { setLoading(false); enableFirestoreNetwork(); }, 2000);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
       setUser(u);
-      setLoading(false); // unblock UI immediately — Firestore ban check runs async
+      setLoading(false);
+      enableFirestoreNetwork();
       if (u && !OWNER_UIDS.includes(u.uid)) {
         try {
           const snap = await getDoc(doc(db, "users", u.uid));
