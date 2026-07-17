@@ -49,6 +49,7 @@ const moreGroups = [
   {
     label: "Creator Studio",
     items: [
+      { href: "/creator", icon: "add_circle", label: "Create Content" },
       { href: "/dashboard", icon: "bar_chart", label: "Dashboard" },
       { href: "/earnings", icon: "payments", label: "Earnings" },
       { href: "/badges", icon: "verified", label: "Badges" },
@@ -102,12 +103,13 @@ export default function MobileNav() {
   const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
   const isGhostPath = pathname.startsWith("/ghost");
   const isExplorePath = pathname.startsWith("/explore") || pathname.startsWith("/search");
+  const isRunPath = pathname.startsWith("/run");
 
   const tabs = [
-    { href: "/", icon: "home", label: "Home", active: pathname === "/" },
-    { href: "/ghost", icon: "sprint", label: "Workout", active: isGhostPath, accent: true },
-    null,
-    { href: "/explore", icon: "explore", label: "Explore", active: isExplorePath },
+    { href: "/", icon: "home", label: "Home", active: pathname === "/", accent: false, run: false },
+    { href: "/ghost", icon: "sprint", label: "Workout", active: isGhostPath, accent: true, run: false },
+    { href: "/run", icon: "directions_run", label: "Run", active: isRunPath, accent: false, run: true },
+    { href: "/explore", icon: "explore", label: "Explore", active: isExplorePath, accent: false, run: false },
   ];
 
   return (
@@ -122,21 +124,13 @@ export default function MobileNav() {
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}>
 
-        {tabs.map((tab, i) => {
-          if (tab === null) {
-            if (pathname.startsWith("/live") || pathname.startsWith("/podcasts")) return <div key="create-spacer" className="flex-1" />;
-            return (
-              <Link key="create" href="/creator" className="flex-1 flex items-center justify-center py-3">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#fff" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#000", fontVariationSettings: "'FILL' 1, 'wght' 500" }}>add</span>
-                </div>
-              </Link>
-            );
-          }
+        {tabs.map((tab) => {
+          const activeColor = tab.run ? "#22c55e" : tab.accent ? "#a78bfa" : "#fff";
+          const inactiveColor = tab.run ? "#2a5c3a" : tab.accent ? "#6d51c4" : "#555";
           return (
             <Link key={tab.href} href={tab.href}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5"
-              style={{ color: tab.active ? (tab.accent ? "#a78bfa" : "#fff") : (tab.accent ? "#6d51c4" : "#555") }}>
+              style={{ color: tab.active ? activeColor : inactiveColor }}>
               <span className="material-symbols-outlined" style={{
                 fontSize: 24,
                 fontVariationSettings: tab.active ? "'FILL' 1, 'wght' 500" : "'FILL' 0, 'wght' 400",

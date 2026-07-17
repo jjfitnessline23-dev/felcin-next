@@ -28,6 +28,7 @@ const secondaryLinks = [
 ];
 
 const moreLinks = [
+  { href: "/run", icon: "directions_run", label: "Run Tracker" },
   { href: "/progress", icon: "compare", label: "Progress Photos" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },
   { href: "/schedule", icon: "calendar_month", label: "Schedule" },
