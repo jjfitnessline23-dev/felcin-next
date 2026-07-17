@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, initializeAuth, browserLocalPersistence, type Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -38,19 +38,27 @@ try {
   auth = getAuth(app);
 }
 
-// Firestore cache: memoryLocalCache when running in a Capacitor bundle.
-// iOS WKWebView's IndexedDB hangs indefinitely when the network is active —
-// this blocks ALL async callbacks (including setTimeout) and is the root cause
-// of the "stuck on loading with internet" bug. NEXT_PUBLIC_CAPACITOR_BUILD is
-// baked in as a compile-time constant by Next.js, so no runtime detection needed.
+// Firestore cache: offline-capable persistent cache on all platforms.
+//
+// For Capacitor bundles (NEXT_PUBLIC_CAPACITOR_BUILD=true, baked at compile time):
+//   - persistentSingleTabManager({ forceOwnership: true }) — skips multi-tab
+//     IndexedDB coordination, which was the source of the WKWebView hang.
+//   - experimentalAutoDetectLongPolling — avoids WebSocket + IndexedDB conflicts
+//     on WKWebView. Together these give full offline persistence without the hang.
+//
+// For web: standard persistentLocalCache (offline support in browser).
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
   const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
-  const cache = (isCapacitor || isCapacitorBuild) ? memoryLocalCache() : persistentLocalCache();
+  const cache = (isCapacitor || isCapacitorBuild)
+    ? persistentLocalCache({ tabManager: persistentSingleTabManager({ forceOwnership: true }) })
+    : persistentLocalCache();
   try {
-    db = initializeFirestore(app, { localCache: cache });
+    db = initializeFirestore(app, {
+      localCache: cache,
+      ...(isCapacitorBuild ? { experimentalAutoDetectLongPolling: true } : {}),
+    });
   } catch {
-    // Already initialized — get the existing instance (it has the right cache from the first call).
     db = getFirestore(app);
   }
 } else {
