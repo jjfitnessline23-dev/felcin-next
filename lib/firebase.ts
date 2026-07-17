@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, initializeAuth, browserLocalPersistence, type Auth } from "firebase/auth";
+import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, type Auth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache, getFirestore, disableNetwork } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -32,9 +32,14 @@ const isCapacitor = detectCapacitor();
 // IndexedDB hang that WKWebView can cause when using the default persistence.
 let auth: Auth;
 try {
-  auth = initializeAuth(app, { persistence: browserLocalPersistence });
+  auth = initializeAuth(app, {
+    persistence: browserLocalPersistence,
+    // Required for signInWithPopup/signInWithRedirect to work when using
+    // initializeAuth. getAuth() sets this automatically, initializeAuth does not —
+    // omitting it causes auth/argument-error on every signInWithPopup call.
+    popupRedirectResolver: typeof window !== "undefined" ? browserPopupRedirectResolver : undefined,
+  });
 } catch {
-  // initializeAuth throws if already initialized — return the existing instance.
   auth = getAuth(app);
 }
 

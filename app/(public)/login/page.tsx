@@ -147,20 +147,7 @@ export default function LoginPage() {
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         setBusy(false); return;
       }
-      // Stale Firebase auth state (from switching builds) corrupts the auth instance.
-      // Auto-fix: wipe all firebase:* keys from localStorage and reload — the next
-      // attempt will start with a clean auth state and succeed.
-      if (code === "auth/argument-error") {
-        try {
-          Object.keys(localStorage)
-            .filter(k => k.startsWith("firebase:"))
-            .forEach(k => localStorage.removeItem(k));
-          await auth.signOut().catch(() => {});
-        } catch {}
-        window.location.reload();
-        return;
-      }
-      setError(
+setError(
         code === "auth/popup-blocked"
           ? "Popup was blocked. Please allow popups for felcin.com and try again."
           : code === "auth/unauthorized-domain"
