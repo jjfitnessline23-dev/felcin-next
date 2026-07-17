@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth";
 import { db, OWNER_UIDS } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
 
 const RunMap = dynamic(() => import("@/components/RunMap"), {
@@ -94,6 +94,13 @@ export default function RunPage() {
   const [runs, setRuns] = useState<RunRoute[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
+
+  // Live sharing
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const liveSessionRef = useRef<string | null>(null);
+  const lastShareWriteRef = useRef<number>(0);
 
   // ── Location: uses @capacitor/geolocation on native, navigator on web ────
 
@@ -195,6 +202,8 @@ export default function RunPage() {
         if (d < 4) return prev;
         distRef.current += d;
         setDistance(distRef.current);
+        // Push live position to Firestore for sharing (throttled)
+        writeLivePosition(lat, lng, distRef.current, Math.floor((Date.now() - startTime - pausedMsRef.current) / 1000));
         return [...prev, { lat, lng, ts: Date.now() }];
       });
     };
@@ -267,10 +276,81 @@ export default function RunPage() {
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
+  // ── Live sharing ──────────────────────────────────────────────────────────
+
+  const startSharing = async () => {
+    if (!user || liveSessionRef.current) return;
+    try {
+      const ref = doc(collection(db, "runLiveSessions"));
+      await setDoc(ref, {
+        uid: user.uid,
+        displayName: user.displayName || "Runner",
+        photoURL: user.photoURL || null,
+        lat: currentPos?.lat ?? 0,
+        lng: currentPos?.lng ?? 0,
+        distance,
+        elapsed,
+        active: true,
+        startedAt: serverTimestamp(),
+        lastUpdated: serverTimestamp(),
+      });
+      liveSessionRef.current = ref.id;
+      setShareId(ref.id);
+      setIsSharing(true);
+
+      const url = `https://www.felcin.com/run/live/${ref.id}`;
+      if (navigator.share) {
+        await navigator.share({ title: `${user.displayName || "Someone"} is running live on Felcin!`, text: "Follow my run in real time 🏃", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 3000);
+      }
+    } catch (e) { console.error("share:", e); }
+  };
+
+  const shareAgain = async () => {
+    if (!shareId) return;
+    const url = `https://www.felcin.com/run/live/${shareId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Follow my live run on Felcin!", text: "Track me in real time 🏃", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 3000);
+      }
+    } catch { /* dismissed */ }
+  };
+
+  const stopSharing = async () => {
+    if (!liveSessionRef.current) return;
+    try { await updateDoc(doc(db, "runLiveSessions", liveSessionRef.current), { active: false }); } catch { }
+    liveSessionRef.current = null;
+    setIsSharing(false);
+    setShareId(null);
+  };
+
+  // Write live position to Firestore max every 8 seconds
+  const writeLivePosition = async (lat: number, lng: number, dist: number, el: number) => {
+    if (!liveSessionRef.current) return;
+    const now = Date.now();
+    if (now - lastShareWriteRef.current < 8000) return;
+    lastShareWriteRef.current = now;
+    try {
+      await updateDoc(doc(db, "runLiveSessions", liveSessionRef.current), {
+        lat, lng, distance: dist, elapsed: el, lastUpdated: serverTimestamp(),
+      });
+    } catch { }
+  };
+
   const startCountdown = () => { setLastSaved(null); setCountdown(3); setPhase("countdown"); };
   const pauseRun = () => { pauseStartRef.current = Date.now(); setPhase("paused"); };
   const resumeRun = () => { pausedMsRef.current += Date.now() - pauseStartRef.current; setPhase("running"); };
-  const stopRun = () => setPhase("completed");
+  const stopRun = async () => {
+    await stopSharing();
+    setPhase("completed");
+  };
   const discardRun = () => { setCoords([]); setDistance(0); setElapsed(0); setPhase("idle"); };
 
   const saveRun = async () => {
@@ -484,7 +564,23 @@ export default function RunPage() {
             <button onClick={phase === "running" ? pauseRun : resumeRun} style={{ width: 78, height: 78, borderRadius: "50%", background: "#22c55e", border: "none", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 0 32px rgba(34,197,94,0.45)" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 36, fontVariationSettings: "'FILL' 1" }}>{phase === "running" ? "pause" : "play_arrow"}</span>
             </button>
-            <div style={{ width: 58, height: 58 }} />
+            {/* Share button */}
+          <button
+            onClick={isSharing ? shareAgain : startSharing}
+            style={{
+              width: 58, height: 58, borderRadius: "50%",
+              background: isSharing ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.08)",
+              border: isSharing ? "1.5px solid rgba(34,197,94,0.5)" : "1.5px solid rgba(255,255,255,0.15)",
+              color: isSharing ? "#22c55e" : "#888",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", gap: 2,
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>
+              {shareCopied ? "check" : "share"}
+            </span>
+            {shareCopied && <span style={{ fontSize: 8, fontWeight: 700, color: "#22c55e" }}>COPIED</span>}
+          </button>
           </div>
         </>
       )}
