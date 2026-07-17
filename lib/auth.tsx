@@ -46,19 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (window.location.protocol !== "http:" && window.location.protocol !== "https:");
 
     if (isCapacitorApp) {
-      try {
-        const hasSavedSession = Object.keys(localStorage).some(
-          (k) => k.startsWith("firebase:authUser:")
-        );
-        if (!hasSavedSession) {
-          setLoading(false);
-        }
-      } catch {
-        setLoading(false);
-      }
+      // Always resolve loading within 500ms on Capacitor — onAuthStateChanged will
+      // still fire and update the user. This prevents any async-blocking scenario
+      // from leaving the loading spinner stuck forever.
+      setTimeout(() => setLoading(false), 500);
     }
 
-    const timeout = setTimeout(() => setLoading(false), 2000);
+    const timeout = setTimeout(() => setLoading(false), 500);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);

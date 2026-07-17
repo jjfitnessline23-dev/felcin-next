@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth";
 import { db, OWNER_UIDS } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
 import { Capacitor } from "@capacitor/core";
 
 const RunMap = dynamic(() => import("@/components/RunMap"), {

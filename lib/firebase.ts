@@ -22,12 +22,16 @@ function detectCapacitor(): boolean {
 }
 const isCapacitor = detectCapacitor();
 
+const IS_CAP_BUILD = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
+
 let auth: Auth;
 try {
   auth = initializeAuth(app, {
     persistence: browserLocalPersistence,
-    // Required for signInWithPopup — initializeAuth does not set this automatically.
-    popupRedirectResolver: typeof window !== "undefined" ? browserPopupRedirectResolver : undefined,
+    // Capacitor uses native sign-in — no redirect flows, no popup resolver needed.
+    // Passing browserPopupRedirectResolver on Capacitor makes Auth check for a pending
+    // redirect result on every startup, adding async work before onAuthStateChanged fires.
+    popupRedirectResolver: IS_CAP_BUILD ? undefined : (typeof window !== "undefined" ? browserPopupRedirectResolver : undefined),
   });
 } catch {
   auth = getAuth(app);
