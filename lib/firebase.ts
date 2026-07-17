@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, type Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache, getFirestore, disableNetwork, enableNetwork } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -34,19 +34,32 @@ try {
   auth = getAuth(app);
 }
 
-// Firestore: memoryLocalCache for Capacitor bundles, persistentLocalCache for web.
-// iOS WKWebView has a WebKit bug: IndexedDB + active network = deadlock that blocks
-// ALL JavaScript (including setTimeout). memoryLocalCache avoids IndexedDB entirely.
-// NEXT_PUBLIC_CAPACITOR_BUILD is baked as a compile-time constant by Next.js so
-// this selection is resolved at build time with no runtime detection needed.
+// Firestore offline strategy for Capacitor iOS bundle:
+//
+// iOS WKWebView deadlocks when IndexedDB.open() and network I/O run concurrently.
+// Fix: disable network at startup so IndexedDB opens without interference, then
+// re-enable after 2s (IndexedDB.open() always completes within ~100ms offline).
+//
+//   t=0ms   — init with persistentLocalCache, disableNetwork() called
+//   t=0ms   — IndexedDB opens clean, app loads from cache (works online & offline)
+//   t=2000ms — enableNetwork() fires, Firestore syncs server data, UI updates live
+//
+// Web: standard persistentLocalCache with no network manipulation needed.
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
   const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
-  const cache = (isCapacitor || isCapacitorBuild) ? memoryLocalCache() : persistentLocalCache();
+  const isCapacitorEnv = isCapacitor || isCapacitorBuild;
+  const cache = isCapacitorEnv
+    ? persistentLocalCache({ tabManager: persistentSingleTabManager({ forceOwnership: true }) })
+    : persistentLocalCache();
   try {
     db = initializeFirestore(app, { localCache: cache });
   } catch {
     db = getFirestore(app);
+  }
+  if (isCapacitorEnv) {
+    disableNetwork(db).catch(() => {});
+    setTimeout(() => enableNetwork(db).catch(() => {}), 2000);
   }
 } else {
   db = getFirestore(app);
