@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, type Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache, getFirestore, disableNetwork } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -14,61 +14,39 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Detect Capacitor by both the bridge object AND the URL scheme.
-// The scheme check catches bundled builds where capacitor:// is used even
-// if window.Capacitor races with module evaluation.
 function detectCapacitor(): boolean {
   if (typeof window === "undefined") return false;
   if (!!(window as any).Capacitor) return true;
-  // Catch any custom Capacitor scheme (capacitor://, ionic://, felcin://, etc.)
-  // by excluding standard web protocols. This is the critical fallback for bundled
-  // iOS builds where the custom scheme name (e.g. "Felcin") differs from "capacitor".
   try { const p = window.location.protocol; return p !== "http:" && p !== "https:"; }
   catch { return false; }
 }
 const isCapacitor = detectCapacitor();
 
-// Always use browserLocalPersistence — safe on all platforms and avoids the
-// IndexedDB hang that WKWebView can cause when using the default persistence.
 let auth: Auth;
 try {
   auth = initializeAuth(app, {
     persistence: browserLocalPersistence,
-    // Required for signInWithPopup/signInWithRedirect to work when using
-    // initializeAuth. getAuth() sets this automatically, initializeAuth does not —
-    // omitting it causes auth/argument-error on every signInWithPopup call.
+    // Required for signInWithPopup — initializeAuth does not set this automatically
+    // unlike getAuth(). Omitting it causes auth/argument-error on web Google sign-in.
     popupRedirectResolver: typeof window !== "undefined" ? browserPopupRedirectResolver : undefined,
   });
 } catch {
   auth = getAuth(app);
 }
 
-// Firestore cache: offline-capable persistent cache on all platforms.
-//
-// For Capacitor bundles (NEXT_PUBLIC_CAPACITOR_BUILD=true, baked at compile time):
-//   - persistentSingleTabManager({ forceOwnership: true }) — skips multi-tab
-//     IndexedDB coordination, which was the source of the WKWebView hang.
-//   - experimentalAutoDetectLongPolling — avoids WebSocket + IndexedDB conflicts
-//     on WKWebView. Together these give full offline persistence without the hang.
-//
-// For web: standard persistentLocalCache (offline support in browser).
+// Firestore: memoryLocalCache for Capacitor bundles, persistentLocalCache for web.
+// iOS WKWebView has a WebKit bug: IndexedDB + active network = deadlock that blocks
+// ALL JavaScript (including setTimeout). memoryLocalCache avoids IndexedDB entirely.
+// NEXT_PUBLIC_CAPACITOR_BUILD is baked as a compile-time constant by Next.js so
+// this selection is resolved at build time with no runtime detection needed.
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
   const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
-  const cache = (isCapacitor || isCapacitorBuild)
-    ? persistentLocalCache({ tabManager: persistentSingleTabManager({ forceOwnership: true }) })
-    : persistentLocalCache();
+  const cache = (isCapacitor || isCapacitorBuild) ? memoryLocalCache() : persistentLocalCache();
   try {
     db = initializeFirestore(app, { localCache: cache });
   } catch {
     db = getFirestore(app);
-  }
-  // Capacitor iOS: disable Firestore network immediately at startup.
-  // WKWebView hangs when IndexedDB opens at the same time as network sync.
-  // auth.tsx calls enableFirestoreNetwork() once the loading spinner is gone,
-  // so Firestore syncs online data only after the app has fully rendered.
-  if (isCapacitor || isCapacitorBuild) {
-    disableNetwork(db).catch(() => {});
   }
 } else {
   db = getFirestore(app);

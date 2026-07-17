@@ -8,16 +8,6 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, OWNER_UIDS } from "./firebase";
-import { enableNetwork } from "firebase/firestore";
-
-// Re-enable Firestore network after the app has finished its initial render.
-// Only called in Capacitor builds where we disabled it at startup to prevent
-// the WKWebView IndexedDB + network hang.
-function enableFirestoreNetwork() {
-  if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true") {
-    enableNetwork(db).catch(() => {});
-  }
-}
 import { deriveNameFromEmail } from "./nameUtils";
 
 interface AuthContextValue {
@@ -47,17 +37,9 @@ export function canAccessApp(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
-  // Always start loading:true — this matches the SSR pre-render and avoids the
-  // React 18 hydration-suppression bug where a useState initializer mismatch
-  // prevents the spinner from ever clearing (re-render is suppressed when the
-  // server said true but client initializer returns false).
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // On Capacitor: if localStorage has no saved Firebase session, unblock the
-    // spinner immediately.  onAuthStateChanged will fire with null — but null→null
-    // is a no-op state update and would never trigger a re-render on its own,
-    // so we must call setLoading(false) explicitly here for logged-out users.
     const isCapacitorApp =
       process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" ||
       !!(window as any).Capacitor ||
@@ -70,28 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         if (!hasSavedSession) {
           setLoading(false);
-          enableFirestoreNetwork();
         }
       } catch {
         setLoading(false);
       }
     }
 
-    // Safety net: unblock after 2s regardless
-    const timeout = setTimeout(() => { setLoading(false); enableFirestoreNetwork(); }, 2000);
+    const timeout = setTimeout(() => setLoading(false), 2000);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
       setUser(u);
       setLoading(false);
-      enableFirestoreNetwork();
       if (u && !OWNER_UIDS.includes(u.uid)) {
         try {
           const snap = await getDoc(doc(db, "users", u.uid));
           setBanned(snap.exists() && snap.data()?.banned === true);
-          // Ensure every user who can access the app has a Firestore doc.
-          // Covers email users who verified but never hit a protected route,
-          // and any other gap between Auth records and Firestore docs.
           if (!snap.exists() && canAccessApp(u)) {
             const profile = {
               displayName: u.displayName || deriveNameFromEmail(u.email || ""),
