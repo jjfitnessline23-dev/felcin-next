@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth";
-import { db } from "@/lib/firebase";
+import { db, OWNER_UIDS } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
 
@@ -52,6 +52,7 @@ function formatDate(raw: any) {
 
 export default function RunPage() {
   const { user } = useAuth();
+  const isAdmin = !!(user && OWNER_UIDS.includes(user.uid));
 
   // Location
   const [locState, setLocState] = useState<LocState>("prompt");
@@ -60,18 +61,20 @@ export default function RunPage() {
   const [waitSecs, setWaitSecs] = useState(0);
 
   useEffect(() => {
+    if (!isAdmin) return;
     if (locState !== "waiting") { setWaitSecs(0); return; }
     const id = setInterval(() => setWaitSecs(s => s + 1), 1000);
     return () => clearInterval(id);
-  }, [locState]);
+  }, [locState, isAdmin]);
 
   // On mount: if permission is already granted, skip the gate entirely
   useEffect(() => {
+    if (!isAdmin) return;
     navigator.permissions?.query({ name: "geolocation" as PermissionName }).then(r => {
       if (r.state === "granted") enableLocation();
       if (r.state === "denied") setLocState("denied");
     }).catch(() => {});
-  }, []);
+  }, [isAdmin]);
 
   // Phase
   const [phase, setPhase] = useState<Phase>("idle");
@@ -289,6 +292,72 @@ export default function RunPage() {
     } catch (e) { console.error(e); }
     setPhase("idle");
   };
+
+  // ── Coming soon for non-admins (all hooks already called above) ───────────
+  if (!isAdmin) {
+    return (
+      <div style={{ minHeight: "100dvh", background: "#090909", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 80px)", textAlign: "center" }}>
+
+        {/* Full-page animated background — matches platform style */}
+        <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
+          {/* Green radial glow */}
+          <div style={{ position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "90vw", maxWidth: 700, height: 700, background: "radial-gradient(ellipse at center, rgba(34,197,94,0.12) 0%, transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+          {/* Purple accent glow bottom-left */}
+          <div style={{ position: "absolute", bottom: "-10%", left: "-10%", width: 500, height: 500, background: "radial-gradient(ellipse at center, rgba(109,40,217,0.07) 0%, transparent 65%)" }} />
+          {/* Large watermark logo right */}
+          <img src="/static/logo-full.svg" alt="" className="ghost-float" style={{ position: "absolute", right: "-5%", top: "50%", transform: "translateY(-50%)", width: "55vw", maxWidth: 500, opacity: 0.04, userSelect: "none" }} />
+          {/* Small watermark logo bottom-left */}
+          <img src="/static/logo-full.svg" alt="" className="ghost-float-bottom" style={{ position: "absolute", left: "-8%", bottom: "8%", width: "28vw", maxWidth: 260, opacity: 0.03, userSelect: "none" }} />
+          {/* Horizontal scan line */}
+          <div style={{ position: "absolute", left: 0, right: 0, height: 1.5, background: "linear-gradient(90deg, transparent, rgba(34,197,94,0.25), transparent)", animation: "scanLine 6s linear infinite", pointerEvents: "none" }} />
+        </div>
+
+        {/* Hero card */}
+        <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 340 }}>
+          <div style={{
+            borderRadius: 28, overflow: "hidden", position: "relative",
+            background: "linear-gradient(135deg, #030d06 0%, #071410 50%, #040a08 100%)",
+            border: "1px solid rgba(34,197,94,0.2)",
+            padding: "40px 28px 36px",
+          }}>
+            {/* Card inner glow */}
+            <div style={{ position: "absolute", top: "-40%", left: "50%", transform: "translateX(-50%)", width: 300, height: 300, background: "radial-gradient(ellipse at center, rgba(34,197,94,0.18) 0%, transparent 65%)", pointerEvents: "none" }} />
+            {/* Card scan line */}
+            <div style={{ position: "absolute", left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(34,197,94,0.3), transparent)", top: 0 }} />
+
+            <div style={{ position: "relative", zIndex: 1 }}>
+              {/* Logo + icon */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 24 }}>
+                <img src="/static/logo-full.svg" alt="Felcin" style={{ width: 52, height: 52 }} />
+                <div style={{ width: 1, height: 40, background: "rgba(34,197,94,0.2)" }} />
+                <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
+              </div>
+
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", letterSpacing: "0.18em", marginBottom: 12 }}>FELCIN</div>
+              <h2 style={{ fontSize: 28, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-0.8px", lineHeight: 1.1, marginBottom: 14 }}>
+                Run Tracker
+              </h2>
+
+              {/* Heartbeat line */}
+              <svg width="160" height="28" viewBox="0 0 160 28" style={{ display: "block", margin: "0 auto 20px" }}>
+                <path d="M 0,14 L 25,14 L 30,8 L 36,22 L 42,4 L 48,24 L 54,14 L 70,14 L 75,10 L 80,14 L 160,14"
+                  fill="none" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+              </svg>
+
+              <p style={{ fontSize: 13, color: "#4a7a5a", lineHeight: 1.7, marginBottom: 28 }}>
+                Live GPS route tracking, real-time maps, personal records, and pace analytics — launching soon.
+              </p>
+
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 20px", borderRadius: 20, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "onAirPulse 1.5s ease-in-out infinite" }} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#22c55e", letterSpacing: "0.12em" }}>COMING SOON</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const isTracking = phase === "running" || phase === "paused";
