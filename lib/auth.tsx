@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // is a no-op state update and would never trigger a re-render on its own,
     // so we must call setLoading(false) explicitly here for logged-out users.
     const isCapacitorApp =
+      process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" ||
       !!(window as any).Capacitor ||
       (window.location.protocol !== "http:" && window.location.protocol !== "https:");
 

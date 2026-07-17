@@ -38,11 +38,15 @@ try {
   auth = getAuth(app);
 }
 
-// Firestore: memoryLocalCache on Capacitor (IndexedDB hangs iOS WKWebView),
-// persistentLocalCache on web (offline support).
+// Firestore cache: memoryLocalCache when running in a Capacitor bundle.
+// iOS WKWebView's IndexedDB hangs indefinitely when the network is active —
+// this blocks ALL async callbacks (including setTimeout) and is the root cause
+// of the "stuck on loading with internet" bug. NEXT_PUBLIC_CAPACITOR_BUILD is
+// baked in as a compile-time constant by Next.js, so no runtime detection needed.
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
-  const cache = isCapacitor ? memoryLocalCache() : persistentLocalCache();
+  const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
+  const cache = (isCapacitor || isCapacitorBuild) ? memoryLocalCache() : persistentLocalCache();
   try {
     db = initializeFirestore(app, { localCache: cache });
   } catch {
