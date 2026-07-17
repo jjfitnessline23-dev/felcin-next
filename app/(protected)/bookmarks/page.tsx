@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, getDoc } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";

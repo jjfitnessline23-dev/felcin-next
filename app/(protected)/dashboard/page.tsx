@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";

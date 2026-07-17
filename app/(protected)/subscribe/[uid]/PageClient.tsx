@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { doc, getDoc, setDoc, addDoc, collection, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc, collection, Timestamp } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";

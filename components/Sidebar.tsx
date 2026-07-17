@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { OWNER_UIDS, db } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "@/lib/db";
 
 const primaryLinks = [
   { href: "/", icon: "home", label: "Home" },

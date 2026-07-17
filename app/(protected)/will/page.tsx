@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
   collection, query, orderBy, limit, getDocs, addDoc, updateDoc, doc,
   serverTimestamp, where, increment,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";

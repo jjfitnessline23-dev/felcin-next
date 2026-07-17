@@ -6,7 +6,7 @@ import {
   doc, getDoc, collection, query, orderBy, onSnapshot,
   addDoc, serverTimestamp, updateDoc, increment, deleteDoc,
   arrayUnion, arrayRemove, setDoc, getDocs, limit, startAfter, QueryDocumentSnapshot,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";

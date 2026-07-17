@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp, deleteDoc } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";

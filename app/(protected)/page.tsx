@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection, query, orderBy, limit, getDocs, getDoc, onSnapshot,
   doc, startAfter, QueryDocumentSnapshot, where, setDoc, deleteDoc, addDoc, serverTimestamp,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";

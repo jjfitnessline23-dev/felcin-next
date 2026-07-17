@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth, canAccessApp } from "@/lib/auth";
-import { doc, getDoc, setDoc, increment } from "firebase/firestore";
+import { doc, getDoc, setDoc, increment } from "@/lib/db";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";

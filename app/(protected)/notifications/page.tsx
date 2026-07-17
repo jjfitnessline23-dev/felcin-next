@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { collection, query, where, limit, orderBy, onSnapshot, updateDoc, doc, writeBatch } from "firebase/firestore";
+import { collection, query, where, limit, orderBy, onSnapshot, updateDoc, doc, writeBatch } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";

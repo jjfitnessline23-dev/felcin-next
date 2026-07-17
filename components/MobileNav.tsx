@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useAuth } from "@/lib/auth";
 import { OWNER_UIDS, db } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "@/lib/db";
 
 const quickActions = [
   { href: "/notifications", icon: "notifications", label: "Notifications", badge: true },

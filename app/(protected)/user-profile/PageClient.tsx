@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection, query, where, getDocs,
   doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, updateDoc, increment,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";

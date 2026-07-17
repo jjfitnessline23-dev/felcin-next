@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc,
   serverTimestamp, query, orderBy, where, onSnapshot,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

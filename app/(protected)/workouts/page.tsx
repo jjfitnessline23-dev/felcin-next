@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, increment, updateDoc, doc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, increment, updateDoc, doc, getDoc } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";

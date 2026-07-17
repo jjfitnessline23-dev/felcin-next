@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot } from "@/lib/db";
 import dynamic from "next/dynamic";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

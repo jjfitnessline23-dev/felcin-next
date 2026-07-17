@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, onSnapshot, updateDoc, increment, collection, addDoc, query, orderBy, limit, serverTimestamp, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, increment, collection, addDoc, query, orderBy, limit, serverTimestamp, getDoc } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";

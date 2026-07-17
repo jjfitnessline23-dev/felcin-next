@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
   User,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "@/lib/db";
 import { auth, db, OWNER_UIDS } from "./firebase";
 import { deriveNameFromEmail } from "./nameUtils";
 

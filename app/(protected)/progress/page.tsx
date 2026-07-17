@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

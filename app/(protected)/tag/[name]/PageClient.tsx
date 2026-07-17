@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { collection, query, where, orderBy, getDocs, limit } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, limit } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 

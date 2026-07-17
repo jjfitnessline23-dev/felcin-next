@@ -7,7 +7,7 @@ import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
   getDoc, setDoc, deleteDoc, serverTimestamp, addDoc, collection,
   getDocs, query, orderBy, limit,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 

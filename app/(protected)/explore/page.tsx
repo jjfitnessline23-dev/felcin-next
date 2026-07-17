@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { collection, query, orderBy, limit, getDocs, getDoc, doc, startAfter, QueryDocumentSnapshot, where } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, getDoc, doc, startAfter, QueryDocumentSnapshot, where } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import PostCard from "@/components/PostCard";
 

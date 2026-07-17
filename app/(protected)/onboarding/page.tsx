@@ -3,7 +3,7 @@
 import { useState } from "react";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "@/lib/db";
 import { signOut } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

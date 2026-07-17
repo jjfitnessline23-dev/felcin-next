@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   collection, doc, getDoc, getDocs, setDoc,
   query, orderBy, limit,
-} from "firebase/firestore";
+} from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";

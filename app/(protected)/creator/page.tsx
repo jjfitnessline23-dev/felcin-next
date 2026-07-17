@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, addDoc, serverTimestamp, Timestamp, getDocs, limit, query } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, Timestamp, getDocs, limit, query } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

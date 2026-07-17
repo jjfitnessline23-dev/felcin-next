@@ -8,7 +8,7 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import { collection, collectionGroup, query, orderBy, limit, getDocs, doc, deleteDoc, updateDoc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { collection, collectionGroup, query, orderBy, limit, getDocs, doc, deleteDoc, updateDoc, getDoc, setDoc, onSnapshot } from "@/lib/db";
 import { auth, db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 

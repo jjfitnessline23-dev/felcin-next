@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { collection, addDoc, getDocs, query, where, orderBy, Timestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, orderBy, Timestamp } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

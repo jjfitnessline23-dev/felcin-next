@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "@/lib/db";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";

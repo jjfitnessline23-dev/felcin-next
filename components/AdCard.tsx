@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { doc, updateDoc, increment } from "firebase/firestore";
+import { doc, updateDoc, increment } from "@/lib/db";
 import { db } from "@/lib/firebase";
 
 export interface Ad {
