@@ -19,8 +19,14 @@ const firebaseConfig = {
 // Firebase handles the absence of IndexedDB gracefully — heartbeat logs a warning and
 // continues. Everything else (auth, firestore via memoryLocalCache/native plugin) is unaffected.
 if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" && typeof window !== "undefined") {
+  // Object.defineProperty on window.indexedDB silently fails on WKWebView (non-configurable).
+  // Patching IDBFactory.prototype.open works regardless — it intercepts at the method level.
   try {
-    Object.defineProperty(window, "indexedDB", { get: () => undefined, configurable: true });
+    if (window.IDBFactory) {
+      (window.IDBFactory.prototype as any).open = function () {
+        throw new DOMException("IndexedDB blocked on Capacitor", "SecurityError");
+      };
+    }
   } catch {}
 }
 
