@@ -34,24 +34,18 @@ export function canAccessApp(user: User | null): boolean {
   return !!user.email;
 }
 
+// Baked as a compile-time constant — true in the Capacitor bundled build.
+const IS_CAPACITOR_BUILD = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // On Capacitor: start loading=false so there is never a spinner to get stuck.
+  // onAuthStateChanged fires within ~100ms (reads localStorage), updating user state.
+  // On web: start loading=true to prevent flash of unauthenticated content.
+  const [loading, setLoading] = useState(!IS_CAPACITOR_BUILD);
 
   useEffect(() => {
-    const isCapacitorApp =
-      process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" ||
-      !!(window as any).Capacitor ||
-      (window.location.protocol !== "http:" && window.location.protocol !== "https:");
-
-    if (isCapacitorApp) {
-      // Always resolve loading within 500ms on Capacitor — onAuthStateChanged will
-      // still fire and update the user. This prevents any async-blocking scenario
-      // from leaving the loading spinner stuck forever.
-      setTimeout(() => setLoading(false), 500);
-    }
-
     const timeout = setTimeout(() => setLoading(false), 500);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
