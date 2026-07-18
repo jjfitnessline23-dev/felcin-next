@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth";
-import { db } from "@/lib/firebase";
+import { db, OWNER_UIDS } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
 import { Capacitor } from "@capacitor/core";
 
@@ -52,6 +52,7 @@ function formatDate(raw: any) {
 
 export default function RunPage() {
   const { user } = useAuth();
+  const isAdmin = !!(user && OWNER_UIDS.includes(user.uid));
 
   // Location
   const [locState, setLocState] = useState<LocState>("prompt");
@@ -370,6 +371,26 @@ export default function RunPage() {
     } catch (e) { console.error(e); }
     setPhase("idle");
   };
+
+  // Coming soon — block all non-admin users until run tracker is fully ready
+  if (!isAdmin) {
+    return (
+      <div style={{ minHeight: "100dvh", background: "#090909", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 80px)", textAlign: "center" }}>
+        <div style={{ width: 88, height: 88, borderRadius: 24, marginBottom: 28, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 44, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", letterSpacing: "0.18em", marginBottom: 12 }}>FELCIN</div>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-0.5px", marginBottom: 12 }}>Run Tracker</h2>
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7, marginBottom: 28, maxWidth: 280 }}>
+          Live GPS route tracking, real-time maps, personal records, and pace analytics — coming soon.
+        </p>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 20px", borderRadius: 20, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "onAirPulse 1.5s ease-in-out infinite" }} />
+          <span style={{ fontSize: 11, fontWeight: 800, color: "#22c55e", letterSpacing: "0.12em" }}>COMING SOON</span>
+        </div>
+      </div>
+    );
+  }
 
   const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const isTracking = phase === "running" || phase === "paused";
