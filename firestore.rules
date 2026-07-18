@@ -148,6 +148,11 @@ service cloud.firestore {
         allow write: if isAuth() && request.auth.uid == userId;
       }
 
+      // Running routes — owner writes, admin reads via collectionGroup below
+      match /runningRoutes/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
       // Catch-all: read-only for owner/admin — write is INTENTIONALLY omitted here
       // so the catch-all never silently bypasses the validated rules above (earnings, etc.)
       match /{subcollection}/{docId} {
@@ -307,8 +312,11 @@ service cloud.firestore {
     }
 
     // ── Admin collection group reads ──
-    // Allows admin to query workoutLogs across ALL users in one collectionGroup call
+    // Allows admin to query workoutLogs and runningRoutes across ALL users in one collectionGroup call
     match /{path=**}/workoutLogs/{docId} {
+      allow read: if isAdmin();
+    }
+    match /{path=**}/runningRoutes/{docId} {
       allow read: if isAdmin();
     }
 

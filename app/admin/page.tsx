@@ -19,8 +19,9 @@ interface Report { id: string; postId?: string; reelId?: string; authorId?: stri
 interface GhostWorkout { id: string; hostId: string; hostName?: string; hostPhoto?: string; title: string; description?: string; exercises?: { name: string; duration: number }[]; sessionCount?: number; isPPV?: boolean; price?: number; createdAt?: { seconds: number }; }
 interface GhostSession { id: string; userId: string; userName?: string; userPhoto?: string; exercisesCount?: number; totalDurationSecs?: number; completedAt?: { seconds: number }; }
 interface AdminWorkoutLog { id: string; userId: string; date?: { seconds: number }; exercises: { name: string; sets: { reps: number; weight: number }[]; equipment?: string }[]; notes?: string; durationMins?: number; }
+interface AdminRunRoute { id: string; userId: string; name?: string; distance: number; duration: number; avgPace: number; date?: { seconds: number }; isDistancePR?: boolean; isPacePR?: boolean; }
 
-type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts" | "marketing";
+type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts" | "runs" | "marketing";
 
 interface AnalyticsData {
   totalPageViews: number;
@@ -103,6 +104,9 @@ export default function AdminPortalPage() {
   const [togglingAdvertise, setTogglingAdvertise] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<AdminWorkoutLog[]>([]);
+  const [runRoutes, setRunRoutes] = useState<AdminRunRoute[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(false);
+  const [runsLoaded, setRunsLoaded] = useState(false);
   const [botLogs, setBotLogs] = useState<{ scanned: number; violations: number; bans: { "7d": number; "30d": number; permanent: number }; runAt: { seconds: number } }[]>([]);
   const [stripeStats, setStripeStats] = useState<{
     today: { revenue: number; count: number };
@@ -215,6 +219,29 @@ export default function AdminPortalPage() {
     if (!user || !OWNER_UIDS.includes(user.uid)) return;
     loadWorkouts();
   }, [!!user, workoutsLoaded]); // eslint-disable-line
+
+  const loadRuns = () => {
+    if (loadingRuns) return;
+    setLoadingRuns(true);
+    setRunRoutes([]);
+    getDocs(query(collectionGroup(db, "runningRoutes"), limit(500)))
+      .then((snap) => {
+        const all: AdminRunRoute[] = snap.docs.map((d) => {
+          const data = d.data();
+          const userId = d.ref.parent.parent?.id ?? "";
+          return { id: d.id, userId, name: data.name, distance: data.distance || 0, duration: data.duration || 0, avgPace: data.avgPace || 0, date: data.date, isDistancePR: data.isDistancePR, isPacePR: data.isPacePR };
+        }).sort((a, b) => (b.date?.seconds ?? 0) - (a.date?.seconds ?? 0));
+        setRunRoutes(all);
+      })
+      .catch((err) => console.error("runningRoutes collectionGroup error:", err))
+      .finally(() => { setLoadingRuns(false); setRunsLoaded(true); });
+  };
+
+  useEffect(() => {
+    if (runsLoaded || loadingRuns) return;
+    if (!user || !OWNER_UIDS.includes(user.uid)) return;
+    loadRuns();
+  }, [!!user, runsLoaded]); // eslint-disable-line
 
   const loadStripeStats = async () => {
     if (loadingStats) return;
@@ -340,6 +367,7 @@ export default function AdminPortalPage() {
     { key: "reports", label: "Reports", icon: "flag" },
     { key: "ghost", label: "Ghost", icon: "sprint" },
     { key: "workouts", label: "Workouts", icon: "fitness_center" },
+    { key: "runs", label: "Runs", icon: "directions_run" },
     { key: "analytics", label: "Analytics", icon: "analytics" },
     { key: "marketing", label: "Marketing", icon: "ads_click" },
     { key: "settings", label: "Settings", icon: "settings" },
@@ -497,6 +525,7 @@ export default function AdminPortalPage() {
               { label: "Total Users", value: users.length, icon: "group", color: "#34d399" },
               { label: "Ghost Workouts", value: ghosts.length, icon: "sprint", color: "#fb923c" },
               { label: "Workout Logs", value: workoutsLoaded ? workoutLogs.length : "—", icon: "fitness_center", color: "#34d399" },
+              { label: "Total Runs", value: runsLoaded ? runRoutes.length : "—", icon: "directions_run", color: "#22c55e" },
               { label: "Pending Reports", value: pendingReports.length, icon: "flag", color: "#f87171" },
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-4 p-4 rounded-xl"
@@ -916,6 +945,93 @@ export default function AdminPortalPage() {
                         ))}
                       </div>
                       {log.notes && <p className="text-xs mt-2 italic" style={{ color: "#444" }}>{log.notes}</p>}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+
+        ) : tab === "runs" ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs" style={{ color: "#444" }}>All users' run history</p>
+              <button onClick={() => { setRunsLoaded(false); loadRuns(); }} disabled={loadingRuns}
+                className="flex items-center gap-1 border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                <span className="text-xs">Refresh</span>
+              </button>
+            </div>
+
+            {runsLoaded && runRoutes.length > 0 && (() => {
+              const totalKm = runRoutes.reduce((s, r) => s + r.distance, 0) / 1000;
+              const uniqueRunners = new Set(runRoutes.map(r => r.userId)).size;
+              const prs = runRoutes.filter(r => r.isDistancePR || r.isPacePR).length;
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Total runs", value: runRoutes.length, color: "#22c55e" },
+                    { label: "Total km", value: totalKm.toFixed(1), color: "#60a5fa" },
+                    { label: "Runners", value: uniqueRunners, color: "#a78bfa" },
+                    { label: "PRs set", value: prs, color: "#fbbf24" },
+                    { label: "Avg km", value: (totalKm / runRoutes.length).toFixed(2), color: "#34d399" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="p-3 rounded-xl text-center" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <p className="text-xl font-bold" style={{ color }}>{value}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {loadingRuns ? (
+              <div className="flex justify-center py-10"><div className="spinner" /></div>
+            ) : runRoutes.length === 0 ? (
+              <p className="text-center py-10" style={{ color: "#555" }}>No runs recorded yet</p>
+            ) : (
+              <>
+                <p className="text-xs" style={{ color: "#444" }}>{runRoutes.length} runs · most recent first</p>
+                {runRoutes.map((run) => {
+                  const userRecord = users.find(u => u.id === run.userId);
+                  const userName = userRecord?.displayName || run.userId.slice(0, 10) + "…";
+                  const userPhoto = userRecord?.photoURL;
+                  const km = (run.distance / 1000).toFixed(2);
+                  const mins = Math.floor(run.duration / 60);
+                  const secs = run.duration % 60;
+                  const timeStr = mins >= 60
+                    ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, "0")}:${String(Math.floor(secs)).padStart(2, "0")}`
+                    : `${mins}:${String(Math.floor(secs)).padStart(2, "0")}`;
+                  const paceStr = run.avgPace > 0 && isFinite(run.avgPace)
+                    ? `${Math.floor(run.avgPace / 60)}:${String(Math.floor(run.avgPace % 60)).padStart(2, "0")}/km`
+                    : "--";
+                  const hasPR = run.isDistancePR || run.isPacePR;
+                  return (
+                    <div key={run.id} className="p-4 rounded-xl"
+                      style={{ background: "#131313", border: `1px solid ${hasPR ? "rgba(251,191,36,0.2)" : "rgba(255,255,255,0.07)"}` }}>
+                      <div className="flex items-center gap-2.5 mb-3">
+                        {userPhoto
+                          ? <img src={userPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
+                          : <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ width: 32, height: 32, background: "#222", color: "#666" }}>{userName.charAt(0).toUpperCase()}</div>}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{userName}</p>
+                            {run.isDistancePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(251,191,36,0.22)" }}>DIST PR</span>}
+                            {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#a78bfa", background: "rgba(167,139,250,0.1)", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(167,139,250,0.22)" }}>PACE PR</span>}
+                          </div>
+                          <p className="text-xs" style={{ color: "#555" }}>
+                            {run.name || "Run"}{run.date ? ` · ${new Date(run.date.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[{ label: "KM", value: km }, { label: "TIME", value: timeStr }, { label: "PACE", value: paceStr }].map(({ label, value }) => (
+                          <div key={label} className="text-center p-2 rounded-xl" style={{ background: "#0d0d0d" }}>
+                            <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>{value}</p>
+                            <p className="text-[10px] mt-0.5" style={{ color: "#444" }}>{label}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
