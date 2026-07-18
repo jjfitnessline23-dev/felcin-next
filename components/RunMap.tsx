@@ -8,14 +8,39 @@ interface Props {
   currentPos: Coord | null;
   followUser: boolean;
   fullscreen: boolean;
+  completed?: boolean; // true when run is finished — swaps pulsing dot for finish flag
 }
 
-export default function RunMap({ coords, currentPos, followUser, fullscreen }: Props) {
+const START_HTML = `
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+    <div style="width:22px;height:22px;border-radius:50%;background:#fff;border:2.5px solid #22c55e;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.5)">
+      <div style="width:7px;height:7px;border-radius:50%;background:#22c55e"></div>
+    </div>
+    <div style="width:2px;height:8px;background:#22c55e;opacity:0.7"></div>
+  </div>`;
+
+const FINISH_HTML = `
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+    <div style="width:22px;height:22px;border-radius:50%;background:#22c55e;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(34,197,94,0.5);font-size:11px">
+      ✓
+    </div>
+    <div style="width:2px;height:8px;background:#22c55e;opacity:0.7"></div>
+  </div>`;
+
+const GPS_HTML = `
+  <div style="position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px">
+    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(74,222,128,0.25);animation:runPulse 1.8s ease-out infinite"></div>
+    <div style="width:15px;height:15px;border-radius:50%;background:#4ade80;border:2.5px solid #fff;box-shadow:0 0 14px rgba(74,222,128,0.85);position:relative;z-index:1"></div>
+  </div>`;
+
+export default function RunMap({ coords, currentPos, followUser, fullscreen, completed }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const routeRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const startMarkerRef = useRef<any>(null);
+  const currentMarkerRef = useRef<any>(null);
   const hasFlownRef = useRef(false);
+  const prevCompletedRef = useRef(false);
 
   // Mount map once
   useEffect(() => {
@@ -23,8 +48,6 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen }: P
 
     import("leaflet").then((L) => {
       if (!containerRef.current || mapRef.current) return;
-
-      // Leaflet's default icon asset resolution breaks in Next.js — clear it
       // @ts-ignore
       delete L.Icon.Default.prototype._getIconUrl;
 
@@ -35,7 +58,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen }: P
         attributionControl: false,
       });
 
-      // CartoDB dark tiles — Canvas 2D, no WebGL, works in all WKWebView versions
+      // CartoDB dark tiles — Canvas 2D, works in all WKWebView versions
       L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         subdomains: "abcd",
@@ -49,22 +72,25 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen }: P
         mapRef.current.remove();
         mapRef.current = null;
         routeRef.current = null;
-        markerRef.current = null;
+        startMarkerRef.current = null;
+        currentMarkerRef.current = null;
         hasFlownRef.current = false;
+        prevCompletedRef.current = false;
       }
     };
   }, []);
 
-  // Resize when idle/fullscreen toggles
+  // Resize on fullscreen toggle
   useEffect(() => {
     const t = setTimeout(() => mapRef.current?.invalidateSize(), 80);
     return () => clearTimeout(t);
   }, [fullscreen]);
 
-  // Update route polyline
+  // Route polyline + start marker
   useEffect(() => {
     if (!mapRef.current) return;
     import("leaflet").then((L) => {
+      // Route line
       if (routeRef.current) { routeRef.current.remove(); routeRef.current = null; }
       if (coords.length >= 2) {
         routeRef.current = L.polyline(
@@ -72,29 +98,54 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen }: P
           { color: "#4ade80", weight: 5, opacity: 0.95 }
         ).addTo(mapRef.current);
       }
+
+      // Start marker at first GPS point
+      if (coords.length > 0 && !startMarkerRef.current) {
+        const icon = L.divIcon({
+          className: "",
+          html: START_HTML,
+          iconSize: [22, 30],
+          iconAnchor: [11, 30],
+        });
+        startMarkerRef.current = L.marker(
+          [coords[0].lat, coords[0].lng],
+          { icon, zIndexOffset: 10 }
+        ).addTo(mapRef.current);
+      }
     });
   }, [coords]);
 
-  // Update GPS dot + pan/fly
+  // Current position dot (or finish flag when completed)
   useEffect(() => {
     if (!mapRef.current || !currentPos) return;
     import("leaflet").then((L) => {
       if (!mapRef.current) return;
 
-      if (!markerRef.current) {
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px">
-            <div style="position:absolute;inset:0;border-radius:50%;background:rgba(74,222,128,0.25);animation:runPulse 1.8s ease-out infinite"></div>
-            <div style="width:15px;height:15px;border-radius:50%;background:#4ade80;border:2.5px solid #fff;box-shadow:0 0 14px rgba(74,222,128,0.85);position:relative;z-index:1"></div>
-          </div>`,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
-        });
-        markerRef.current = L.marker([currentPos.lat, currentPos.lng], { icon })
-          .addTo(mapRef.current);
+      const justCompleted = completed && !prevCompletedRef.current;
+      prevCompletedRef.current = !!completed;
+
+      if (!currentMarkerRef.current) {
+        const html = completed ? FINISH_HTML : GPS_HTML;
+        const size: [number, number] = completed ? [22, 30] : [34, 34];
+        const anchor: [number, number] = completed ? [11, 30] : [17, 17];
+        const icon = L.divIcon({ className: "", html, iconSize: size, iconAnchor: anchor });
+        currentMarkerRef.current = L.marker(
+          [currentPos.lat, currentPos.lng],
+          { icon, zIndexOffset: 100 }
+        ).addTo(mapRef.current);
       } else {
-        markerRef.current.setLatLng([currentPos.lat, currentPos.lng]);
+        currentMarkerRef.current.setLatLng([currentPos.lat, currentPos.lng]);
+
+        // Swap icon from GPS dot → finish flag when run ends
+        if (justCompleted) {
+          const icon = L.divIcon({
+            className: "",
+            html: FINISH_HTML,
+            iconSize: [22, 30],
+            iconAnchor: [11, 30],
+          });
+          currentMarkerRef.current.setIcon(icon);
+        }
       }
 
       if (!hasFlownRef.current) {
@@ -104,7 +155,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen }: P
         mapRef.current.panTo([currentPos.lat, currentPos.lng], { animate: true, duration: 0.7 });
       }
     });
-  }, [currentPos, followUser]);
+  }, [currentPos, followUser, completed]);
 
   return (
     <>

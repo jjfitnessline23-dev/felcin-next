@@ -504,6 +504,7 @@ export default function RunPage() {
           coords={coords.map(c => ({ lat: c.lat, lng: c.lng }))}
           currentPos={currentPos}
           followUser={phase === "idle" || phase === "running"}
+          completed={phase === "completed"}
           fullscreen={phase !== "idle"}
         />
         {phase === "idle" && (
