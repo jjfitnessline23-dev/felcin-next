@@ -209,16 +209,25 @@ export default function RunPage() {
       return;
     }
 
-    const onPos = (lat: number, lng: number) => {
-      setCurrentPos({ lat, lng });
+    // accuracy = GPS error radius in metres. Skip noisy readings for the route
+    // but still update the map dot (currentPos) so the pin doesn't freeze.
+    const onPos = (lat: number, lng: number, accuracy?: number) => {
+      // Always move the map dot, even on imprecise readings
+      if (accuracy === undefined || accuracy <= 50) {
+        setCurrentPos({ lat, lng });
+      }
+
+      // Only add to the route if the fix is good (≤30 m accuracy, ≥8 m moved)
+      if (accuracy !== undefined && accuracy > 30) return;
+
       setCoords((prev) => {
         if (prev.length === 0) return [{ lat, lng, ts: Date.now() }];
         const last = prev[prev.length - 1];
         const d = haversineDist(last.lat, last.lng, lat, lng);
-        if (d < 4) return prev;
+        if (d < 8) return prev;          // raised from 4 → 8 m to cut GPS jitter
+        if (d > 100) return prev;        // >100 m jump in one tick = bad reading, skip
         distRef.current += d;
         setDistance(distRef.current);
-        // Push live position to Firestore for sharing (throttled)
         writeLivePosition(lat, lng, distRef.current, Math.floor((Date.now() - startTime - pausedMsRef.current) / 1000));
         return [...prev, { lat, lng, ts: Date.now() }];
       });
@@ -229,12 +238,14 @@ export default function RunPage() {
         const { Geolocation } = await import("@capacitor/geolocation");
         const id = await Geolocation.watchPosition(
           { enableHighAccuracy: true },
-          (pos, err) => { if (!err && pos) onPos(pos.coords.latitude, pos.coords.longitude); }
+          (pos, err) => {
+            if (!err && pos) onPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy ?? undefined);
+          }
         );
         runWatchRef.current = id as any;
       } else {
         runWatchRef.current = navigator.geolocation.watchPosition(
-          (pos) => onPos(pos.coords.latitude, pos.coords.longitude),
+          (pos) => onPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
           () => {},
           { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
         ) as any;
