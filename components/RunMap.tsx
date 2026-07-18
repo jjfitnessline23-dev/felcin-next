@@ -44,9 +44,12 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
   const prevCompletedRef = useRef(false);
   const coordsRef = useRef<Coord[]>([]); // latest coords accessible from all effects
 
-  // Mount map once
+  // Mount map once — capture currentPos at mount time so the map starts
+  // at the user's location instead of [0,0] (Africa) and flying in.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
+    const initPos = currentPos; // snapshot from first render
 
     import("leaflet").then((L) => {
       if (!containerRef.current || mapRef.current) return;
@@ -54,8 +57,8 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
       delete L.Icon.Default.prototype._getIconUrl;
 
       const map = L.map(containerRef.current, {
-        center: [0, 0],
-        zoom: 2,
+        center: initPos ? [initPos.lat, initPos.lng] : [0, 0],
+        zoom: initPos ? 17 : 2,
         zoomControl: false,
         attributionControl: false,
       });
@@ -67,6 +70,9 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
       }).addTo(map);
 
       mapRef.current = map;
+
+      // Already centred — skip the fly-to in the currentPos effect
+      if (initPos) hasFlownRef.current = true;
     });
 
     return () => {
