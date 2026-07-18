@@ -57,8 +57,9 @@ export default function RunPage() {
   // Location
   const [locState, setLocState] = useState<LocState>("prompt");
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
-  const idleWatchRef = useRef<number | null>(null);
+  const idleWatchRef = useRef<any>(null);
   const [waitSecs, setWaitSecs] = useState(0);
+  const enablingRef = useRef(false); // prevent double-tap
 
   useEffect(() => {
     if (locState !== "waiting") { setWaitSecs(0); return; }
@@ -66,12 +67,24 @@ export default function RunPage() {
     return () => clearInterval(id);
   }, [locState]);
 
-  // On mount: if permission is already granted, skip the gate entirely
+  // On mount: check if permission is already granted/denied and act immediately
   useEffect(() => {
-    navigator.permissions?.query({ name: "geolocation" as PermissionName }).then(r => {
-      if (r.state === "granted") enableLocation();
-      if (r.state === "denied") setLocState("denied");
-    }).catch(() => {});
+    (async () => {
+      if (isNative) {
+        try {
+          const { Geolocation } = await import("@capacitor/geolocation");
+          const status = await Geolocation.checkPermissions();
+          if (status.location === "granted") enableLocation();
+          else if (status.location === "denied") setLocState("denied");
+          // "prompt" = not yet asked, show the Enable button
+        } catch { /* plugin unavailable, show Enable button */ }
+      } else {
+        navigator.permissions?.query({ name: "geolocation" as PermissionName }).then(r => {
+          if (r.state === "granted") enableLocation();
+          if (r.state === "denied") setLocState("denied");
+        }).catch(() => {});
+      }
+    })();
   }, []);
 
   // Phase
@@ -105,31 +118,29 @@ export default function RunPage() {
   const isNative = Capacitor.isNativePlatform();
 
   const enableLocation = async () => {
+    if (enablingRef.current) return;
+    enablingRef.current = true;
     setLocState("waiting");
     try {
       if (isNative) {
-        // Native: request permission via Capacitor (shows proper iOS "While Using" dialog)
         const { Geolocation } = await import("@capacitor/geolocation");
+        // Request permission — iOS shows "Allow While Using App" dialog here.
+        // This awaits the user's response; no timeout needed.
         const perm = await Geolocation.requestPermissions();
-        if (perm.location === "denied") { setLocState("denied"); return; }
+        if (perm.location === "denied") { setLocState("denied"); enablingRef.current = false; return; }
 
-        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 });
+        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000 });
         setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocState("granted");
 
-        // Start live watch via Capacitor
         if (idleWatchRef.current === null) {
-          const watchId = await Geolocation.watchPosition(
+          idleWatchRef.current = await Geolocation.watchPosition(
             { enableHighAccuracy: false },
-            (pos, err) => {
-              if (err || !pos) return;
-              setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-            }
+            (p, err) => { if (!err && p) setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }); }
           );
-          (idleWatchRef as any).current = watchId;
         }
       } else {
-        // Web: use navigator.geolocation
+        // Web: navigator.geolocation is callback-based, no first-class await
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -139,17 +150,20 @@ export default function RunPage() {
                 (p) => setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
                 () => {},
                 { enableHighAccuracy: false, maximumAge: 5000, timeout: 30000 }
-              ) as any;
+              );
             }
+            enablingRef.current = false;
           },
-          (err) => setLocState(err.code === 1 ? "denied" : "prompt"),
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }
+          (err) => { setLocState(err.code === 1 ? "denied" : "prompt"); enablingRef.current = false; },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 }
         );
+        return; // web path resolves via callbacks
       }
     } catch (e) {
       console.error("Location error:", e);
       setLocState("denied");
     }
+    enablingRef.current = false;
   };
 
   // Clean up watches on unmount
@@ -408,8 +422,9 @@ export default function RunPage() {
           </span>
         </div>
 
-        {/* Blocked or no-popup-after-5s → same fix screen */}
-        {(locState === "denied" || (locState === "waiting" && waitSecs >= 5)) && (
+        {/* Blocked or web-timeout → settings screen. On native, requestPermissions() awaits the dialog
+            so waitSecs never controls the UI; only show settings on native when explicitly denied. */}
+        {(locState === "denied" || (locState === "waiting" && !isNative && waitSecs >= 30)) && (
           <>
             <h2 style={{ fontSize: 21, fontWeight: 800, color: "#f2f2f2", marginBottom: 8 }}>Allow Location Access</h2>
             <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6, maxWidth: 290, marginBottom: 24 }}>
@@ -442,15 +457,15 @@ export default function RunPage() {
               {isNative ? "Open Felcin Settings" : "Done — Reload Page"}
             </button>
             {isNative && (
-              <button onClick={() => { setLocState("prompt"); }} style={{ background: "none", border: "none", color: "#555", fontSize: 13, cursor: "pointer", padding: "8px 0" }}>
+              <button onClick={() => { enablingRef.current = false; enableLocation(); }} style={{ background: "none", border: "none", color: "#555", fontSize: 13, cursor: "pointer", padding: "8px 0" }}>
                 I've enabled it — try again
               </button>
             )}
           </>
         )}
 
-        {/* Waiting ≤ 5s */}
-        {locState === "waiting" && waitSecs < 5 && (
+        {/* Waiting — native: always show (requestPermissions awaits dialog + GPS fix); web: show until 30s */}
+        {locState === "waiting" && (isNative || waitSecs < 30) && (
           <>
             <h2 style={{ fontSize: 21, fontWeight: 800, color: "#f2f2f2", marginBottom: 10 }}>Waiting for permission…</h2>
             <p style={{ fontSize: 13, color: "#555", lineHeight: 1.65, maxWidth: 280 }}>
