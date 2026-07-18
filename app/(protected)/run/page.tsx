@@ -19,6 +19,7 @@ interface Coord { lat: number; lng: number; ts: number }
 interface RunRoute {
   id: string; name: string; distance: number; duration: number;
   avgPace: number; date: any; isDistancePR: boolean; isPacePR: boolean;
+  coordinates?: { lat: number; lng: number }[];
 }
 type Phase = "idle" | "countdown" | "running" | "paused" | "completed";
 type LocState = "prompt" | "waiting" | "granted" | "denied";
@@ -106,6 +107,7 @@ export default function RunPage() {
   const [runs, setRuns] = useState<RunRoute[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
+  const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
 
   // Live sharing
   const [isSharing, setIsSharing] = useState(false);
@@ -606,6 +608,69 @@ export default function RunPage() {
         </div>
       )}
 
+      {/* RUN DETAIL OVERLAY */}
+      {expandedRun && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "#090909", display: "flex", flexDirection: "column" }}>
+          {/* Map */}
+          <div style={{ position: "relative", flexShrink: 0, height: "52dvh" }}>
+            {(expandedRun.coordinates?.length ?? 0) > 0 ? (
+              <RunMap
+                coords={expandedRun.coordinates!.map(c => ({ lat: c.lat, lng: c.lng }))}
+                currentPos={{ lat: expandedRun.coordinates![expandedRun.coordinates!.length - 1].lat, lng: expandedRun.coordinates![expandedRun.coordinates!.length - 1].lng }}
+                followUser={false}
+                fullscreen={false}
+                completed={true}
+              />
+            ) : (
+              <div style={{ width: "100%", height: "100%", background: "#0d0d0d", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <p style={{ fontSize: 13, color: "#333" }}>No route data</p>
+              </div>
+            )}
+            {/* Back button */}
+            <button
+              onClick={() => setExpandedRun(null)}
+              style={{ position: "absolute", top: "calc(env(safe-area-inset-top,0px) + 14px)", left: 16, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(8px)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+            </button>
+          </div>
+
+          {/* Stats */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 20px)" }}>
+            {/* Name + date + badges */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                <span style={{ fontSize: 20, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-0.4px" }}>{expandedRun.name || "Run"}</span>
+                {expandedRun.isDistancePR && <span style={{ fontSize: 10, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(251,191,36,0.25)" }}>DIST PR</span>}
+                {expandedRun.isPacePR && <span style={{ fontSize: 10, fontWeight: 800, color: "#a78bfa", background: "rgba(167,139,250,0.1)", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(167,139,250,0.25)" }}>PACE PR</span>}
+              </div>
+              <p style={{ fontSize: 13, color: "#555" }}>{formatDate(expandedRun.date)}</p>
+            </div>
+
+            {/* Stats grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+              {[
+                { label: "KM", value: (expandedRun.distance / 1000).toFixed(2) },
+                { label: "TIME", value: formatTime(expandedRun.duration) },
+                { label: "PACE", value: `${formatPace(expandedRun.avgPace)}/km` },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ background: "#131313", borderRadius: 14, padding: "14px 10px", textAlign: "center", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#f2f2f2", lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 9, color: "#444", fontWeight: 700, letterSpacing: "0.1em", marginTop: 5 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* GPS points */}
+            {(expandedRun.coordinates?.length ?? 0) > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "#131313", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#333" }}>route</span>
+                <span style={{ fontSize: 12, color: "#444" }}>{expandedRun.coordinates!.length} GPS points recorded</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* IDLE CONTENT */}
       {phase === "idle" && (
         <div style={{ position: "relative", zIndex: 1, padding: "12px 16px 48px" }}>
@@ -637,7 +702,7 @@ export default function RunPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {runs.map(run => <RunCard key={run.id} run={run} />)}
+                {runs.map(run => <RunCard key={run.id} run={run} onTap={() => setExpandedRun(run)} />)}
               </div>
             )}
           </div>
@@ -647,12 +712,12 @@ export default function RunPage() {
   );
 }
 
-function RunCard({ run }: { run: RunRoute }) {
+function RunCard({ run, onTap }: { run: RunRoute; onTap?: () => void }) {
   const hasPR = run.isDistancePR || run.isPacePR;
   const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const fmtP = (s: number) => (!s || !isFinite(s) || s <= 0) ? "--:--" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   return (
-    <div style={{ background: "#131313", borderRadius: 16, padding: "14px 16px", border: hasPR ? "1px solid rgba(251,191,36,0.18)" : "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 14 }}>
+    <div onClick={onTap} style={{ background: "#131313", borderRadius: 16, padding: "14px 16px", border: hasPR ? "1px solid rgba(251,191,36,0.18)" : "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 14, cursor: onTap ? "pointer" : "default", WebkitTapHighlightColor: "transparent" }}>
       <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: "rgba(34,197,94,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
       </div>
