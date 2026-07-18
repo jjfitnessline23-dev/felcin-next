@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import FelcinLogo from "@/components/FelcinLogo";
 import { useAuth } from "@/lib/auth";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
@@ -506,7 +507,12 @@ export default function RunPage() {
           fullscreen={phase !== "idle"}
         />
         {phase === "idle" && (
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: "linear-gradient(to bottom, transparent, #090909)", pointerEvents: "none" }} />
+          <>
+            <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top,0px) + 14px)", left: 16, zIndex: 2, pointerEvents: "none", opacity: 0.85 }}>
+              <FelcinLogo size={36} />
+            </div>
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: "linear-gradient(to bottom, transparent, #090909)", pointerEvents: "none" }} />
+          </>
         )}
       </div>
 
