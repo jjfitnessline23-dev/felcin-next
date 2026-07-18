@@ -8,7 +8,8 @@ interface Props {
   currentPos: Coord | null;
   followUser: boolean;
   fullscreen: boolean;
-  completed?: boolean; // true when run is finished — swaps pulsing dot for finish flag
+  completed?: boolean;
+  matchedCoords?: Coord[]; // road-snapped route from Valhalla; falls back to coords if null
 }
 
 const START_HTML = `
@@ -33,7 +34,7 @@ const GPS_HTML = `
     <div style="width:15px;height:15px;border-radius:50%;background:#4ade80;border:2.5px solid #fff;box-shadow:0 0 14px rgba(74,222,128,0.85);position:relative;z-index:1"></div>
   </div>`;
 
-export default function RunMap({ coords, currentPos, followUser, fullscreen, completed }: Props) {
+export default function RunMap({ coords, currentPos, followUser, fullscreen, completed, matchedCoords }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const routeRef = useRef<any>(null);
@@ -88,15 +89,18 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
   }, [fullscreen]);
 
   // Route polyline + start marker
+  // Use road-snapped coords if available, raw GPS as fallback
+  const displayCoords = matchedCoords && matchedCoords.length >= 2 ? matchedCoords : coords;
+
   useEffect(() => {
     coordsRef.current = coords;
     if (!mapRef.current) return;
     import("leaflet").then((L) => {
-      // Route line
+      // Route line — prefer matched (road-snapped) over raw GPS
       if (routeRef.current) { routeRef.current.remove(); routeRef.current = null; }
-      if (coords.length >= 2) {
+      if (displayCoords.length >= 2) {
         routeRef.current = L.polyline(
-          coords.map(c => [c.lat, c.lng] as [number, number]),
+          displayCoords.map(c => [c.lat, c.lng] as [number, number]),
           { color: "#4ade80", weight: 5, opacity: 0.95 }
         ).addTo(mapRef.current);
       }
@@ -115,7 +119,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         ).addTo(mapRef.current);
       }
     });
-  }, [coords]);
+  }, [coords, matchedCoords]); // eslint-disable-line
 
   // Current position dot (or finish flag when completed)
   useEffect(() => {
@@ -150,9 +154,9 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         }
       }
 
-      if (justCompleted && coordsRef.current.length > 1) {
-        // Zoom out to show the full route — start to finish
-        const bounds = L.latLngBounds(coordsRef.current.map(c => [c.lat, c.lng] as [number, number]));
+      const fitSrc = matchedCoords && matchedCoords.length > 1 ? matchedCoords : coordsRef.current;
+      if (justCompleted && fitSrc.length > 1) {
+        const bounds = L.latLngBounds(fitSrc.map(c => [c.lat, c.lng] as [number, number]));
         mapRef.current.fitBounds(bounds, { padding: [60, 40], animate: true, duration: 0.9 });
       } else if (!hasFlownRef.current) {
         hasFlownRef.current = true;

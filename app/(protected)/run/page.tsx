@@ -6,6 +6,7 @@ import FelcinLogo from "@/components/FelcinLogo";
 import { useAuth } from "@/lib/auth";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
+import { snapToRoads } from "@/lib/mapMatch";
 import { Capacitor } from "@capacitor/core";
 
 const RunMap = dynamic(() => import("@/components/RunMap"), {
@@ -108,6 +109,8 @@ export default function RunPage() {
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
   const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
+  const [matchedCoords, setMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
+  const [detailMatchedCoords, setDetailMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
 
   // Live sharing
   const [isSharing, setIsSharing] = useState(false);
@@ -300,6 +303,19 @@ export default function RunPage() {
     const id = setInterval(() => setElapsed(Math.floor((Date.now() - startTime - pausedMsRef.current) / 1000)), 1000);
     return () => clearInterval(id);
   }, [phase, startTime]);
+
+  // Road-snap when run ends
+  useEffect(() => {
+    if (phase !== "completed" || coords.length < 2) { setMatchedCoords(null); return; }
+    snapToRoads(coords.map(c => ({ lat: c.lat, lng: c.lng }))).then(m => { if (m) setMatchedCoords(m); }).catch(() => {});
+  }, [phase]); // eslint-disable-line
+
+  // Road-snap when a historical run detail opens
+  useEffect(() => {
+    setDetailMatchedCoords(null);
+    if (!expandedRun?.coordinates?.length) return;
+    snapToRoads(expandedRun.coordinates).then(m => { if (m) setDetailMatchedCoords(m); }).catch(() => {});
+  }, [expandedRun?.id]); // eslint-disable-line
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -518,6 +534,7 @@ export default function RunPage() {
           currentPos={currentPos}
           followUser={phase === "idle" || phase === "running"}
           completed={phase === "completed"}
+          matchedCoords={matchedCoords ?? undefined}
           fullscreen={phase !== "idle"}
         />
         {phase === "idle" && (
@@ -631,6 +648,7 @@ export default function RunPage() {
                 followUser={false}
                 fullscreen={false}
                 completed={true}
+                matchedCoords={detailMatchedCoords ?? undefined}
               />
             ) : (
               <div style={{ width: "100%", height: "100%", background: "#0d0d0d", display: "flex", alignItems: "center", justifyContent: "center" }}>
