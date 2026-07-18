@@ -24,11 +24,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      // On Capacitor, loading starts false — give onAuthStateChanged 800ms to
-      // fire from localStorage before redirecting. Prevents flash to login page.
-      const delay = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" ? 800 : 0;
-      const t = setTimeout(() => router.replace("/login"), delay);
-      return () => clearTimeout(t);
+      router.replace("/login");
+      return;
     }
     if (banned) {
       signOut().then(() => router.replace("/login?banned=1"));

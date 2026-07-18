@@ -12,24 +12,6 @@ const firebaseConfig = {
   appId: "1:989891719192:web:1266786c201c87f4c8536d",
 };
 
-// Block IndexedDB on Capacitor iOS before Firebase initializes.
-// @firebase/app's heartbeat service calls idb.openDB() on every initializeApp().
-// On iOS WKWebView with network active, any indexedDB.open() call triggers a WebKit
-// bug that deadlocks ALL JS async callbacks (setTimeout, Promises, onAuthStateChanged).
-// Firebase handles the absence of IndexedDB gracefully — heartbeat logs a warning and
-// continues. Everything else (auth, firestore via memoryLocalCache/native plugin) is unaffected.
-if (process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" && typeof window !== "undefined") {
-  // Object.defineProperty on window.indexedDB silently fails on WKWebView (non-configurable).
-  // Patching IDBFactory.prototype.open works regardless — it intercepts at the method level.
-  try {
-    if (window.IDBFactory) {
-      (window.IDBFactory.prototype as any).open = function () {
-        throw new DOMException("IndexedDB blocked on Capacitor", "SecurityError");
-      };
-    }
-  } catch {}
-}
-
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 function detectCapacitor(): boolean {

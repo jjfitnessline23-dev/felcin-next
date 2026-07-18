@@ -15,12 +15,8 @@
 import * as fs from "firebase/firestore";
 import { db as _db } from "@/lib/firebase";
 
-// Always use the web Firestore SDK. The native @capacitor-firebase/firestore
-// plugin was intended to avoid the iOS WKWebView IDB deadlock, but the IDB
-// issue is now fixed at the build level (idb no-op + Firebase Auth patch).
-// The native plugin's gRPC connection hangs on first load; web SDK with
-// memoryLocalCache is reliable and needs no native bridge.
-const IS_CAP = false;
+// Baked as a compile-time constant by Next.js — tree-shakes the unused branch.
+const IS_CAP = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
 // ─── Exported db instance (still needed as first arg to doc/collection) ───────
 export const db = _db;
