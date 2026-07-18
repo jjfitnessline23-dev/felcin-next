@@ -68,10 +68,12 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         attributionControl: false,
       });
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-        subdomains: "abcd",
-      }).addTo(map);
+      // MapTiler streets-v2-dark — full street name labels at every zoom level
+      const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
+      L.tileLayer(
+        `https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}.png?key=${maptilerKey}`,
+        { maxZoom: 20, tileSize: 256, attribution: "" }
+      ).addTo(map);
 
       mapRef.current = map;
       if (initPos) hasFlownRef.current = true;
@@ -189,7 +191,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
           0%   { transform: scale(1);   opacity: 0.6; }
           100% { transform: scale(2.8); opacity: 0; }
         }
-        .leaflet-container { background: #0a0a0a !important; }
+        .leaflet-container { background: #1a1a2e !important; }
         .leaflet-grab { cursor: default; }
         .leaflet-dragging .leaflet-grab { cursor: grabbing; }
       `}</style>
