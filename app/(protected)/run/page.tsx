@@ -411,16 +411,16 @@ export default function RunPage() {
         {/* Blocked or no-popup-after-5s → same fix screen */}
         {(locState === "denied" || (locState === "waiting" && waitSecs >= 5)) && (
           <>
-            <h2 style={{ fontSize: 21, fontWeight: 800, color: "#f2f2f2", marginBottom: 8 }}>Enable Location in Settings</h2>
+            <h2 style={{ fontSize: 21, fontWeight: 800, color: "#f2f2f2", marginBottom: 8 }}>Allow Location Access</h2>
             <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6, maxWidth: 290, marginBottom: 24 }}>
-              Your browser has location blocked for this site. Fix it in 3 taps:
+              Felcin needs location to track your run. Enable it in 3 taps:
             </p>
 
             <div style={{ width: "100%", maxWidth: 320, background: "#131313", borderRadius: 18, padding: "18px 18px", marginBottom: 24, textAlign: "left", border: "1px solid rgba(255,255,255,0.07)" }}>
               {[
                 { n: 1, text: "Open iPhone Settings" },
-                { n: 2, text: "Privacy & Security → Location Services" },
-                { n: 3, text: "Tap Safari (or Chrome) → set to While Using" },
+                { n: 2, text: 'Scroll down and tap "Felcin"' },
+                { n: 3, text: 'Tap Location → select "While Using"' },
               ].map(({ n, text }) => (
                 <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: n < 3 ? 14 : 0 }}>
                   <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#22c55e", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{n}</div>
@@ -429,9 +429,23 @@ export default function RunPage() {
               ))}
             </div>
 
-            <button onClick={() => window.location.reload()} style={{ width: "100%", maxWidth: 320, padding: "16px 0", borderRadius: 16, border: "none", background: "#22c55e", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 20px rgba(34,197,94,0.25)" }}>
-              Done — Reload Page
+            {/* Deep-link to app settings on native, fallback reload on web */}
+            <button
+              onClick={() => {
+                if (isNative) {
+                  window.open("app-settings:", "_system");
+                } else {
+                  window.location.reload();
+                }
+              }}
+              style={{ width: "100%", maxWidth: 320, padding: "16px 0", borderRadius: 16, border: "none", background: "#22c55e", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 20px rgba(34,197,94,0.25)", marginBottom: 12 }}>
+              {isNative ? "Open Felcin Settings" : "Done — Reload Page"}
             </button>
+            {isNative && (
+              <button onClick={() => { setLocState("prompt"); }} style={{ background: "none", border: "none", color: "#555", fontSize: 13, cursor: "pointer", padding: "8px 0" }}>
+                I've enabled it — try again
+              </button>
+            )}
           </>
         )}
 
