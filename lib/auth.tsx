@@ -61,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? ({
             uid: rawUser.uid,
             email: rawUser.email ?? null,
+            emailVerified: (rawUser as any).emailVerified ?? false,
             displayName: rawUser.displayName ?? null,
             photoURL: rawUser.photoURL ?? rawUser.photoUrl ?? null,
             phoneNumber: rawUser.phoneNumber ?? null,
