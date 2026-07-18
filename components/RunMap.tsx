@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 
 interface Coord { lat: number; lng: number }
 interface Props {
@@ -9,11 +9,11 @@ interface Props {
   followUser: boolean;
   fullscreen: boolean;
   completed?: boolean;
-  matchedCoords?: Coord[]; // road-snapped route from Valhalla; falls back to coords if null
+  matchedCoords?: Coord[];
 }
 
 const START_HTML = `
-  <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+  <div style="display:flex;flex-direction:column;align-items:center">
     <div style="width:22px;height:22px;border-radius:50%;background:#fff;border:2.5px solid #22c55e;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.5)">
       <div style="width:7px;height:7px;border-radius:50%;background:#22c55e"></div>
     </div>
@@ -21,7 +21,7 @@ const START_HTML = `
   </div>`;
 
 const FINISH_HTML = `
-  <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+  <div style="display:flex;flex-direction:column;align-items:center">
     <div style="width:22px;height:22px;border-radius:50%;background:#22c55e;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(34,197,94,0.5);font-size:11px">
       ✓
     </div>
@@ -42,14 +42,19 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
   const currentMarkerRef = useRef<any>(null);
   const hasFlownRef = useRef(false);
   const prevCompletedRef = useRef(false);
-  const coordsRef = useRef<Coord[]>([]); // latest coords accessible from all effects
+  const coordsRef = useRef<Coord[]>([]);
 
-  // Mount map once — capture currentPos at mount time so the map starts
-  // at the user's location instead of [0,0] (Africa) and flying in.
+  // Becomes true once Leaflet has initialised — re-triggers all dependent effects
+  const [mapInit, setMapInit] = useState(false);
+  // Stays true until the map is centred on the user — hides the [0,0] Africa flash
+  const [mapCover, setMapCover] = useState(true);
+
+  // ── Mount: initialise Leaflet at the user's current position ─────────────
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const initPos = currentPos; // snapshot from first render
+    // Snapshot the position NOW so we start the map there, not at [0,0] (Africa)
+    const initPos = currentPos;
 
     import("leaflet").then((L) => {
       if (!containerRef.current || mapRef.current) return;
@@ -63,16 +68,16 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         attributionControl: false,
       });
 
-      // CartoDB dark tiles — Canvas 2D, works in all WKWebView versions
       L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         subdomains: "abcd",
       }).addTo(map);
 
       mapRef.current = map;
-
-      // Already centred — skip the fly-to in the currentPos effect
       if (initPos) hasFlownRef.current = true;
+
+      // Signal all dependent effects to run now that the map is ready
+      setMapInit(true);
     });
 
     return () => {
@@ -86,23 +91,25 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         prevCompletedRef.current = false;
       }
     };
-  }, []);
+  }, []); // eslint-disable-line
 
-  // Resize on fullscreen toggle
+  // ── Resize on fullscreen toggle ───────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => mapRef.current?.invalidateSize(), 80);
     return () => clearTimeout(t);
   }, [fullscreen]);
 
-  // Route polyline + start marker
-  // Use road-snapped coords if available, raw GPS as fallback
+  // ── Route polyline + start marker ─────────────────────────────────────────
   const displayCoords = matchedCoords && matchedCoords.length >= 2 ? matchedCoords : coords;
 
   useEffect(() => {
     coordsRef.current = coords;
-    if (!mapRef.current) return;
+    if (!mapRef.current || !mapInit) return;
+
     import("leaflet").then((L) => {
-      // Route line — prefer matched (road-snapped) over raw GPS
+      if (!mapRef.current) return;
+
+      // Route line
       if (routeRef.current) { routeRef.current.remove(); routeRef.current = null; }
       if (displayCoords.length >= 2) {
         routeRef.current = L.polyline(
@@ -125,17 +132,19 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         ).addTo(mapRef.current);
       }
     });
-  }, [coords, matchedCoords]); // eslint-disable-line
+  }, [coords, matchedCoords, mapInit]); // eslint-disable-line
 
-  // Current position dot (or finish flag when completed)
+  // ── Current position dot / finish flag + camera ───────────────────────────
   useEffect(() => {
-    if (!mapRef.current || !currentPos) return;
+    if (!mapRef.current || !currentPos || !mapInit) return;
+
     import("leaflet").then((L) => {
       if (!mapRef.current) return;
 
       const justCompleted = completed && !prevCompletedRef.current;
       prevCompletedRef.current = !!completed;
 
+      // Create or update the position marker
       if (!currentMarkerRef.current) {
         const html = completed ? FINISH_HTML : GPS_HTML;
         const size: [number, number] = completed ? [22, 30] : [34, 34];
@@ -147,31 +156,30 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         ).addTo(mapRef.current);
       } else {
         currentMarkerRef.current.setLatLng([currentPos.lat, currentPos.lng]);
-
-        // Swap icon from GPS dot → finish flag when run ends
         if (justCompleted) {
-          const icon = L.divIcon({
-            className: "",
-            html: FINISH_HTML,
-            iconSize: [22, 30],
-            iconAnchor: [11, 30],
-          });
+          const icon = L.divIcon({ className: "", html: FINISH_HTML, iconSize: [22, 30], iconAnchor: [11, 30] });
           currentMarkerRef.current.setIcon(icon);
         }
       }
 
+      // Camera
       const fitSrc = matchedCoords && matchedCoords.length > 1 ? matchedCoords : coordsRef.current;
       if (justCompleted && fitSrc.length > 1) {
         const bounds = L.latLngBounds(fitSrc.map(c => [c.lat, c.lng] as [number, number]));
         mapRef.current.fitBounds(bounds, { padding: [60, 40], animate: true, duration: 0.9 });
+        setMapCover(false);
       } else if (!hasFlownRef.current) {
         hasFlownRef.current = true;
-        mapRef.current.setView([currentPos.lat, currentPos.lng], 17, { animate: true, duration: 1 });
+        mapRef.current.setView([currentPos.lat, currentPos.lng], 17, { animate: false });
+        setMapCover(false);
       } else if (followUser) {
         mapRef.current.panTo([currentPos.lat, currentPos.lng], { animate: true, duration: 0.7 });
+        setMapCover(false);
+      } else {
+        setMapCover(false);
       }
     });
-  }, [currentPos, followUser, completed]);
+  }, [currentPos, followUser, completed, matchedCoords, mapInit]); // eslint-disable-line
 
   return (
     <>
@@ -185,7 +193,17 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         .leaflet-grab { cursor: default; }
         .leaflet-dragging .leaflet-grab { cursor: grabbing; }
       `}</style>
-      <div ref={containerRef} style={{ width: "100%", height: "100%", background: "#0a0a0a" }} />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+        {/* Dark cover hides the [0,0] Africa flash until the map is centred */}
+        {mapCover && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 1000,
+            background: "#0a0a0a",
+            pointerEvents: "none",
+          }} />
+        )}
+      </div>
     </>
   );
 }
