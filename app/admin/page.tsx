@@ -125,6 +125,7 @@ export default function AdminPortalPage() {
   const [runRoutes, setRunRoutes] = useState<AdminRunRoute[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [runsLoaded, setRunsLoaded] = useState(false);
+  const [runsError, setRunsError] = useState<string | null>(null);
   const [botLogs, setBotLogs] = useState<{ scanned: number; violations: number; bans: { "7d": number; "30d": number; permanent: number }; runAt: { seconds: number } }[]>([]);
   const [stripeStats, setStripeStats] = useState<{
     today: { revenue: number; count: number };
@@ -242,16 +243,22 @@ export default function AdminPortalPage() {
     if (loadingRuns) return;
     setLoadingRuns(true);
     setRunRoutes([]);
+    setRunsError(null);
     getDocs(query(collectionGroup(db, "runningRoutes"), limit(500)))
       .then((snap) => {
         const all: AdminRunRoute[] = snap.docs.map((d) => {
           const data = d.data();
-          const userId = d.ref.parent.parent?.id ?? "";
+          // For web SDK snapshots, extract userId from the doc path: users/{userId}/runningRoutes/{docId}
+          const ref = (d as any).ref;
+          const userId = ref?.parent?.parent?.id ?? ref?.path?.split("/")?.[1] ?? "";
           return { id: d.id, userId, name: data.name, distance: data.distance || 0, duration: data.duration || 0, avgPace: data.avgPace || 0, date: data.date, isDistancePR: data.isDistancePR, isPacePR: data.isPacePR, coordinates: data.coordinates || [] };
         }).sort((a, b) => (b.date?.seconds ?? 0) - (a.date?.seconds ?? 0));
         setRunRoutes(all);
       })
-      .catch((err) => console.error("runningRoutes collectionGroup error:", err))
+      .catch((err) => {
+        console.error("runningRoutes collectionGroup error:", err);
+        setRunsError(err?.code === "permission-denied" ? "Permission denied — check Firestore rules for runningRoutes collectionGroup." : String(err?.message || err));
+      })
       .finally(() => { setLoadingRuns(false); setRunsLoaded(true); });
   };
 
@@ -1003,10 +1010,21 @@ export default function AdminPortalPage() {
               );
             })()}
 
-            {loadingRuns ? (
+            {runsError && (
+              <div className="p-4 rounded-xl" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <p className="text-sm font-semibold mb-1" style={{ color: "#f87171" }}>Query error</p>
+                <p className="text-xs" style={{ color: "#f87171", opacity: 0.7 }}>{runsError}</p>
+              </div>
+            )}
+
+            {(loadingRuns || !runsLoaded) ? (
               <div className="flex justify-center py-10"><div className="spinner" /></div>
             ) : runRoutes.length === 0 ? (
-              <p className="text-center py-10" style={{ color: "#555" }}>No runs recorded yet</p>
+              <div className="text-center py-10">
+                <span className="material-symbols-outlined" style={{ fontSize: 44, display: "block", color: "#1e1e1e", marginBottom: 10 }}>directions_run</span>
+                <p className="text-sm font-semibold" style={{ color: "#444" }}>No runs recorded yet</p>
+                <p className="text-xs mt-2" style={{ color: "#333" }}>Go to /run on the app, complete a run and tap Save — it will appear here.</p>
+              </div>
             ) : (
               <>
                 <p className="text-xs" style={{ color: "#444" }}>{runRoutes.length} runs · most recent first</p>
