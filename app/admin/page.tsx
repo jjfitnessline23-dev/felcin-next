@@ -19,7 +19,25 @@ interface Report { id: string; postId?: string; reelId?: string; authorId?: stri
 interface GhostWorkout { id: string; hostId: string; hostName?: string; hostPhoto?: string; title: string; description?: string; exercises?: { name: string; duration: number }[]; sessionCount?: number; isPPV?: boolean; price?: number; createdAt?: { seconds: number }; }
 interface GhostSession { id: string; userId: string; userName?: string; userPhoto?: string; exercisesCount?: number; totalDurationSecs?: number; completedAt?: { seconds: number }; }
 interface AdminWorkoutLog { id: string; userId: string; date?: { seconds: number }; exercises: { name: string; sets: { reps: number; weight: number }[]; equipment?: string }[]; notes?: string; durationMins?: number; }
-interface AdminRunRoute { id: string; userId: string; name?: string; distance: number; duration: number; avgPace: number; date?: { seconds: number }; isDistancePR?: boolean; isPacePR?: boolean; }
+interface AdminRunRoute { id: string; userId: string; name?: string; distance: number; duration: number; avgPace: number; date?: { seconds: number }; isDistancePR?: boolean; isPacePR?: boolean; coordinates?: { lat: number; lng: number }[]; }
+
+function MiniRoute({ coords }: { coords?: { lat: number; lng: number }[] }) {
+  if (!coords || coords.length < 2) return <div style={{ width: 80, height: 44, borderRadius: 8, background: "#0d0d0d", flexShrink: 0 }} />;
+  const step = Math.max(1, Math.floor(coords.length / 120));
+  const pts = coords.filter((_, i) => i % step === 0);
+  const lats = pts.map(c => c.lat), lngs = pts.map(c => c.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const W = 80, H = 44, pad = 5;
+  const sx = (lng: number) => pad + ((lng - minLng) / (maxLng - minLng || 0.0001)) * (W - pad * 2);
+  const sy = (lat: number) => H - pad - ((lat - minLat) / (maxLat - minLat || 0.0001)) * (H - pad * 2);
+  const d = pts.map((c, i) => `${i === 0 ? "M" : "L"}${sx(c.lng).toFixed(1)},${sy(c.lat).toFixed(1)}`).join(" ");
+  return (
+    <svg width={W} height={H} style={{ flexShrink: 0, borderRadius: 8, background: "#0d0d0d" }}>
+      <path d={d} fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+    </svg>
+  );
+}
 
 type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts" | "runs" | "marketing";
 
@@ -229,7 +247,7 @@ export default function AdminPortalPage() {
         const all: AdminRunRoute[] = snap.docs.map((d) => {
           const data = d.data();
           const userId = d.ref.parent.parent?.id ?? "";
-          return { id: d.id, userId, name: data.name, distance: data.distance || 0, duration: data.duration || 0, avgPace: data.avgPace || 0, date: data.date, isDistancePR: data.isDistancePR, isPacePR: data.isPacePR };
+          return { id: d.id, userId, name: data.name, distance: data.distance || 0, duration: data.duration || 0, avgPace: data.avgPace || 0, date: data.date, isDistancePR: data.isDistancePR, isPacePR: data.isPacePR, coordinates: data.coordinates || [] };
         }).sort((a, b) => (b.date?.seconds ?? 0) - (a.date?.seconds ?? 0));
         setRunRoutes(all);
       })
@@ -997,35 +1015,53 @@ export default function AdminPortalPage() {
                   const userName = userRecord?.displayName || run.userId.slice(0, 10) + "…";
                   const userPhoto = userRecord?.photoURL;
                   const km = (run.distance / 1000).toFixed(2);
-                  const mins = Math.floor(run.duration / 60);
-                  const secs = run.duration % 60;
-                  const timeStr = mins >= 60
-                    ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, "0")}:${String(Math.floor(secs)).padStart(2, "0")}`
-                    : `${mins}:${String(Math.floor(secs)).padStart(2, "0")}`;
+                  const totalSecs = Math.floor(run.duration);
+                  const h = Math.floor(totalSecs / 3600);
+                  const m = Math.floor((totalSecs % 3600) / 60);
+                  const s = totalSecs % 60;
+                  const timeStr = h > 0
+                    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+                    : `${m}:${String(s).padStart(2, "0")}`;
                   const paceStr = run.avgPace > 0 && isFinite(run.avgPace)
                     ? `${Math.floor(run.avgPace / 60)}:${String(Math.floor(run.avgPace % 60)).padStart(2, "0")}/km`
                     : "--";
                   const hasPR = run.isDistancePR || run.isPacePR;
+                  const runDate = run.date ? new Date(run.date.seconds * 1000) : null;
+                  const gpsPoints = run.coordinates?.length ?? 0;
                   return (
                     <div key={run.id} className="p-4 rounded-xl"
                       style={{ background: "#131313", border: `1px solid ${hasPR ? "rgba(251,191,36,0.2)" : "rgba(255,255,255,0.07)"}` }}>
-                      <div className="flex items-center gap-2.5 mb-3">
-                        {userPhoto
-                          ? <img src={userPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
-                          : <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ width: 32, height: 32, background: "#222", color: "#666" }}>{userName.charAt(0).toUpperCase()}</div>}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{userName}</p>
-                            {run.isDistancePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(251,191,36,0.22)" }}>DIST PR</span>}
-                            {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#a78bfa", background: "rgba(167,139,250,0.1)", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(167,139,250,0.22)" }}>PACE PR</span>}
+                      {/* Header: user + route preview */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          {userPhoto
+                            ? <img src={userPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
+                            : <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ width: 32, height: 32, background: "#222", color: "#666" }}>{userName.charAt(0).toUpperCase()}</div>}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{userName}</p>
+                              {run.isDistancePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(251,191,36,0.22)" }}>DIST PR</span>}
+                              {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#a78bfa", background: "rgba(167,139,250,0.1)", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(167,139,250,0.22)" }}>PACE PR</span>}
+                            </div>
+                            <p className="text-xs" style={{ color: "#555" }}>
+                              {run.name || "Run"}
+                              {runDate && ` · ${runDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at ${runDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                            </p>
+                            <p className="text-[10px] mt-0.5" style={{ color: "#333" }}>
+                              {gpsPoints} GPS pts · ID: {run.id.slice(0, 10)}…
+                            </p>
                           </div>
-                          <p className="text-xs" style={{ color: "#555" }}>
-                            {run.name || "Run"}{run.date ? ` · ${new Date(run.date.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
-                          </p>
                         </div>
+                        <MiniRoute coords={run.coordinates} />
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[{ label: "KM", value: km }, { label: "TIME", value: timeStr }, { label: "PACE", value: paceStr }].map(({ label, value }) => (
+                      {/* Stats grid */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { label: "KM", value: km },
+                          { label: "TIME", value: timeStr },
+                          { label: "PACE", value: paceStr },
+                          { label: "PTS", value: gpsPoints > 0 ? gpsPoints.toString() : "—" },
+                        ].map(({ label, value }) => (
                           <div key={label} className="text-center p-2 rounded-xl" style={{ background: "#0d0d0d" }}>
                             <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>{value}</p>
                             <p className="text-[10px] mt-0.5" style={{ color: "#444" }}>{label}</p>
