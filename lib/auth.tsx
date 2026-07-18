@@ -34,31 +34,54 @@ export function canAccessApp(user: User | null): boolean {
   return !!user.email;
 }
 
+// Baked as compile-time constant — tree-shakes the unused branch in each build.
+const IS_CAP_BUILD = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [banned, setBanned] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const isCapacitorApp =
-      process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true" ||
-      !!(window as any).Capacitor ||
-      (window.location.protocol !== "http:" && window.location.protocol !== "https:");
+    let mounted = true;
 
-    // Always resolve loading within 500ms on Capacitor so no spinner stays stuck.
-    if (isCapacitorApp) {
-      setTimeout(() => setLoading(false), 500);
-    }
+    async function handleUser(rawUser: {
+      uid: string;
+      email?: string | null;
+      displayName?: string | null;
+      photoUrl?: string | null;
+      photoURL?: string | null;
+      phoneNumber?: string | null;
+      providerData?: { providerId: string }[];
+    } | null) {
+      if (!mounted) return;
 
-    const timeout = setTimeout(() => setLoading(false), 500);
+      // Normalize native plugin user (photoUrl) vs web SDK user (photoURL)
+      const u = rawUser
+        ? ({
+            uid: rawUser.uid,
+            email: rawUser.email ?? null,
+            displayName: rawUser.displayName ?? null,
+            photoURL: rawUser.photoURL ?? rawUser.photoUrl ?? null,
+            phoneNumber: rawUser.phoneNumber ?? null,
+            providerData: (rawUser.providerData ?? []).map((p) => ({
+              providerId: p.providerId,
+              uid: rawUser.uid,
+              displayName: null,
+              email: rawUser.email ?? null,
+              phoneNumber: null,
+              photoURL: null,
+            })),
+          } as unknown as User)
+        : null;
 
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      clearTimeout(timeout);
       setUser(u);
       setLoading(false);
+
       if (u && !OWNER_UIDS.includes(u.uid)) {
         try {
           const snap = await getDoc(doc(db, "users", u.uid));
+          if (!mounted) return;
           setBanned(snap.exists() && snap.data()?.banned === true);
           if (!snap.exists() && canAccessApp(u)) {
             const profile = {
@@ -70,20 +93,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setDoc(doc(db, "users", u.uid, "public", "profile"), profile, { merge: true }).catch(() => {});
           }
         } catch {
-          setBanned(false);
+          if (mounted) setBanned(false);
         }
       } else {
-        setBanned(false);
+        if (mounted) setBanned(false);
       }
+    }
+
+    if (IS_CAP_BUILD) {
+      // On iOS/Android: use the native @capacitor-firebase/authentication plugin.
+      // The Firebase web SDK's onAuthStateChanged makes a network request to refresh
+      // the auth token on startup. On capacitor:// scheme WKWebView with network active,
+      // this request hangs indefinitely, freezing the loading state.
+      // The native plugin uses the iOS Firebase SDK directly — no WKWebView network calls.
+      import("@capacitor-firebase/authentication")
+        .then(({ FirebaseAuthentication }) => {
+          // Get current user immediately (resolves from native cache, no network needed)
+          FirebaseAuthentication.getCurrentUser()
+            .then(({ user }) => handleUser(user))
+            .catch(() => { if (mounted) setLoading(false); });
+
+          // Listen for future sign-in / sign-out events
+          FirebaseAuthentication.addAuthStateChangeListener(({ user }) => {
+            handleUser(user);
+          });
+        })
+        .catch(() => {
+          if (mounted) setLoading(false);
+        });
+
+      return () => { mounted = false; };
+    }
+
+    // Web: use Firebase web SDK auth
+    const timeout = setTimeout(() => { if (mounted) setLoading(false); }, 500);
+    const unsub = onAuthStateChanged(auth, (u) => {
+      clearTimeout(timeout);
+      handleUser(u);
     });
 
     return () => {
+      mounted = false;
       clearTimeout(timeout);
       unsub();
     };
   }, []);
 
   const signOut = async () => {
+    if (IS_CAP_BUILD) {
+      try {
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        await FirebaseAuthentication.signOut();
+      } catch {}
+    }
     await firebaseSignOut(auth);
   };
 
