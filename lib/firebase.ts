@@ -14,41 +14,35 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-function detectCapacitor(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!!(window as any).Capacitor) return true;
-  try { const p = window.location.protocol; return p !== "http:" && p !== "https:"; }
-  catch { return false; }
-}
-const isCapacitor = detectCapacitor();
-
+// Compile-time constant — Next.js bakes this into the bundle so the unused branch
+// is tree-shaken. Never use runtime window.Capacitor detection for config decisions.
 const IS_CAP_BUILD = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
 let auth: Auth;
 try {
   auth = initializeAuth(app, {
     persistence: browserLocalPersistence,
-    // Capacitor uses native sign-in — no redirect flows, no popup resolver needed.
-    // Passing browserPopupRedirectResolver on Capacitor makes Auth check for a pending
-    // redirect result on every startup, adding async work before onAuthStateChanged fires.
-    popupRedirectResolver: IS_CAP_BUILD ? undefined : (typeof window !== "undefined" ? browserPopupRedirectResolver : undefined),
+    // On Capacitor, sign-in is handled by the native @capacitor-firebase/authentication
+    // plugin. No redirect flows are used, so no popup resolver is needed.
+    popupRedirectResolver: IS_CAP_BUILD
+      ? undefined
+      : typeof window !== "undefined"
+      ? browserPopupRedirectResolver
+      : undefined,
   });
 } catch {
   auth = getAuth(app);
 }
 
-// Firestore cache:
-// - Capacitor bundle: memoryLocalCache — avoids IndexedDB entirely.
-//   iOS WKWebView deadlocks when IndexedDB.open() runs while network is active.
-//   There is no JS-level workaround; disableNetwork() still triggers IndexedDB.
-//   Offline persistence requires @capacitor-firebase/firestore (native SDK).
-// - Web: persistentLocalCache — IndexedDB works fine in desktop/mobile browsers.
+// On Capacitor: memoryLocalCache — lib/db.ts routes all Firestore calls to the
+// native plugin anyway, so this instance is only used as a reference object.
+// On web: persistentLocalCache — IndexedDB works fine in desktop/mobile browsers.
 let db: ReturnType<typeof getFirestore>;
 if (typeof window !== "undefined") {
-  const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
-  const cache = (isCapacitor || isCapacitorBuild) ? memoryLocalCache() : persistentLocalCache();
   try {
-    db = initializeFirestore(app, { localCache: cache });
+    db = initializeFirestore(app, {
+      localCache: IS_CAP_BUILD ? memoryLocalCache() : persistentLocalCache(),
+    });
   } catch {
     db = getFirestore(app);
   }

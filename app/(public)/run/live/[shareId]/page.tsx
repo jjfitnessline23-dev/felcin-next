@@ -3,8 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { db } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { db, doc, onSnapshot } from "@/lib/db";
 
 const RunMap = dynamic(() => import("@/components/RunMap"), {
   ssr: false,

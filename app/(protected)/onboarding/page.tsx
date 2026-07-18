@@ -4,8 +4,7 @@ import { useState } from "react";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "@/lib/db";
-import { signOut } from "firebase/auth";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
 import { trackSignUp } from "@/lib/gtag";
@@ -22,7 +21,7 @@ const INTERESTS = [
 ];
 
 export default function OnboardingPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -122,7 +121,7 @@ export default function OnboardingPage() {
               Felcin is only available to users aged 17 and above.
             </p>
             <button
-              onClick={() => signOut(auth).catch(() => {})}
+              onClick={() => signOut().catch(() => {})}
               className="w-full py-3.5 rounded-2xl font-bold text-sm border-none cursor-pointer"
               style={{ background: "rgba(255,255,255,0.08)", color: "#888" }}>
               Sign out
