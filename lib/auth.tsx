@@ -102,27 +102,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (IS_CAP_BUILD) {
       // On iOS/Android: use the native @capacitor-firebase/authentication plugin.
-      // The Firebase web SDK's onAuthStateChanged makes a network request to refresh
-      // the auth token on startup. On capacitor:// scheme WKWebView with network active,
-      // this request hangs indefinitely, freezing the loading state.
-      // The native plugin uses the iOS Firebase SDK directly — no WKWebView network calls.
+      // Safety net: if the native call hangs for any reason, force loading=false
+      // after 3s so the user always sees the login page rather than an infinite spinner.
+      const capTimeout = setTimeout(() => { if (mounted) setLoading(false); }, 3000);
+
       import("@capacitor-firebase/authentication")
         .then(({ FirebaseAuthentication }) => {
-          // Get current user immediately (resolves from native cache, no network needed)
           FirebaseAuthentication.getCurrentUser()
-            .then(({ user }) => handleUser(user))
-            .catch(() => { if (mounted) setLoading(false); });
+            .then(({ user }) => { clearTimeout(capTimeout); handleUser(user); })
+            .catch(() => { clearTimeout(capTimeout); if (mounted) setLoading(false); });
 
-          // Listen for future sign-in / sign-out events
           FirebaseAuthentication.addAuthStateChangeListener(({ user }) => {
             handleUser(user);
           });
         })
         .catch(() => {
+          clearTimeout(capTimeout);
           if (mounted) setLoading(false);
         });
 
-      return () => { mounted = false; };
+      return () => { mounted = false; clearTimeout(capTimeout); };
     }
 
     // Web: use Firebase web SDK auth
