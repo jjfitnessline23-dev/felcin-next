@@ -84,12 +84,14 @@ export default function LoginPage() {
         if (age < 17) { setError("You must be at least 17 years old to create an account."); setBusy(false); return; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         sendEmailVerification(cred.user).catch(() => {});
-        // User is already signed in — go straight to onboarding, verify email in background
-        router.replace("/onboarding");
+        // Stay busy — useEffect will redirect once onAuthStateChanged fires with the new user
         return;
       }
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/");
+      // Stay busy — useEffect redirects to "/" once onAuthStateChanged fires.
+      // Calling router.replace here would navigate before auth context updates,
+      // causing ProtectedLayout to see user=null and bounce back to /login.
+      return;
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
       const msg = (err as { message?: string }).message || "Something went wrong";
@@ -136,9 +138,10 @@ export default function LoginPage() {
         // Web browser: popup keeps the user on felcin.com, avoiding the felcin.firebaseapp.com
         // redirect which iOS/Android intercept as a Universal Link and open the native app
         const provider = new GoogleAuthProvider();
-        const userCred = await signInWithPopup(auth, provider);
-        const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
-        router.replace(isNew ? "/onboarding" : "/");
+        await signInWithPopup(auth, provider);
+        // Stay busy — useEffect redirects once onAuthStateChanged fires.
+        // ProtectedLayout's onboarding check handles new-user routing to /onboarding.
+        return;
       }
     } catch (err: unknown) {
       setStep("");
