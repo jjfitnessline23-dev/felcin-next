@@ -41,6 +41,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
   const currentMarkerRef = useRef<any>(null);
   const hasFlownRef = useRef(false);
   const prevCompletedRef = useRef(false);
+  const coordsRef = useRef<Coord[]>([]); // latest coords accessible from all effects
 
   // Mount map once
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
 
   // Route polyline + start marker
   useEffect(() => {
+    coordsRef.current = coords;
     if (!mapRef.current) return;
     import("leaflet").then((L) => {
       // Route line
@@ -148,7 +150,11 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         }
       }
 
-      if (!hasFlownRef.current) {
+      if (justCompleted && coordsRef.current.length > 1) {
+        // Zoom out to show the full route — start to finish
+        const bounds = L.latLngBounds(coordsRef.current.map(c => [c.lat, c.lng] as [number, number]));
+        mapRef.current.fitBounds(bounds, { padding: [60, 40], animate: true, duration: 0.9 });
+      } else if (!hasFlownRef.current) {
         hasFlownRef.current = true;
         mapRef.current.setView([currentPos.lat, currentPos.lng], 17, { animate: true, duration: 1 });
       } else if (followUser) {
