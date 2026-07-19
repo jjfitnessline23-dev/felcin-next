@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, type Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -19,35 +19,33 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const IS_CAP_BUILD = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
 let auth: Auth;
-try {
-  auth = initializeAuth(app, {
-    persistence: browserLocalPersistence,
-    // On Capacitor, sign-in is handled by the native @capacitor-firebase/authentication
-    // plugin. No redirect flows are used, so no popup resolver is needed.
-    popupRedirectResolver: IS_CAP_BUILD
-      ? undefined
-      : typeof window !== "undefined"
-      ? browserPopupRedirectResolver
-      : undefined,
-  });
-} catch {
-  auth = getAuth(app);
-}
-
-// On Capacitor: memoryLocalCache — lib/db.ts routes all Firestore calls to the
-// native plugin anyway, so this instance is only used as a reference object.
-// On web: persistentLocalCache — IndexedDB works fine in desktop/mobile browsers.
 let db: ReturnType<typeof getFirestore>;
-if (typeof window !== "undefined") {
+
+if (IS_CAP_BUILD && typeof window !== "undefined") {
+  // On Capacitor: skip initializeAuth() and initializeFirestore() entirely.
+  // Both are handled by native @capacitor-firebase/* plugins via lib/db.ts and lib/auth.tsx.
+  // Calling these triggers @firebase/installations which makes blocking URLSession
+  // calls on iOS that cause the app to freeze on startup.
+  // auth and db are null — all call sites on Capacitor use native plugins instead.
+  auth = null as unknown as Auth;
+  db = null as unknown as ReturnType<typeof getFirestore>;
+} else {
+  // SSR or web browser: full web SDK initialization
+  try {
+    auth = initializeAuth(app, {
+      persistence: browserLocalPersistence,
+      popupRedirectResolver: typeof window !== "undefined" ? browserPopupRedirectResolver : undefined,
+    });
+  } catch {
+    auth = getAuth(app);
+  }
   try {
     db = initializeFirestore(app, {
-      localCache: IS_CAP_BUILD ? memoryLocalCache() : persistentLocalCache(),
+      localCache: persistentLocalCache(),
     });
   } catch {
     db = getFirestore(app);
   }
-} else {
-  db = getFirestore(app);
 }
 
 const storage = getStorage(app);

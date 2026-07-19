@@ -146,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
         await FirebaseAuthentication.signOut();
       } catch {}
+      return; // auth is null on Capacitor — native plugin handles sign-out
     }
     await firebaseSignOut(auth);
   };
