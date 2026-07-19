@@ -14,25 +14,23 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Compile-time constants baked into each bundle by Next.js.
+// Compile-time constant — Next.js bakes this into the bundle so the unused branch
+// is tree-shaken. Never use runtime window.Capacitor detection for config decisions.
 const IS_CAP_BUILD = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
-// ios → native plugins (avoids WKWebView IndexedDB hang on iOS)
-// android → web SDK (Android WebView IndexedDB is fine; gives persistent offline cache)
-const IS_IOS_BUILD = process.env.NEXT_PUBLIC_PLATFORM === "ios";
 
 let auth: Auth;
 let db: ReturnType<typeof getFirestore>;
 
-if (IS_CAP_BUILD && IS_IOS_BUILD && typeof window !== "undefined") {
-  // iOS Capacitor only: skip web SDK entirely.
-  // Native @capacitor-firebase/* plugins handle auth + Firestore.
-  // initializeFirestore() triggers @firebase/installations → blocking URLSession
-  // calls on iOS that freeze the app at startup.
+if (IS_CAP_BUILD && typeof window !== "undefined") {
+  // On Capacitor: skip initializeAuth() and initializeFirestore() entirely.
+  // Both are handled by native @capacitor-firebase/* plugins via lib/db.ts and lib/auth.tsx.
+  // Calling these triggers @firebase/installations which makes blocking URLSession
+  // calls on iOS that cause the app to freeze on startup.
+  // auth and db are null — all call sites on Capacitor use native plugins instead.
   auth = null as unknown as Auth;
   db = null as unknown as ReturnType<typeof getFirestore>;
 } else {
-  // Web, SSR, or Android Capacitor: web Firebase SDK.
-  // Android WebView supports IndexedDB — persistentLocalCache() survives app restarts.
+  // SSR or web browser: full web SDK initialization
   try {
     auth = initializeAuth(app, {
       persistence: browserLocalPersistence,

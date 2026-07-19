@@ -15,9 +15,8 @@
 import * as fs from "firebase/firestore";
 import { db as _db } from "@/lib/firebase";
 
-// Native Firestore plugin only on iOS — Android WebView handles IndexedDB fine.
-const IS_CAP = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true"
-            && process.env.NEXT_PUBLIC_PLATFORM === "ios";
+// Baked as a compile-time constant by Next.js — tree-shakes the unused branch.
+const IS_CAP = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
 // ─── Exported db instance (still needed as first arg to doc/collection) ───────
 export const db = _db;
