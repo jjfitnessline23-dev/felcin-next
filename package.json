@@ -13,7 +13,7 @@
     "@capacitor-firebase/authentication": "^7.0.0",
     "@capacitor-firebase/firestore": "^7.0.0",
     "@capacitor/core": "^7.0.0",
-    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/geolocation": "^7.0.0",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@sentry/nextjs": "^10.63.0",

@@ -108,6 +108,7 @@ export default function RunPage() {
   const [runs, setRuns] = useState<RunRoute[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
+  const savingRef = useRef(false);
   const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
   const [matchedCoords, setMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
   const [detailMatchedCoords, setDetailMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
@@ -397,7 +398,8 @@ export default function RunPage() {
   const discardRun = () => { setCoords([]); setDistance(0); setElapsed(0); setPhase("idle"); };
 
   const saveRun = async () => {
-    if (!user) return;
+    if (!user || savingRef.current) return;
+    savingRef.current = true;
     const duration = elapsed, avgPace = distance > 0 ? duration / (distance / 1000) : 0;
     const maxDist = runs.reduce((m, r) => Math.max(m, r.distance || 0), 0);
     const bestPace = runs.filter(r => r.avgPace > 0 && r.distance >= 1000).reduce((m, r) => Math.min(m, r.avgPace), Infinity);
@@ -413,6 +415,7 @@ export default function RunPage() {
       setRuns(prev => [{ id: ref.id, name, distance, duration, avgPace, date: new Date(), isDistancePR, isPacePR }, ...prev]);
       setLastSaved({ isDistancePR, isPacePR });
     } catch (e) { console.error(e); }
+    savingRef.current = false;
     setPhase("idle");
   };
 
@@ -669,8 +672,8 @@ export default function RunPage() {
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                 <span style={{ fontSize: 20, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-0.4px" }}>{expandedRun.name || "Run"}</span>
-                {expandedRun.isDistancePR && <span style={{ fontSize: 10, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(251,191,36,0.25)" }}>DIST PR</span>}
-                {expandedRun.isPacePR && <span style={{ fontSize: 10, fontWeight: 800, color: "#a78bfa", background: "rgba(167,139,250,0.1)", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(167,139,250,0.25)" }}>PACE PR</span>}
+                {expandedRun.isDistancePR && <span style={{ fontSize: 10, fontWeight: 900, color: "#000", background: "#fbbf24", padding: "2px 8px", borderRadius: 6, letterSpacing: "0.04em" }}>DIST PR</span>}
+                {expandedRun.isPacePR && <span style={{ fontSize: 10, fontWeight: 900, color: "#000", background: "#a78bfa", padding: "2px 8px", borderRadius: 6, letterSpacing: "0.04em" }}>PACE PR</span>}
               </div>
               <p style={{ fontSize: 13, color: "#555" }}>{formatDate(expandedRun.date)}</p>
             </div>
@@ -753,8 +756,8 @@ function RunCard({ run, onTap }: { run: RunRoute; onTap?: () => void }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: "#f2f2f2" }}>{run.name || "Run"}</span>
-          {run.isDistancePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "1px 5px", borderRadius: 4, border: "1px solid rgba(251,191,36,0.22)" }}>DIST PR</span>}
-          {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 800, color: "#a78bfa", background: "rgba(167,139,250,0.1)", padding: "1px 5px", borderRadius: 4, border: "1px solid rgba(167,139,250,0.22)" }}>PACE PR</span>}
+          {run.isDistancePR && <span style={{ fontSize: 9, fontWeight: 900, color: "#000", background: "#fbbf24", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>DIST PR</span>}
+          {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 900, color: "#000", background: "#a78bfa", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>PACE PR</span>}
         </div>
         <div style={{ fontSize: 12, color: "#555" }}>{(run.distance / 1000).toFixed(2)} km · {fmtT(run.duration)} · {fmtP(run.avgPace)}/km</div>
       </div>
