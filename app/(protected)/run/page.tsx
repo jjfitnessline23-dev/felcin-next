@@ -419,39 +419,6 @@ export default function RunPage() {
     setPhase("idle");
   };
 
-  // Coming soon — block all non-admin users until run tracker is fully ready
-  if (!isAdmin) {
-    return (
-      <div style={{ minHeight: "100dvh", background: "#090909", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 80px)", textAlign: "center" }}>
-        <style>{`@keyframes onAirPulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
-        <div style={{ background: "rgba(0,18,8,0.85)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 28, padding: "40px 32px", maxWidth: 340, width: "100%", boxShadow: "0 0 60px rgba(34,197,94,0.07), inset 0 1px 0 rgba(255,255,255,0.03)" }}>
-          {/* Logo row */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 28 }}>
-            <div style={{ borderRadius: 18, overflow: "hidden", border: "1.5px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>
-              <FelcinLogo size={62} />
-            </div>
-            <div style={{ width: 1, height: 46, background: "rgba(34,197,94,0.28)" }} />
-            <div style={{ width: 62, height: 62, borderRadius: 18, background: "rgba(34,197,94,0.1)", border: "1.5px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 38, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
-            </div>
-          </div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", letterSpacing: "0.18em", marginBottom: 10 }}>FELCIN</div>
-          <h2 style={{ fontSize: 26, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-0.5px", margin: "0 0 18px" }}>Run Tracker</h2>
-          {/* Heartbeat line */}
-          <svg viewBox="0 0 220 44" style={{ width: "80%", maxWidth: 220, marginBottom: 22, overflow: "visible" }}>
-            <path d="M0,22 L72,22 L80,22 L86,7 L96,38 L104,12 L110,22 L220,22" fill="none" stroke="#22c55e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.65"/>
-          </svg>
-          <p style={{ fontSize: 13, color: "#4a4a4a", lineHeight: 1.75, marginBottom: 28, maxWidth: 260, margin: "0 auto 28px" }}>
-            Live GPS route tracking, real-time maps, personal records, and pace analytics — launching soon.
-          </p>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 22px", borderRadius: 22, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "onAirPulse 1.5s ease-in-out infinite" }} />
-            <span style={{ fontSize: 11, fontWeight: 800, color: "#22c55e", letterSpacing: "0.12em" }}>COMING SOON</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const isTracking = phase === "running" || phase === "paused";
