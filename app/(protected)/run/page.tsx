@@ -427,9 +427,11 @@ export default function RunPage() {
         <div style={{ background: "rgba(0,18,8,0.85)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 28, padding: "40px 32px", maxWidth: 340, width: "100%", boxShadow: "0 0 60px rgba(34,197,94,0.07), inset 0 1px 0 rgba(255,255,255,0.03)" }}>
           {/* Logo row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 28 }}>
-            <FelcinLogo size={62} />
+            <div style={{ borderRadius: 18, overflow: "hidden", border: "1.5px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>
+              <FelcinLogo size={62} />
+            </div>
             <div style={{ width: 1, height: 46, background: "rgba(34,197,94,0.28)" }} />
-            <div style={{ width: 62, height: 62, borderRadius: 18, background: "rgba(34,197,94,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 62, height: 62, borderRadius: 18, background: "rgba(34,197,94,0.1)", border: "1.5px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 38, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
             </div>
           </div>
