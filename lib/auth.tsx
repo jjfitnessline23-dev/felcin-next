@@ -102,18 +102,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (IS_CAP_BUILD) {
-      // On iOS/Android: use the native @capacitor-firebase/authentication plugin.
-      // Safety net: if the native call hangs for any reason, force loading=false
-      // after 3s so the user always sees the login page rather than an infinite spinner.
-      const capTimeout = setTimeout(() => { if (mounted) setLoading(false); }, 3000);
+      // Skip getCurrentUser() — it calls getIDTokenResult() which triggers a
+      // native URLSession token refresh for expired tokens. iOS's default socket
+      // timeout is 60 seconds; on a "semi-connected" network this hangs the app
+      // until airplane mode kills the socket.
+      //
+      // addAuthStateChangeListener fires immediately from Keychain cache with no
+      // network call, giving us the auth state in <50ms instead of 60 seconds.
+      const capTimeout = setTimeout(() => { if (mounted) setLoading(false); }, 1000);
 
       import("@capacitor-firebase/authentication")
         .then(({ FirebaseAuthentication }) => {
-          FirebaseAuthentication.getCurrentUser()
-            .then(({ user }) => { clearTimeout(capTimeout); handleUser(user); })
-            .catch(() => { clearTimeout(capTimeout); if (mounted) setLoading(false); });
-
           FirebaseAuthentication.addAuthStateChangeListener(({ user }) => {
+            clearTimeout(capTimeout);
             handleUser(user);
           });
         })
