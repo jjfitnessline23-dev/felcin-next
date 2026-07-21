@@ -62,6 +62,11 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
+  // While auth is resolving, show a blank screen so any transient redirect
+  // to /login (spinner → timeout → /login → auth fires → /) is invisible.
+  if (loading) {
+    return <div className="fixed inset-0" style={{ background: "#111" }} />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
