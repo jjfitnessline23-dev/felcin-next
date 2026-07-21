@@ -19,7 +19,7 @@ export default function EmailVerifyBanner() {
 
     const id = setInterval(async () => {
       try {
-        if (!auth.currentUser) return;
+        if (!auth?.currentUser) return;
         await reload(auth.currentUser);
         if (auth.currentUser.emailVerified) {
           clearInterval(id);
@@ -36,13 +36,14 @@ export default function EmailVerifyBanner() {
 
   const resend = async () => {
     try {
-      await sendEmailVerification(auth.currentUser!);
+      if (!auth?.currentUser) return;
+      await sendEmailVerification(auth.currentUser);
       setSent(true);
     } catch {}
   };
 
   const checkNow = async () => {
-    if (!auth.currentUser || checking) return;
+    if (!auth?.currentUser || checking) return;
     setChecking(true);
     try {
       await reload(auth.currentUser);

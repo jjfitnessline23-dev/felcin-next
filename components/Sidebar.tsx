@@ -13,6 +13,7 @@ import { doc, onSnapshot } from "@/lib/db";
 const primaryLinks = [
   { href: "/", icon: "home", label: "Home" },
   { href: "/ghost", icon: "sprint", label: "Ghost Workouts", accent: true },
+  { href: "/run", icon: "directions_run", label: "Run Tracker" },
   { href: "/podcasts", icon: "mic", label: "Podcast Studio", studio: true },
   { href: "/reels", icon: "play_circle", label: "Reels" },
   { href: "/live", icon: "live_tv", label: "Live Studio" },
@@ -28,7 +29,6 @@ const secondaryLinks = [
 ];
 
 const moreLinks = [
-  { href: "/run", icon: "directions_run", label: "Run Tracker" },
   { href: "/progress", icon: "compare", label: "Progress Photos" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },
   { href: "/schedule", icon: "calendar_month", label: "Schedule" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, increment, updateDoc, doc, getDoc } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -91,8 +91,11 @@ export default function WorkoutsPage() {
 
   const [mood, setMood] = useState<string | null>(null);
   const [session, setSession] = useState<ActiveSession | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [restSecs, setRestSecs] = useState(0);
+  const elapsedValRef  = useRef(0);
+  const restSecsValRef = useRef(0);
+  // DOM refs for direct timer display updates — no React re-render needed
+  const elapsedDomRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const restDomRefs    = useRef<(HTMLSpanElement | null)[]>([]);
   const [restActive, setRestActive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [focusedSet, setFocusedSet] = useState<{ ei: number; si: number } | null>(null);
@@ -115,11 +118,14 @@ export default function WorkoutsPage() {
   const [infoOpen, setInfoOpen] = useState<{ day: string; ei: number; si: number } | null>(null);
   const [expandedPlanEx, setExpandedPlanEx] = useState<Record<string, boolean>>({});
 
+  const scrollRestoreRef = useRef<number | null>(null);
   const elapsedRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const restRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const planSynced    = useRef(false);
-  const planSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const planSaveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exNameTimer    = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const inputRefs     = useRef<Record<string, HTMLInputElement | null>>({});
+  const toggleDebounceRef = useRef<Record<string, number>>({});
 
   /* Load localStorage */
   useEffect(() => {
@@ -133,7 +139,7 @@ export default function WorkoutsPage() {
           ...e, sets: e.sets.map((st) => ({ ...st, setType: (st.setType ?? "S") as SetType })),
         }));
         setSession(s);
-        setElapsed(Math.floor((Date.now() - s.startTime) / 1000));
+        elapsedValRef.current = Math.floor((Date.now() - s.startTime) / 1000);
       }
     } catch {}
   }, []);
@@ -204,14 +210,22 @@ export default function WorkoutsPage() {
 
   useEffect(() => {
     if (!session) { if (elapsedRef.current) clearInterval(elapsedRef.current); return; }
-    elapsedRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    elapsedRef.current = setInterval(() => {
+      elapsedValRef.current += 1;
+      const t = fmtTimer(elapsedValRef.current);
+      elapsedDomRefs.current.forEach(el => { if (el) el.textContent = t; });
+    }, 1000);
     return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
   }, [!!session]); // eslint-disable-line
 
   useEffect(() => {
     if (restRef.current) clearInterval(restRef.current);
     if (!restActive) return;
-    restRef.current = setInterval(() => setRestSecs((r) => r + 1), 1000);
+    restRef.current = setInterval(() => {
+      restSecsValRef.current += 1;
+      const t = fmtTimer(restSecsValRef.current);
+      restDomRefs.current.forEach(el => { if (el) el.textContent = t; });
+    }, 1000);
     return () => { if (restRef.current) clearInterval(restRef.current); };
   }, [restActive]);
 
@@ -220,6 +234,14 @@ export default function WorkoutsPage() {
       mutatePlan(planningDay, () => [{ name: "", sets: [{ reps: 10, weight: 0 }] }]);
   }, [planningDay]); // eslint-disable-line
 
+  // Runs after every commit — restores scroll if a mutation requested it
+  useLayoutEffect(() => {
+    if (scrollRestoreRef.current !== null) {
+      window.scrollTo(0, scrollRestoreRef.current);
+      scrollRestoreRef.current = null;
+    }
+  });
+
   /* Session */
   function saveSession(s: ActiveSession | null) {
     setSession(s);
@@ -227,6 +249,7 @@ export default function WorkoutsPage() {
     else localStorage.removeItem(SESSION_KEY);
   }
   function mutate(fn: (s: ActiveSession) => ActiveSession) {
+    scrollRestoreRef.current = window.scrollY;
     setSession((prev) => {
       if (!prev) return prev;
       const next = fn(prev);
@@ -242,7 +265,7 @@ export default function WorkoutsPage() {
       ? fromPlan.map((e) => ({ name: e.name, equipment: e.equipment, sets: e.sets.map((s) => ({ ...s, done: false, setType: "S" as SetType })) }))
       : [{ name: "", sets: [{ reps: 10, weight: 0, done: false, setType: "S" as SetType }] }];
     saveSession({ startTime: Date.now(), exercises, notes: "" });
-    setElapsed(0);
+    elapsedValRef.current = 0;
     if (mood && user) addDoc(collection(db, "users", user.uid, "moodLogs"), { mood, date: serverTimestamp() }).catch(() => {});
   }
   function addEx() { mutate((s) => ({ ...s, exercises: [...s.exercises, { name: "", sets: [{ reps: 10, weight: 0, done: false, setType: "S" as SetType }] }] })); }
@@ -312,14 +335,23 @@ export default function WorkoutsPage() {
     mutate((s) => ({ ...s, exercises: s.exercises.map((e, i) => i !== ei ? e : { ...e, sets: e.sets.map((set, j) => j !== si ? set : { ...set, reps: prevSet.reps, weight: prevSet.weight }) }) }));
   }
   function toggleDone(ei: number, si: number) {
-    mutate((s) => {
-      const wasDone = s.exercises[ei]?.sets[si]?.done;
-      if (!wasDone) {
-        setRestSecs(0); setRestActive(true);
-        setTimeout(() => { const key = `${ei}-${si + 1}-reps`; inputRefs.current[key]?.focus(); inputRefs.current[key]?.select(); }, 60);
-      }
-      return { ...s, exercises: s.exercises.map((e, i) => i !== ei ? e : { ...e, sets: e.sets.map((set, j) => j !== si ? set : { ...set, done: !set.done }) }) };
-    });
+    // Debounce prevents double-tap from reading the same stale session state twice
+    const key = `${ei}-${si}`;
+    const now = Date.now();
+    if (now - (toggleDebounceRef.current[key] ?? 0) < 300) return;
+    toggleDebounceRef.current[key] = now;
+
+    const wasDone = session?.exercises[ei]?.sets[si]?.done;
+    mutate((s) => ({
+      ...s,
+      exercises: s.exercises.map((e, i) => i !== ei ? e : {
+        ...e, sets: e.sets.map((set, j) => j !== si ? set : { ...set, done: !set.done }),
+      }),
+    }));
+    if (!wasDone) {
+      restSecsValRef.current = 0;
+      setRestActive(true);
+    }
   }
   async function endWorkout() {
     if (!user || !session || saving) return;
@@ -327,7 +359,7 @@ export default function WorkoutsPage() {
     setSaving(true);
     try {
       if (named.length > 0) {
-        const durationMins = Math.max(1, Math.round(elapsed / 60));
+        const durationMins = Math.max(1, Math.round(elapsedValRef.current / 60));
         const exercises = named.map((e) => e.type === "cardio"
           ? { name: e.name, type: "cardio" as const, sets: [], cardio: e.cardio || { durationMins: 0 }, ...(e.equipment ? { equipment: e.equipment } : {}) }
           : { name: e.name, sets: e.sets.map(({ reps, weight }) => ({ reps, weight })), ...(e.equipment ? { equipment: e.equipment } : {}) });
@@ -344,7 +376,7 @@ export default function WorkoutsPage() {
         setPrs(np);
         setLogs((p) => [{ id: ref.id, exercises, notes: (session.notes || "").trim() || undefined, durationMins }, ...p]);
       }
-      saveSession(null); setElapsed(0); setRestSecs(0); setRestActive(false);
+      saveSession(null); elapsedValRef.current = 0; restSecsValRef.current = 0; setRestActive(false);
     } catch {}
     setSaving(false);
   }
@@ -422,7 +454,7 @@ export default function WorkoutsPage() {
               <div><span className="text-base font-black" style={{ color: "#22c55e" }}>{logs.length}</span><span className="text-xs ml-1" style={{ color: "#555" }}>workouts</span></div>
               <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} />
               <div><span className="text-base font-black" style={{ color: "#fbbf24" }}>{Object.keys(prs).length}</span><span className="text-xs ml-1" style={{ color: "#555" }}>PRs</span></div>
-              {session && <><div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} /><div><span className="text-base font-black tabular-nums" style={{ color: "#22c55e" }}>{fmtTimer(elapsed)}</span><span className="text-xs ml-1" style={{ color: "#555" }}>elapsed</span></div></>}
+              {session && <><div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} /><div><span ref={el => { elapsedDomRefs.current[0] = el; }} className="text-base font-black tabular-nums" style={{ color: "#22c55e" }}>{fmtTimer(elapsedValRef.current)}</span><span className="text-xs ml-1" style={{ color: "#555" }}>elapsed</span></div></>}
             </div>
           )}
         </div>
@@ -822,7 +854,7 @@ export default function WorkoutsPage() {
             <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#22c55e" }}>timer</span>
-                <span className="text-xl font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{fmtTimer(elapsed)}</span>
+                <span ref={el => { elapsedDomRefs.current[1] = el; }} className="text-xl font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{fmtTimer(elapsedValRef.current)}</span>
               </div>
               <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.07)" }}>
                 {(["kg","lbs"] as const).map((u) => (
@@ -1096,49 +1128,6 @@ export default function WorkoutsPage() {
                           );
                         })}
 
-                        {/* Quick adjust — show only when a set is focused */}
-                        {focusedSi !== null && (() => {
-                          const activeSi = focusedSi;
-                          const activeSet = session.exercises[ei]?.sets[activeSi];
-                          return (
-                            <div className="mx-3 mb-2 mt-1 rounded-xl overflow-hidden" style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.08)" }}>
-                              {/* Row 1: [−] reps weight [Match Set] */}
-                              <div className="flex items-center gap-1.5 p-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                                <button onClick={() => setField(ei, activeSi, "reps", Math.max(0, (activeSet?.reps ?? 1) - 1))}
-                                  className="flex items-center justify-center rounded-lg font-bold border-none cursor-pointer shrink-0 text-base"
-                                  style={{ width: 42, height: 42, background: "#2a2a2a", color: "#f2f2f2" }}>−</button>
-                                <div className="flex-1 flex items-center justify-center rounded-lg font-semibold text-sm"
-                                  style={{ height: 42, background: "#2a2a2a", color: "#f2f2f2" }}>
-                                  {activeSet?.reps ?? 0}
-                                </div>
-                                <div className="flex-1 flex items-center justify-center rounded-lg font-semibold text-sm"
-                                  style={{ height: 42, background: "#2a2a2a", color: "#f2f2f2" }}>
-                                  {toDisplay(activeSet?.weight ?? 0, useKg)}
-                                </div>
-                                <button onClick={() => matchSet(ei, activeSi)}
-                                  className="flex items-center justify-center rounded-lg text-[11px] font-bold border-none cursor-pointer shrink-0 text-center leading-tight"
-                                  style={{ width: 62, height: 42, background: "rgba(167,139,250,0.18)", color: "#a78bfa" }}>
-                                  Match{"\n"}Set
-                                </button>
-                              </div>
-                              {/* Row 2: +2.5  +2.5  +5  -2.5  Match Set Prev. Set */}
-                              <div className="flex items-center gap-1.5 p-2">
-                                {([+2.5, +2.5, +5, -2.5] as number[]).map((d, idx) => (
-                                  <button key={idx} onClick={() => adjustWeight(ei, activeSi, d)}
-                                    className="flex-1 rounded-lg text-sm font-bold border-none cursor-pointer"
-                                    style={{ height: 42, background: "#2a2a2a", color: "#f2f2f2" }}>
-                                    {d > 0 ? "+" : ""}{d}
-                                  </button>
-                                ))}
-                                <button onClick={() => matchPrevSet(ei, activeSi)}
-                                  className="flex items-center justify-center rounded-lg text-[10px] font-bold border-none cursor-pointer shrink-0 text-center leading-tight"
-                                  style={{ width: 62, height: 42, background: "rgba(167,139,250,0.18)", color: "#a78bfa" }}>
-                                  Match Set{"\n"}Prev. Set
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
 
                         {/* Rest timer — solid green bar like spec */}
                         <div className="flex items-center justify-between mx-3 mb-2 px-4 py-3 rounded-xl"
@@ -1146,15 +1135,16 @@ export default function WorkoutsPage() {
                           <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined" style={{ fontSize: 16, color: restActive ? "#22c55e" : "#444" }}>self_improvement</span>
                             <span className="text-sm font-bold tabular-nums" style={{ color: restActive ? "#22c55e" : "#555" }}>
-                              {restActive ? `Rest — ${fmtTimer(restSecs)}` : "Rest timer"}
+                              {restActive ? "Rest — " : "Rest timer"}
+                              {restActive && <span ref={el => { restDomRefs.current[0] = el; }}>{fmtTimer(restSecsValRef.current)}</span>}
                             </span>
                           </div>
                           {restActive ? (
-                            <button onClick={() => { setRestActive(false); setRestSecs(0); }}
+                            <button onClick={() => { setRestActive(false); restSecsValRef.current = 0; }}
                               className="text-sm font-bold px-4 py-1.5 rounded-lg border-none cursor-pointer"
                               style={{ background: "rgba(180,83,9,0.35)", color: "#f97316" }}>Done</button>
                           ) : (
-                            <button onClick={() => { setRestSecs(0); setRestActive(true); }}
+                            <button onClick={() => { restSecsValRef.current = 0; setRestActive(true); }}
                               className="text-sm font-bold px-4 py-1.5 rounded-lg border-none cursor-pointer"
                               style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>Start</button>
                           )}
@@ -1632,13 +1622,59 @@ export default function WorkoutsPage() {
 
       {demoExercise && <ExerciseDemo exerciseName={demoExercise} onClose={() => setDemoExercise(null)} />}
 
+      {/* Quick adjust — fixed floating toolbar, never shifts layout */}
+      {session && focusedSet !== null && (() => {
+        const { ei, si } = focusedSet;
+        const activeSet = session.exercises[ei]?.sets[si];
+        if (!activeSet) return null;
+        return (
+          <div className="fixed left-0 right-0 z-50"
+            style={{ bottom: "calc(env(safe-area-inset-bottom,0px) + 122px)", background: "rgba(18,18,18,0.98)", backdropFilter: "blur(16px)", borderTop: "1px solid rgba(255,255,255,0.1)", padding: "8px 12px" }}>
+            {/* Row 1: − reps weight Match Set */}
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <button onClick={() => setField(ei, si, "reps", Math.max(0, (activeSet.reps ?? 1) - 1))}
+                className="flex items-center justify-center rounded-lg font-bold border-none cursor-pointer shrink-0 text-base"
+                style={{ width: 42, height: 40, background: "#2a2a2a", color: "#f2f2f2" }}>−</button>
+              <div className="flex-1 flex items-center justify-center rounded-lg font-semibold text-sm"
+                style={{ height: 40, background: "#2a2a2a", color: "#f2f2f2" }}>
+                {activeSet.reps ?? 0} reps
+              </div>
+              <div className="flex-1 flex items-center justify-center rounded-lg font-semibold text-sm"
+                style={{ height: 40, background: "#2a2a2a", color: "#f2f2f2" }}>
+                {toDisplay(activeSet.weight ?? 0, useKg)} {unitLabel}
+              </div>
+              <button onClick={() => matchSet(ei, si)}
+                className="flex items-center justify-center rounded-lg text-[11px] font-bold border-none cursor-pointer shrink-0 text-center leading-tight"
+                style={{ width: 62, height: 40, background: "rgba(167,139,250,0.18)", color: "#a78bfa" }}>
+                Match{"\n"}Set
+              </button>
+            </div>
+            {/* Row 2: weight adjustments */}
+            <div className="flex items-center gap-1.5">
+              {([+2.5, +2.5, +5, -2.5] as number[]).map((d, idx) => (
+                <button key={idx} onClick={() => adjustWeight(ei, si, d)}
+                  className="flex-1 rounded-lg text-sm font-bold border-none cursor-pointer"
+                  style={{ height: 40, background: "#2a2a2a", color: "#f2f2f2" }}>
+                  {d > 0 ? "+" : ""}{d}
+                </button>
+              ))}
+              <button onClick={() => matchPrevSet(ei, si)}
+                className="flex items-center justify-center rounded-lg text-[10px] font-bold border-none cursor-pointer shrink-0 text-center leading-tight"
+                style={{ width: 62, height: 40, background: "rgba(167,139,250,0.18)", color: "#a78bfa" }}>
+                Match Set{"\n"}Prev. Set
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Sticky bar */}
       {session && (
         <div className="fixed left-0 right-0 flex items-center justify-between px-4 py-3 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom,0px) + 64px)", background: "rgba(9,9,9,0.92)", backdropFilter: "blur(16px)", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#22c55e" }}>timer</span>
-            <span className="text-sm font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{fmtTimer(elapsed)}</span>
+            <span ref={el => { elapsedDomRefs.current[2] = el; }} className="text-sm font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{fmtTimer(elapsedValRef.current)}</span>
             <span className="text-xs" style={{ color: "#444" }}>· {session.exercises.filter((e) => (e.name||"").trim()).length} exercises</span>
           </div>
           <button onClick={endWorkout} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-bold border-none cursor-pointer"

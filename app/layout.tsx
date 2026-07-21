@@ -98,6 +98,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: `
           document.fonts.ready.then(function() { document.documentElement.classList.add('fonts-loaded'); });
         ` }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
+            });
+          }
+        ` }} />
       </head>
       <body className={`${manrope.variable} antialiased`} style={{ fontFamily: "var(--font-manrope), system-ui, sans-serif" }}>
         <AuthProvider>

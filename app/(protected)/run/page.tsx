@@ -60,9 +60,17 @@ export default function RunPage() {
   // Location
   const [locState, setLocState] = useState<LocState>("prompt");
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
-  const idleWatchRef = useRef<any>(null);
   const [waitSecs, setWaitSecs] = useState(0);
-  const enablingRef = useRef(false); // prevent double-tap
+  const enablingRef = useRef(false);
+
+  // Single persistent watch — never cleared except on unmount
+  const watchRef = useRef<any>(null);
+  const mountedRef = useRef(true);
+  const reconnectRef = useRef<any>(null);
+  // Refs so the watch callback always sees current values without stale closures
+  const phaseRef = useRef<Phase>("idle");
+  const startTimeRef = useRef(0);
+  const lastAcceptedCoordRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (locState !== "waiting") { setWaitSecs(0); return; }
@@ -90,9 +98,10 @@ export default function RunPage() {
     })();
   }, []);
 
-  // Phase
+  // Phase — also mirror to ref so watch callback never has a stale value
   const [phase, setPhase] = useState<Phase>("idle");
   const [countdown, setCountdown] = useState(3);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   // Run recording
   const [coords, setCoords] = useState<Coord[]>([]);
@@ -102,7 +111,7 @@ export default function RunPage() {
   const [elapsed, setElapsed] = useState(0);
   const pausedMsRef = useRef(0);
   const pauseStartRef = useRef(0);
-  const runWatchRef = useRef<number | null>(null);
+  useEffect(() => { startTimeRef.current = startTime; }, [startTime]);
 
   // History
   const [runs, setRuns] = useState<RunRoute[]>([]);
@@ -120,156 +129,168 @@ export default function RunPage() {
   const liveSessionRef = useRef<string | null>(null);
   const lastShareWriteRef = useRef<number>(0);
 
-  // ── Location: uses @capacitor/geolocation on native, navigator on web ────
+  // ── Single persistent location watch ─────────────────────────────────────
 
   const isNative = Capacitor.isNativePlatform();
+
+  // Position handler — uses refs so it never has stale closures
+  const handlePosition = (lat: number, lng: number, accuracy?: number) => {
+    if (!mountedRef.current) return;
+
+    // Update map dot: only if accuracy is reasonable (≤ 80m), avoids wild off-road jumps
+    if (accuracy === undefined || accuracy <= 80) {
+      setCurrentPos({ lat, lng });
+    }
+
+    // Record route point only while actively running with good GPS (≤ 30m)
+    if (phaseRef.current !== "running") return;
+    if (accuracy !== undefined && accuracy > 30) return;
+
+    // Distance filter and accumulation live OUTSIDE the setCoords updater to prevent
+    // React 18 concurrent-mode double-invocation from corrupting distRef or firing
+    // duplicate Firestore writes.
+    const last = lastAcceptedCoordRef.current;
+    if (last) {
+      const d = haversineDist(last.lat, last.lng, lat, lng);
+      if (d < 8 || d > 100) return;
+      distRef.current += d;
+    }
+    lastAcceptedCoordRef.current = { lat, lng };
+    setDistance(distRef.current);
+    writeLivePosition(lat, lng, distRef.current, Math.floor((Date.now() - startTimeRef.current - pausedMsRef.current) / 1000));
+    setCoords(prev => [...prev, { lat, lng, ts: Date.now() }]);
+  };
+
+  const stopWatch = async () => {
+    if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
+    if (watchRef.current !== null) {
+      if (isNative) {
+        const { Geolocation } = await import("@capacitor/geolocation");
+        await Geolocation.clearWatch({ id: watchRef.current }).catch(() => {});
+      } else {
+        navigator.geolocation.clearWatch(watchRef.current);
+      }
+      watchRef.current = null;
+    }
+  };
+
+  // Start the single watch — no permission dialog unless requestPermission=true
+  const startWatch = async (requestPermission = false) => {
+    if (!mountedRef.current) return;
+    await stopWatch();
+
+    try {
+      if (isNative) {
+        const { Geolocation } = await import("@capacitor/geolocation");
+
+        if (requestPermission) {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location === "denied") { setLocState("denied"); enablingRef.current = false; return; }
+        } else {
+          const status = await Geolocation.checkPermissions();
+          if (status.location === "denied") { setLocState("denied"); return; }
+          if (status.location !== "granted") {
+            // Permission was reset (app reinstall etc.) — clear flag and show Enable button
+            localStorage.removeItem("felcin_loc");
+            setLocState("prompt");
+            return;
+          }
+        }
+
+        // Get an immediate fix so the map centres right away
+        try {
+          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+          if (mountedRef.current) setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        } catch {}
+
+        if (!mountedRef.current) return;
+        localStorage.setItem("felcin_loc", "1");
+        setLocState("granted");
+
+        const id = await Geolocation.watchPosition(
+          { enableHighAccuracy: true },
+          (pos, err) => {
+            if (!mountedRef.current) return;
+            if (err) {
+              // GPS error — auto-reconnect in 3 s without asking permission again
+              reconnectRef.current = setTimeout(() => startWatch(false), 3000);
+              return;
+            }
+            if (pos) handlePosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy ?? undefined);
+          }
+        );
+        watchRef.current = id;
+
+      } else {
+        // Web fallback
+        watchRef.current = navigator.geolocation.watchPosition(
+          (pos) => handlePosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+          (err) => {
+            if (!mountedRef.current) return;
+            if (err.code === 1) { setLocState("denied"); return; }
+            // Non-permission error — auto-reconnect
+            reconnectRef.current = setTimeout(() => startWatch(false), 3000);
+          },
+          { enableHighAccuracy: true, maximumAge: 2000 } // no timeout → never fires errors on slow GPS
+        );
+        setLocState("granted");
+        enablingRef.current = false;
+      }
+    } catch {
+      // Unexpected plugin/bridge error — schedule reconnect (auto-watch path only)
+      enablingRef.current = false;
+      if (mountedRef.current && !requestPermission) {
+        reconnectRef.current = setTimeout(() => startWatch(false), 3000);
+      }
+      return;
+    }
+
+    enablingRef.current = false;
+  };
 
   const enableLocation = async () => {
     if (enablingRef.current) return;
     enablingRef.current = true;
     setLocState("waiting");
-    try {
-      if (isNative) {
-        const { Geolocation } = await import("@capacitor/geolocation");
-        // Request permission — iOS shows "Allow While Using App" dialog here.
-        // This awaits the user's response; no timeout needed.
-        const perm = await Geolocation.requestPermissions();
-        if (perm.location === "denied") { setLocState("denied"); enablingRef.current = false; return; }
-
-        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000 });
-        setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocState("granted");
-
-        if (idleWatchRef.current === null) {
-          idleWatchRef.current = await Geolocation.watchPosition(
-            { enableHighAccuracy: false },
-            (p, err) => { if (!err && p) setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }); }
-          );
-        }
-      } else {
-        // Web: navigator.geolocation is callback-based, no first-class await
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-            setLocState("granted");
-            if (idleWatchRef.current === null) {
-              idleWatchRef.current = navigator.geolocation.watchPosition(
-                (p) => setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-                () => {},
-                { enableHighAccuracy: false, maximumAge: 5000, timeout: 30000 }
-              );
-            }
-            enablingRef.current = false;
-          },
-          (err) => { setLocState(err.code === 1 ? "denied" : "prompt"); enablingRef.current = false; },
-          { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 }
-        );
-        return; // web path resolves via callbacks
-      }
-    } catch (e) {
-      console.error("Location error:", e);
-      setLocState("denied");
-    }
-    enablingRef.current = false;
+    await startWatch(true);
   };
 
-  // Clean up watches on unmount
-  useEffect(() => () => {
-    (async () => {
-      if (idleWatchRef.current !== null) {
-        if (isNative) {
-          const { Geolocation } = await import("@capacitor/geolocation");
-          await Geolocation.clearWatch({ id: idleWatchRef.current as any });
-        } else {
-          navigator.geolocation.clearWatch(idleWatchRef.current as any);
-        }
-      }
-      if (runWatchRef.current !== null) {
-        if (isNative) {
-          const { Geolocation } = await import("@capacitor/geolocation");
-          await Geolocation.clearWatch({ id: runWatchRef.current as any });
-        } else {
-          navigator.geolocation.clearWatch(runWatchRef.current as any);
-        }
-      }
-    })();
-  }, []);
-
-  // ── High-accuracy run recording watch ────────────────────────────────────
-
+  // On mount: auto-start if permission already granted. Cleanup on unmount.
   useEffect(() => {
-    if (phase !== "running") {
-      if (runWatchRef.current !== null) {
-        (async () => {
-          if (isNative) {
-            const { Geolocation } = await import("@capacitor/geolocation");
-            await Geolocation.clearWatch({ id: runWatchRef.current as any });
-          } else {
-            navigator.geolocation.clearWatch(runWatchRef.current as any);
-          }
-          runWatchRef.current = null;
-        })();
-      }
-      return;
-    }
-
-    // accuracy = GPS error radius in metres. Skip noisy readings for the route
-    // but still update the map dot (currentPos) so the pin doesn't freeze.
-    const onPos = (lat: number, lng: number, accuracy?: number) => {
-      // Always move the map dot, even on imprecise readings
-      if (accuracy === undefined || accuracy <= 50) {
-        setCurrentPos({ lat, lng });
-      }
-
-      // Only add to the route if the fix is good (≤30 m accuracy, ≥8 m moved)
-      if (accuracy !== undefined && accuracy > 30) return;
-
-      setCoords((prev) => {
-        if (prev.length === 0) return [{ lat, lng, ts: Date.now() }];
-        const last = prev[prev.length - 1];
-        const d = haversineDist(last.lat, last.lng, lat, lng);
-        if (d < 8) return prev;          // raised from 4 → 8 m to cut GPS jitter
-        if (d > 100) return prev;        // >100 m jump in one tick = bad reading, skip
-        distRef.current += d;
-        setDistance(distRef.current);
-        writeLivePosition(lat, lng, distRef.current, Math.floor((Date.now() - startTime - pausedMsRef.current) / 1000));
-        return [...prev, { lat, lng, ts: Date.now() }];
+    mountedRef.current = true;
+    // Restore saved permission state synchronously so the UI never flashes "Enable"
+    // on returning users. SSR renders "prompt"; this effect runs client-side only.
+    if (localStorage.getItem("felcin_loc") === "1") setLocState("waiting");
+    if (isNative) {
+      import("@capacitor/geolocation").then(({ Geolocation }) => {
+        Geolocation.checkPermissions().then(s => {
+          if (s.location === "granted") startWatch(false);
+          else if (s.location === "denied") setLocState("denied");
+        }).catch(() => {});
       });
-    };
-
-    (async () => {
-      if (isNative) {
-        const { Geolocation } = await import("@capacitor/geolocation");
-        const id = await Geolocation.watchPosition(
-          { enableHighAccuracy: true },
-          (pos, err) => {
-            if (!err && pos) onPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy ?? undefined);
-          }
-        );
-        runWatchRef.current = id as any;
-      } else {
-        runWatchRef.current = navigator.geolocation.watchPosition(
-          (pos) => onPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-          () => {},
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
-        ) as any;
-      }
-    })();
-
+    } else {
+      navigator.permissions?.query({ name: "geolocation" as PermissionName }).then(r => {
+        if (r.state === "granted") startWatch(false);
+        if (r.state === "denied") setLocState("denied");
+      }).catch(() => {});
+    }
     return () => {
-      if (runWatchRef.current !== null) {
-        (async () => {
-          if (isNative) {
-            const { Geolocation } = await import("@capacitor/geolocation");
-            await Geolocation.clearWatch({ id: runWatchRef.current as any });
-          } else {
-            navigator.geolocation.clearWatch(runWatchRef.current as any);
-          }
-          runWatchRef.current = null;
-        })();
+      mountedRef.current = false;
+      // Clear reconnect timer synchronously; clear the native watch without blocking unmount.
+      if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
+      if (watchRef.current !== null) {
+        const id = watchRef.current;
+        watchRef.current = null;
+        if (isNative) {
+          import("@capacitor/geolocation").then(({ Geolocation }) => {
+            Geolocation.clearWatch({ id }).catch(() => {});
+          });
+        } else {
+          navigator.geolocation.clearWatch(id);
+        }
       }
     };
-  }, [phase]);
+  }, []);
 
   // ── Load history ─────────────────────────────────────────────────────────
 
@@ -289,6 +310,7 @@ export default function RunPage() {
     if (phase !== "countdown") return;
     if (countdown <= 0) {
       distRef.current = 0; pausedMsRef.current = 0; pauseStartRef.current = 0;
+      lastAcceptedCoordRef.current = null;
       setDistance(0); setCoords([]); setElapsed(0);
       setStartTime(Date.now()); setPhase("running");
       return;
@@ -395,7 +417,7 @@ export default function RunPage() {
     await stopSharing();
     setPhase("completed");
   };
-  const discardRun = () => { setCoords([]); setDistance(0); setElapsed(0); setPhase("idle"); };
+  const discardRun = () => { setCoords([]); setDistance(0); setElapsed(0); distRef.current = 0; lastAcceptedCoordRef.current = null; setPhase("idle"); };
 
   const saveRun = async () => {
     if (!user || savingRef.current) return;
@@ -422,6 +444,37 @@ export default function RunPage() {
 
   const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const isTracking = phase === "running" || phase === "paused";
+
+  // ── Coming soon (non-admin) ───────────────────────────────────────────────
+
+  if (!isAdmin) {
+    return (
+      <div style={{ minHeight: "100dvh", background: "#090909", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 80px)", textAlign: "center" }}>
+        <style>{`@keyframes onAirPulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
+        <div style={{ background: "rgba(0,18,8,0.85)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 28, padding: "40px 32px", maxWidth: 340, width: "100%", boxShadow: "0 0 60px rgba(34,197,94,0.07), inset 0 1px 0 rgba(255,255,255,0.03)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 28 }}>
+            <FelcinLogo size={62} />
+            <div style={{ width: 1, height: 46, background: "rgba(34,197,94,0.28)" }} />
+            <div style={{ width: 62, height: 62, borderRadius: 18, background: "rgba(34,197,94,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 38, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", letterSpacing: "0.18em", marginBottom: 10 }}>FELCIN</div>
+          <h2 style={{ fontSize: 26, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-0.5px", margin: "0 0 18px" }}>Run Tracker</h2>
+          <svg viewBox="0 0 220 44" style={{ width: "80%", maxWidth: 220, marginBottom: 22, overflow: "visible" }}>
+            <path d="M0,22 L72,22 L80,22 L86,7 L96,38 L104,12 L110,22 L220,22" fill="none" stroke="#22c55e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.65"/>
+          </svg>
+          <p style={{ fontSize: 13, color: "#4a4a4a", lineHeight: 1.75, marginBottom: 28, maxWidth: 260, margin: "0 auto 28px" }}>
+            Live GPS route tracking, real-time maps, personal records, and pace analytics — launching soon.
+          </p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 22px", borderRadius: 22, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "onAirPulse 1.5s ease-in-out infinite" }} />
+            <span style={{ fontSize: 11, fontWeight: 800, color: "#22c55e", letterSpacing: "0.12em" }}>COMING SOON</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Permission screen ─────────────────────────────────────────────────────
 

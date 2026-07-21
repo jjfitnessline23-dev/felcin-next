@@ -7,8 +7,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  OAuthProvider,
-  signInWithCredential,
   signInWithPopup,
   sendPasswordResetEmail,
   sendEmailVerification,
@@ -127,12 +125,9 @@ export default function LoginPage() {
         try { await FirebaseAuthentication.signOut(); } catch {}
         const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
         if (!result.credential?.idToken) throw new Error("No ID token returned");
-        const credential = GoogleAuthProvider.credential(
-          result.credential.idToken,
-          result.credential.accessToken ?? null
-        );
-        const userCred = await signInWithCredential(auth, credential);
-        const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
+        // Native plugin already signed the user into Firebase — auth state listener fires.
+        // Do not call signInWithCredential(auth, ...) here: auth is null on Capacitor builds.
+        const isNew = result.additionalUserInfo?.isNewUser ?? false;
         window.location.href = isNew ? "/onboarding" : "/";
       } else {
         // Web browser: popup keeps the user on felcin.com, avoiding the felcin.firebaseapp.com
@@ -171,13 +166,9 @@ setError(
       const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
       const result = await FirebaseAuthentication.signInWithApple();
       if (!result.credential?.idToken) throw new Error("No ID token returned");
-      const provider = new OAuthProvider("apple.com");
-      const credential = provider.credential({
-        idToken: result.credential.idToken,
-        rawNonce: result.credential.nonce ?? undefined,
-      });
-      const userCred = await signInWithCredential(auth, credential);
-      const isNew = userCred.user.metadata.creationTime === userCred.user.metadata.lastSignInTime;
+      // Native plugin already signed the user into Firebase — auth state listener fires.
+      // Do not call signInWithCredential(auth, ...) here: auth is null on Capacitor builds.
+      const isNew = result.additionalUserInfo?.isNewUser ?? false;
       window.location.href = isNew ? "/onboarding" : "/";
     } catch (err: unknown) {
       setStep("");
