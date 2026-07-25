@@ -364,7 +364,6 @@ export default function AdminPortalPage() {
     setTogglingAdvertise(false);
   };
 
-
   const pendingReports = reports.filter((r) => r.status !== "reviewed");
 
   const deleteGhost = async (id: string) => {
@@ -1203,7 +1202,6 @@ export default function AdminPortalPage() {
                   style={{ transform: advertiseEnabled ? "translateX(20px)" : "translateX(0)" }} />
               </button>
             </div>
-
           </div>
 
         ) : tab === "marketing" ? (

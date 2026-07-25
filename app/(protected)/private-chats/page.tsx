@@ -47,6 +47,7 @@ export default function PrivateChatsPage() {
   const [otherOnline, setOtherOnline] = useState(false);
   const [otherLastSeen, setOtherLastSeen] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const chatRootRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -95,6 +96,45 @@ export default function PrivateChatsPage() {
     }, () => {});
   }, [user]);
 
+  // When keyboard opens in Capacitor WKWebView, window.innerHeight stays fixed but
+  // visualViewport.height shrinks. The chat root sits below env(safe-area-inset-top)
+  // so a height-only fix overflows. Instead: switch to position:fixed when keyboard
+  // is open, pinning the container between safe-area-top and the keyboard top.
+  useEffect(() => {
+    const root = chatRootRef.current;
+    if (!root) return;
+    const update = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const isDesktop = window.innerWidth >= 1024;
+      const kbHeight = isDesktop ? 0 : Math.max(0, window.innerHeight - vv.height);
+      const kbOpen = kbHeight > 150;
+      if (kbOpen) {
+        root.style.position = "fixed";
+        root.style.top = "env(safe-area-inset-top, 0px)";
+        root.style.bottom = `${kbHeight}px`;
+        root.style.left = "0";
+        root.style.right = "0";
+        root.style.height = "auto";
+        requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }));
+      } else {
+        root.style.position = "";
+        root.style.top = "";
+        root.style.bottom = "";
+        root.style.left = "";
+        root.style.right = "";
+        root.style.height = "";
+      }
+    };
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
+  }, []);
+
   useEffect(() => {
     if (!activeChat) { setMessages([]); return; }
     // No orderBy — serverTimestamp() causes pending docs to be excluded from ordered queries
@@ -103,7 +143,7 @@ export default function PrivateChatsPage() {
     const unsub = onSnapshot(q, (snap) => {
       const sorted = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<Msg, "id">) }))
-        .sort((a, b) => (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0));
+        .sort((a, b) => (a.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER) - (b.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER));
       setMessages(sorted);
       clearTimeout(scrollTimer.current);
       scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
@@ -121,16 +161,22 @@ export default function PrivateChatsPage() {
       await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, text: t, createdAt: serverTimestamp() });
       const otherUid = activeChat.split("_").find((id) => id !== user.uid);
       if (otherUid) {
+        const preview = t.length > 50 ? t.slice(0, 50) + "…" : t;
         addDoc(collection(db, "notifications"), {
           recipientId: otherUid, senderId: user.uid,
           senderName: user.displayName || "Someone",
           senderPhoto: user.photoURL || "",
           type: "message",
-          message: t.length > 50 ? t.slice(0, 50) + "…" : t,
+          message: preview,
           read: false, createdAt: serverTimestamp(),
         }).catch(() => {});
+        fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: preview }),
+        }).catch(() => {});
       }
-    } catch {}
+    } catch { setText(t); }
     setSending(false);
   };
 
@@ -138,7 +184,7 @@ export default function PrivateChatsPage() {
   const hasText = text.trim().length > 0;
 
   return (
-    <div className="private-chats-root flex overflow-hidden" style={{ background: "#090909" }}>
+    <div ref={chatRootRef} className="private-chats-root flex overflow-hidden" style={{ background: "#090909", height: "calc(100dvh - 4rem - env(safe-area-inset-top, 0px))" }}>
 
       {/* ── Chat list panel ── */}
       <div className={`shrink-0 flex flex-col ${
@@ -221,7 +267,7 @@ export default function PrivateChatsPage() {
 
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 shrink-0"
-            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)" }}>
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)", paddingTop: "max(12px, env(safe-area-inset-top, 0px))" }}>
             <button onClick={() => setActiveChat(null)} className="icon-btn lg:hidden" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
@@ -251,7 +297,7 @@ export default function PrivateChatsPage() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5" style={{ position: "relative" }}>
+          <div className="flex-1 overflow-y-auto min-h-0" style={{ position: "relative" }}>
 
             {/* Ghost watermark */}
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", overflow: "hidden" }}>
@@ -264,65 +310,70 @@ export default function PrivateChatsPage() {
               </svg>
             </div>
 
-            {messages.length === 0 && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100%", padding: "32px 16px", gap: 20, position: "relative", zIndex: 1 }}>
+            {/* Inner flex column — minHeight 100% + justify-end pushes messages to bottom */}
+            <div style={{ minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "16px", gap: "6px" }}>
 
-                {/* Ghost icon */}
-                <div style={{ position: "relative", width: 72, height: 72 }}>
-                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)", animation: "ghostPulse 3s ease-in-out infinite" }} />
-                  <div style={{ width: "100%", height: "100%", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(168,85,247,0.2)" }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="40" height="40">
-                      <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="rgba(168,85,247,0.6)"/>
-                      <circle cx="24" cy="29" r="4.5" fill="#090909"/>
-                      <circle cx="40" cy="29" r="4.5" fill="#090909"/>
-                      <path d="M 0,36 L 14,36 L 16,34 L 18,36 L 20,36 L 21,38 L 24,20 L 27,39 L 30,34 L 32,36 C 34,36 35,31 37,36 L 64,36"
-                        fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
+              {messages.length === 0 && (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 20, position: "relative", zIndex: 1 }}>
 
-                <div style={{ textAlign: "center" }}>
-                  <p style={{ fontWeight: 700, fontSize: 15, color: "#f2f2f2", marginBottom: 4 }}>{otherName}</p>
-                  <p style={{ fontSize: 13, color: "#555" }}>Say hello 👋</p>
-                </div>
-
-                {/* Ghost sayings */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", maxWidth: 240 }}>
-                  {[
-                    { emoji: "👻", text: "The Ghost is listening..." },
-                    { emoji: "⚡", text: "Train together, even apart." },
-                    { emoji: "🔥", text: "Every great session starts with a message." },
-                  ].map((s) => (
-                    <div key={s.text} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 16, background: "rgba(168,85,247,0.05)", border: "1px solid rgba(168,85,247,0.1)" }}>
-                      <span style={{ fontSize: 14, flexShrink: 0 }}>{s.emoji}</span>
-                      <span style={{ fontSize: 12, color: "#555", lineHeight: 1.4 }}>{s.text}</span>
+                  {/* Ghost icon */}
+                  <div style={{ position: "relative", width: 72, height: 72 }}>
+                    <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)", animation: "ghostPulse 3s ease-in-out infinite" }} />
+                    <div style={{ width: "100%", height: "100%", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(168,85,247,0.2)" }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="40" height="40">
+                        <path d="M 12 32 A 20 20 0 0 0 52 32 L 52 50 Q 46 57 40 50 Q 32 57 24 50 Q 18 57 12 50 Z" fill="rgba(168,85,247,0.6)"/>
+                        <circle cx="24" cy="29" r="4.5" fill="#090909"/>
+                        <circle cx="40" cy="29" r="4.5" fill="#090909"/>
+                        <path d="M 0,36 L 14,36 L 16,34 L 18,36 L 20,36 L 21,38 L 24,20 L 27,39 L 30,34 L 32,36 C 34,36 35,31 37,36 L 64,36"
+                          fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {messages.map((m, i) => {
-              const isMine = m.senderId === user?.uid;
-              const prevSame = i > 0 && messages[i-1].senderId === m.senderId;
-              return (
-                <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`} style={{ marginTop: prevSame ? 2 : 8 }}>
-                  <div className="max-w-[72%] px-4 py-2.5 text-sm leading-relaxed" style={{
-                    background: isMine
-                      ? "linear-gradient(135deg,#7C3AED,#a855f7)"
-                      : "linear-gradient(135deg,#1a1a2a,#131320)",
-                    color: isMine ? "#fff" : "#e0e0e0",
-                    borderRadius: isMine
-                      ? (prevSame ? "18px 6px 6px 18px" : "18px 18px 6px 18px")
-                      : (prevSame ? "6px 18px 18px 6px" : "18px 18px 18px 6px"),
-                    boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
-                    border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
-                  }}>
-                    {m.text}
+                  </div>
+
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ fontWeight: 700, fontSize: 15, color: "#f2f2f2", marginBottom: 4 }}>{otherName}</p>
+                    <p style={{ fontSize: 13, color: "#555" }}>Say hello 👋</p>
+                  </div>
+
+                  {/* Ghost sayings */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", maxWidth: 240 }}>
+                    {[
+                      { emoji: "👻", text: "The Ghost is listening..." },
+                      { emoji: "⚡", text: "Train together, even apart." },
+                      { emoji: "🔥", text: "Every great session starts with a message." },
+                    ].map((s) => (
+                      <div key={s.text} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 16, background: "rgba(168,85,247,0.05)", border: "1px solid rgba(168,85,247,0.1)" }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>{s.emoji}</span>
+                        <span style={{ fontSize: 12, color: "#555", lineHeight: 1.4 }}>{s.text}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-            <div ref={bottomRef} />
+              )}
+
+              {messages.map((m, i) => {
+                const isMine = m.senderId === user?.uid;
+                const prevSame = i > 0 && messages[i-1].senderId === m.senderId;
+                return (
+                  <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`} style={{ marginTop: prevSame ? 2 : 8 }}>
+                    <div className="max-w-[72%] px-4 py-2.5 text-sm leading-relaxed" style={{
+                      background: isMine
+                        ? "linear-gradient(135deg,#7C3AED,#a855f7)"
+                        : "linear-gradient(135deg,#1a1a2a,#131320)",
+                      color: isMine ? "#fff" : "#e0e0e0",
+                      borderRadius: isMine
+                        ? (prevSame ? "18px 6px 6px 18px" : "18px 18px 6px 18px")
+                        : (prevSame ? "6px 18px 18px 6px" : "18px 18px 18px 6px"),
+                      boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+                      border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
+                    }}>
+                      {m.text}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={bottomRef} />
+            </div>
           </div>
 
           {/* Input bar */}
@@ -342,8 +393,8 @@ export default function PrivateChatsPage() {
               placeholder="Type a message…"
               className="flex-1 px-4 py-2.5 rounded-full outline-none transition-all"
               style={{
-                background: hasText ? "rgba(124,58,237,0.08)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${hasText ? "rgba(124,58,237,0.3)" : "rgba(255,255,255,0.08)"}`,
+                background: hasText ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.12)",
+                border: `1px solid ${hasText ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.2)"}`,
                 color: "#f2f2f2", fontSize: 16,
               }} />
             <button type="button" onClick={(e) => { e.preventDefault(); sendMsg(); }} disabled={!hasText || sending}

@@ -127,10 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Web: use Firebase web SDK auth
-    // 3 s fallback — Firebase local persistence typically resolves in < 200 ms,
-    // but a generous timeout prevents the spinner being replaced by a /login flash
-    // on slow first loads.
-    const timeout = setTimeout(() => { if (mounted) setLoading(false); }, 3000);
+    const timeout = setTimeout(() => { if (mounted) setLoading(false); }, 500);
     const unsub = onAuthStateChanged(auth, (u) => {
       clearTimeout(timeout);
       handleUser(u);
