@@ -2,19 +2,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/firebase";
+import OutageScreen from "./OutageScreen";
 
 type Status = "ok" | "offline" | "platform_down" | "reconnected";
 
 export default function OfflineBanner() {
   const [status, setStatus] = useState<Status>("ok");
-  const [dismissed, setDismissed] = useState(false);
   const platformTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusRef = useRef<Status>("ok");
 
   const set = (s: Status) => {
     statusRef.current = s;
     setStatus(s);
-    if (s !== "platform_down") setDismissed(false);
   };
 
   useEffect(() => {
@@ -107,26 +106,16 @@ export default function OfflineBanner() {
   }, []);
 
   if (status === "ok") return null;
-  if (status === "platform_down" && dismissed) return null;
 
-  const isPlatformDown = status === "platform_down";
-  const isOffline = status === "offline";
+  // Full-screen takeover for platform outage — replaces whatever broken UI is beneath
+  if (status === "platform_down") return <OutageScreen />;
+
   const isReconnected = status === "reconnected";
 
-  const bg = isReconnected
-    ? "rgba(34,197,94,0.97)"
-    : isPlatformDown
-    ? "rgba(12,8,30,0.97)"
-    : "rgba(17,17,17,0.97)";
-
-  const border = isReconnected
-    ? "rgba(34,197,94,0.4)"
-    : isPlatformDown
-    ? "rgba(124,58,237,0.35)"
-    : "rgba(239,68,68,0.3)";
-
-  const icon = isReconnected ? "check_circle" : isPlatformDown ? "construction" : "wifi_off";
-  const iconColor = isReconnected ? "#fff" : isPlatformDown ? "#a78bfa" : "#ef4444";
+  const bg = isReconnected ? "rgba(34,197,94,0.97)" : "rgba(17,17,17,0.97)";
+  const border = isReconnected ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.3)";
+  const icon = isReconnected ? "check_circle" : "wifi_off";
+  const iconColor = isReconnected ? "#fff" : "#ef4444";
 
   return (
     <div
@@ -156,31 +145,15 @@ export default function OfflineBanner() {
       </span>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: isReconnected ? "#fff" : isPlatformDown ? "#e2d9f3" : "#f87171" }}>
-          {isReconnected
-            ? "Back online"
-            : isPlatformDown
-            ? "We're experiencing technical issues"
-            : "No internet connection"}
+        <span style={{ fontSize: 13, fontWeight: 700, color: isReconnected ? "#fff" : "#f87171" }}>
+          {isReconnected ? "Back online" : "No internet connection"}
         </span>
         {!isReconnected && (
-          <span style={{ fontSize: 11, color: isOffline ? "#555" : "#7c6fa8", marginLeft: 6 }}>
-            {isPlatformDown
-              ? "Our team is working on it — features may be limited"
-              : "Some features may not work"}
+          <span style={{ fontSize: 11, color: "#555", marginLeft: 6 }}>
+            Some features may not work
           </span>
         )}
       </div>
-
-      {isPlatformDown && (
-        <button
-          onClick={() => setDismissed(true)}
-          style={{ flexShrink: 0, background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#7c6fa8", lineHeight: 1 }}
-          aria-label="Dismiss"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-        </button>
-      )}
     </div>
   );
 }
