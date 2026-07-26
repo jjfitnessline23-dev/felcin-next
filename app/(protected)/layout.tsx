@@ -9,8 +9,10 @@ import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import OfflineBanner from "@/components/OfflineBanner";
 import EmailVerifyBanner from "@/components/EmailVerifyBanner";
+import UpdateBanner from "@/components/UpdateBanner";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, banned, signOut } = useAuth();
@@ -102,12 +104,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ background: "#090909", minHeight: "100dvh" }}>
+      <UpdateBanner />
       <OfflineBanner />
       <EmailVerifyBanner />
       <Sidebar />
       <main className="lg:pl-60 pb-16 lg:pb-0 min-h-screen" style={{ width: "100%", paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className="w-full lg:max-w-[430px] lg:mx-auto">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </div>
       </main>
       <MobileNav />

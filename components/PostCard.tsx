@@ -104,10 +104,9 @@ async function buildWatermarkCanvas(cw: number, ch: number): Promise<HTMLCanvasE
 
 export default function PostCard({ post, onBlock, boostEnabled = true }: { post: Post; onBlock?: (uid: string) => void; boostEnabled?: boolean }) {
   const { user } = useAuth();
-  const [liked, setLiked] = useState(post.likedBy?.includes(user?.uid || "") ?? false);
-  const [likeCount, setLikeCount] = useState(post.likes ?? 0);
+  const [liked, setLiked] = useState(Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || ""));
+  const [likeCount, setLikeCount] = useState(typeof post.likes === "number" ? post.likes : 0);
   const [imgBroken, setImgBroken] = useState(false);
-  const [videoPaused, setVideoPaused] = useState(false);
   const [videoMuted, setVideoMuted] = useState(true);
   const [liking, setLiking] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -260,8 +259,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   };
 
   useEffect(() => {
-    setLiked(post.likedBy?.includes(user?.uid || "") ?? false);
-    setLikeCount(post.likes ?? 0);
+    setLiked(Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || ""));
+    setLikeCount(typeof post.likes === "number" ? post.likes : 0);
   }, [post.likedBy, post.likes, user?.uid]);
 
   useEffect(() => {
@@ -768,7 +767,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
             style={{ color: "#555" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chat_bubble</span>
-            <span className="text-sm font-semibold">{Math.max(0, post.comments ?? 0)}</span>
+            <span className="text-sm font-semibold">{Math.max(0, typeof post.comments === "number" ? post.comments : 0)}</span>
           </Link>
 
           <button onClick={handleRepost} disabled={reposting || !!post.isRepost}

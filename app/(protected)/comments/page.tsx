@@ -80,7 +80,7 @@ export default function CommentsPage() {
       const p = snap.data() as Post;
       setPost(p);
       setLikeCount(p.likes ?? 0);
-      if (user) setLiked(p.likedBy?.includes(user.uid) ?? false);
+      if (user) setLiked(Array.isArray(p.likedBy) && p.likedBy.includes(user.uid));
 
       if (user?.uid !== p.authorId) {
         const viewedKey = `viewed_${postId}`;
@@ -134,9 +134,15 @@ export default function CommentsPage() {
     }).catch(() => router.replace("/"));
 
     initialLoadDone.current = false;
-    const q = query(collection(db, col, postId, "comments"), orderBy("createdAt", "asc"));
+    // No orderBy — serverTimestamp() causes pending docs to be excluded from ordered queries.
+    // Sort client-side so comments appear immediately on send.
+    const q = query(collection(db, col, postId, "comments"));
     const unsub = onSnapshot(q, (snap) => {
-      setComments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Comment, "id">) })));
+      setComments(
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<Comment, "id">) }))
+          .sort((a, b) => (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0))
+      );
       if (initialLoadDone.current) {
         clearTimeout(scrollTimer.current);
         scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
@@ -189,7 +195,7 @@ export default function CommentsPage() {
           body: JSON.stringify({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", postId }),
         }).catch(() => {});
       }
-    } catch {}
+    } catch { setText(t); }
     setSending(false);
   };
 

@@ -23,6 +23,7 @@ interface RunRoute {
   coordinates?: { lat: number; lng: number }[];
 }
 type Phase = "idle" | "countdown" | "running" | "paused" | "completed";
+type ActivityMode = "run" | "cycle";
 type LocState = "prompt" | "waiting" | "granted" | "denied";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -104,9 +105,15 @@ export default function RunPage() {
   const pauseStartRef = useRef(0);
   const runWatchRef = useRef<number | null>(null);
 
+  // Activity mode + units
+  const [mode, setMode] = useState<ActivityMode>("run");
+  const [useMiles, setUseMiles] = useState(false);
+
   // History
   const [runs, setRuns] = useState<RunRoute[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
+  const [rides, setRides] = useState<RunRoute[]>([]);
+  const [loadingRides, setLoadingRides] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
   const savingRef = useRef(false);
   const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
@@ -281,6 +288,12 @@ export default function RunPage() {
         setRuns((await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute)));
       } catch { } finally { setLoadingRuns(false); }
     })();
+    (async () => {
+      try {
+        const q = query(collection(db, "users", user.uid, "cyclingRoutes"), orderBy("date", "desc"), limit(30));
+        setRides((await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute)));
+      } catch { } finally { setLoadingRides(false); }
+    })();
   }, [user]);
 
   // ── Countdown ────────────────────────────────────────────────────────────
@@ -400,19 +413,25 @@ export default function RunPage() {
   const saveRun = async () => {
     if (!user || savingRef.current) return;
     savingRef.current = true;
-    const duration = elapsed, avgPace = distance > 0 ? duration / (distance / 1000) : 0;
-    const maxDist = runs.reduce((m, r) => Math.max(m, r.distance || 0), 0);
-    const bestPace = runs.filter(r => r.avgPace > 0 && r.distance >= 1000).reduce((m, r) => Math.min(m, r.avgPace), Infinity);
+    const isCycle = mode === "cycle";
+    const duration = elapsed;
+    const avgPace = distance > 0 ? duration / (distance / 1000) : 0;
+    const history = isCycle ? rides : runs;
+    const maxDist = history.reduce((m, r) => Math.max(m, r.distance || 0), 0);
+    const bestPace = history.filter(r => r.avgPace > 0 && r.distance >= 500).reduce((m, r) => Math.min(m, r.avgPace), Infinity);
     const isDistancePR = distance > 100 && distance > maxDist;
-    const isPacePR = distance >= 1000 && avgPace > 0 && avgPace < bestPace;
+    const isPacePR = distance >= 500 && avgPace > 0 && avgPace < bestPace;
     let stored = coords;
     if (coords.length > 1000) { const step = Math.ceil(coords.length / 1000); stored = coords.filter((_, i) => i % step === 0); }
-    const name = `${new Date().toLocaleDateString("en-US", { weekday: "short" })} Run`;
+    const day = new Date().toLocaleDateString("en-US", { weekday: "short" });
+    const name = isCycle ? `${day} Ride` : `${day} Run`;
+    const col = isCycle ? "cyclingRoutes" : "runningRoutes";
     try {
-      const ref = await addDoc(collection(db, "users", user.uid, "runningRoutes"), {
+      const ref = await addDoc(collection(db, "users", user.uid, col), {
         coordinates: stored, distance, duration, avgPace, date: serverTimestamp(), isDistancePR, isPacePR, name,
       });
-      setRuns(prev => [{ id: ref.id, name, distance, duration, avgPace, date: new Date(), isDistancePR, isPacePR }, ...prev]);
+      const entry = { id: ref.id, name, distance, duration, avgPace, date: new Date(), isDistancePR, isPacePR };
+      if (isCycle) setRides(prev => [entry, ...prev]); else setRuns(prev => [entry, ...prev]);
       setLastSaved({ isDistancePR, isPacePR });
     } catch (e) { console.error(e); }
     savingRef.current = false;
@@ -421,7 +440,22 @@ export default function RunPage() {
 
 
   const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
+  const speedKmh = elapsed > 0 ? (distance / elapsed) * 3.6 : 0;
   const isTracking = phase === "running" || phase === "paused";
+  const isCycle = mode === "cycle";
+  const ACCENT = isCycle ? "#f97316" : "#22c55e";
+  const ACCENT_GLOW = isCycle ? "rgba(249,115,22,0.28)" : "rgba(34,197,94,0.28)";
+  const ACTIVITY_ICON = isCycle ? "directions_bike" : "directions_run";
+  const ACTIVITY_LABEL = isCycle ? "Ride" : "Run";
+
+  // Unit helpers
+  const KM_TO_MI = 0.621371;
+  const distDisplay = useMiles ? (distance / 1000 * KM_TO_MI).toFixed(2) : (distance / 1000).toFixed(2);
+  const distUnit = useMiles ? "MI" : "KM";
+  const paceDisplay = isCycle
+    ? (useMiles ? (speedKmh * KM_TO_MI).toFixed(1) : speedKmh.toFixed(1))
+    : formatPace(useMiles ? avgPace * KM_TO_MI : avgPace);
+  const paceUnit = isCycle ? (useMiles ? "MPH" : "KM/H") : (useMiles ? "MIN/MI" : "MIN/KM");
 
   // ── Permission screen ─────────────────────────────────────────────────────
 
@@ -546,13 +580,17 @@ export default function RunPage() {
         <>
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, padding: "calc(env(safe-area-inset-top,0px) + 20px) 24px 22px", background: "linear-gradient(to bottom,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 75%,transparent 100%)" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              {[{ label: "KM", value: (distance / 1000).toFixed(2) }, { label: "TIME", value: formatTime(elapsed) }, { label: "MIN/KM", value: formatPace(avgPace) }].map(({ label, value }) => (
+              {[{ label: distUnit, value: distDisplay }, { label: "TIME", value: formatTime(elapsed) }, { label: paceUnit, value: paceDisplay }].map(({ label, value }) => (
                 <div key={label} style={{ textAlign: "center", flex: 1 }}>
                   <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", letterSpacing: "-1px", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{value}</div>
                   <div style={{ fontSize: 10, color: "#555", fontWeight: 700, letterSpacing: "0.13em", marginTop: 5 }}>{label}</div>
                 </div>
               ))}
             </div>
+            {/* Unit toggle */}
+            <button onClick={() => setUseMiles(m => !m)} style={{ display: "block", margin: "12px auto 0", padding: "4px 14px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em" }}>
+              {useMiles ? "KM" : "MI"}
+            </button>
             {phase === "paused" && (
               <div style={{ textAlign: "center", marginTop: 10 }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: "#f59e0b", letterSpacing: "0.14em", background: "rgba(245,158,11,0.12)", padding: "3px 14px", borderRadius: 20 }}>PAUSED</span>
@@ -564,7 +602,7 @@ export default function RunPage() {
             <button onClick={stopRun} style={{ width: 58, height: 58, borderRadius: "50%", background: "rgba(239,68,68,0.15)", border: "1.5px solid rgba(239,68,68,0.4)", color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 26, fontVariationSettings: "'FILL' 1" }}>stop</span>
             </button>
-            <button onClick={phase === "running" ? pauseRun : resumeRun} style={{ width: 78, height: 78, borderRadius: "50%", background: "#22c55e", border: "none", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 0 32px rgba(34,197,94,0.45)" }}>
+            <button onClick={phase === "running" ? pauseRun : resumeRun} style={{ width: 78, height: 78, borderRadius: "50%", background: ACCENT, border: "none", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: `0 0 32px ${ACCENT_GLOW.replace("0.28","0.45")}` }}>
               <span className="material-symbols-outlined" style={{ fontSize: 36, fontVariationSettings: "'FILL' 1" }}>{phase === "running" ? "pause" : "play_arrow"}</span>
             </button>
             {/* Share button */}
@@ -596,9 +634,9 @@ export default function RunPage() {
               <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)" }} />
             </div>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6 }}>RUN COMPLETE</div>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6, color: isCycle ? "#fb923c" : "#4ade80" }}>{isCycle ? "RIDE COMPLETE" : "RUN COMPLETE"}</div>
               <div style={{ fontSize: 42, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-1.5px", lineHeight: 1 }}>
-                {(distance / 1000).toFixed(2)}<span style={{ fontSize: 18, fontWeight: 600, color: "#555", marginLeft: 6 }}>km</span>
+                {distDisplay}<span style={{ fontSize: 18, fontWeight: 600, color: "#555", marginLeft: 6 }}>{useMiles ? "mi" : "km"}</span>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -614,7 +652,7 @@ export default function RunPage() {
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={discardRun} style={{ flex: 1, padding: "14px 0", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", background: "transparent", color: "#555", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Discard</button>
-              <button onClick={saveRun} style={{ flex: 2, padding: "14px 0", borderRadius: 14, border: "none", background: "#22c55e", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>Save Run</button>
+              <button onClick={saveRun} style={{ flex: 2, padding: "14px 0", borderRadius: 14, border: "none", background: ACCENT, color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>Save {ACTIVITY_LABEL}</button>
             </div>
           </div>
         </div>
@@ -692,31 +730,66 @@ export default function RunPage() {
               <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fbbf24", fontVariationSettings: "'FILL' 1", flexShrink: 0 }}>emoji_events</span>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#f2f2f2" }}>New Personal Record!</div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{[lastSaved.isDistancePR && "Longest run", lastSaved.isPacePR && "Best pace"].filter(Boolean).join(" · ")}</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{[lastSaved.isDistancePR && `Longest ${ACTIVITY_LABEL.toLowerCase()}`, lastSaved.isPacePR && (isCycle ? "Best speed" : "Best pace")].filter(Boolean).join(" · ")}</div>
               </div>
             </div>
           )}
 
-          <button onClick={startCountdown} style={{ width: "100%", padding: "17px 0", borderRadius: 18, border: "none", background: "#22c55e", color: "#fff", fontSize: 17, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 4px 24px rgba(34,197,94,0.28)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>directions_run</span>
-            Start Run
+          {/* Mode toggle */}
+          <div style={{ display: "flex", background: "#131313", borderRadius: 16, padding: 4, gap: 4, marginBottom: 14, border: "1px solid rgba(255,255,255,0.05)" }}>
+            {(["run", "cycle"] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)} style={{
+                flex: 1, padding: "11px 0", borderRadius: 12, border: "none", cursor: "pointer",
+                background: mode === m ? (m === "run" ? "#22c55e" : "#f97316") : "transparent",
+                color: mode === m ? "#fff" : "#555",
+                fontSize: 13, fontWeight: 700, transition: "all 0.18s",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>
+                  {m === "run" ? "directions_run" : "directions_bike"}
+                </span>
+                {m === "run" ? "Running" : "Cycling Track"}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={startCountdown} style={{ width: "100%", padding: "17px 0", borderRadius: 18, border: "none", background: ACCENT, color: "#fff", fontSize: 17, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: `0 4px 24px ${ACCENT_GLOW}` }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>{ACTIVITY_ICON}</span>
+            Start {ACTIVITY_LABEL}
           </button>
 
           <div style={{ marginTop: 28 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#333", letterSpacing: "0.12em", marginBottom: 12 }}>RUN HISTORY</p>
-            {loadingRuns ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[0, 1, 2].map(i => <div key={i} style={{ height: 68, borderRadius: 16, background: "#131313" }} />)}
-              </div>
-            ) : runs.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px 0" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", color: "#1e1e1e", marginBottom: 10 }}>route</span>
-                <p style={{ fontSize: 14, color: "#333", fontWeight: 500 }}>No runs yet</p>
-              </div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#333", letterSpacing: "0.12em", marginBottom: 12 }}>{isCycle ? "RIDE HISTORY" : "RUN HISTORY"}</p>
+            {isCycle ? (
+              loadingRides ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[0, 1, 2].map(i => <div key={i} style={{ height: 68, borderRadius: 16, background: "#131313" }} />)}
+                </div>
+              ) : rides.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 0" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", color: "#1e1e1e", marginBottom: 10 }}>directions_bike</span>
+                  <p style={{ fontSize: 14, color: "#333", fontWeight: 500 }}>No rides yet</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {rides.map(ride => <RunCard key={ride.id} run={ride} mode="cycle" onTap={() => setExpandedRun(ride)} />)}
+                </div>
+              )
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {runs.map(run => <RunCard key={run.id} run={run} onTap={() => setExpandedRun(run)} />)}
-              </div>
+              loadingRuns ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[0, 1, 2].map(i => <div key={i} style={{ height: 68, borderRadius: 16, background: "#131313" }} />)}
+                </div>
+              ) : runs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 0" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", color: "#1e1e1e", marginBottom: 10 }}>route</span>
+                  <p style={{ fontSize: 14, color: "#333", fontWeight: 500 }}>No runs yet</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {runs.map(run => <RunCard key={run.id} run={run} onTap={() => setExpandedRun(run)} />)}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -725,22 +798,28 @@ export default function RunPage() {
   );
 }
 
-function RunCard({ run, onTap }: { run: RunRoute; onTap?: () => void }) {
+function RunCard({ run, mode = "run", onTap }: { run: RunRoute; mode?: ActivityMode; onTap?: () => void }) {
   const hasPR = run.isDistancePR || run.isPacePR;
+  const isCycle = mode === "cycle";
+  const accent = isCycle ? "#f97316" : "#22c55e";
+  const accentBg = isCycle ? "rgba(249,115,22,0.1)" : "rgba(34,197,94,0.1)";
+  const icon = isCycle ? "directions_bike" : "directions_run";
   const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const fmtP = (s: number) => (!s || !isFinite(s) || s <= 0) ? "--:--" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const speedStr = run.duration > 0 ? `${((run.distance / run.duration) * 3.6).toFixed(1)} km/h` : "--";
+  const thirdStat = isCycle ? speedStr : `${fmtP(run.avgPace)}/km`;
   return (
     <div onClick={onTap} style={{ background: "#131313", borderRadius: 16, padding: "14px 16px", border: hasPR ? "1px solid rgba(251,191,36,0.18)" : "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 14, cursor: onTap ? "pointer" : "default", WebkitTapHighlightColor: "transparent" }}>
-      <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: "rgba(34,197,94,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_run</span>
+      <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: accentBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 22, color: accent, fontVariationSettings: "'FILL' 1" }}>{icon}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#f2f2f2" }}>{run.name || "Run"}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#f2f2f2" }}>{run.name || (isCycle ? "Ride" : "Run")}</span>
           {run.isDistancePR && <span style={{ fontSize: 9, fontWeight: 900, color: "#000", background: "#fbbf24", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>DIST PR</span>}
-          {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 900, color: "#000", background: "#a78bfa", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>PACE PR</span>}
+          {run.isPacePR && <span style={{ fontSize: 9, fontWeight: 900, color: "#000", background: "#a78bfa", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>{isCycle ? "SPEED PR" : "PACE PR"}</span>}
         </div>
-        <div style={{ fontSize: 12, color: "#555" }}>{(run.distance / 1000).toFixed(2)} km · {fmtT(run.duration)} · {fmtP(run.avgPace)}/km</div>
+        <div style={{ fontSize: 12, color: "#555" }}>{(run.distance / 1000).toFixed(2)} km · {fmtT(run.duration)} · {thirdStat}</div>
       </div>
       <div style={{ fontSize: 11, color: "#333", flexShrink: 0 }}>{formatDate(run.date)}</div>
     </div>

@@ -55,7 +55,7 @@ export default function ReelsPage() {
       // Seed like state
       if (user) {
         const liked = new Set<string>();
-        enriched.forEach((r) => { if (r.likedBy?.includes(user.uid)) liked.add(r.id); });
+        enriched.forEach((r) => { if (Array.isArray(r.likedBy) && r.likedBy.includes(user.uid)) liked.add(r.id); });
         setLikedIds(liked);
       }
       setLoading(false);

@@ -1,6 +1,5 @@
-const CACHE = 'felcin-v14';
+const CACHE = 'felcin-v19';
 
-// Inline offline page shown when nothing is cached yet
 const OFFLINE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,15 +37,8 @@ const OFFLINE_RESPONSE = () => new Response(OFFLINE_HTML, {
   headers: { 'Content-Type': 'text/html; charset=utf-8' },
 });
 
-const APP_SHELL = [
-  '/',
-  '/login',
-  '/manifest.json',
-  '/logo512.png',
-  '/static/logo-nav.svg',
-];
+const APP_SHELL = ['/', '/login', '/manifest.json', '/logo512.png', '/static/logo-nav.svg'];
 
-// Install — pre-cache the app shell, one URL at a time so one failure doesn't abort all
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then(async (cache) => {
@@ -58,7 +50,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate — remove old cache versions only
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
@@ -67,20 +58,37 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch — smart caching strategy
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
+  // Navigation requests: network-first, fall back to cached shell so app boots offline
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, clone));
+          }
+          return res;
+        })
+        .catch(async () => {
+          const cached = await caches.match(req)
+            || await caches.match('/')
+            || await caches.match('/login');
+          return cached || OFFLINE_RESPONSE();
+        })
+    );
+    return;
+  }
+
   try {
     const url = new URL(req.url);
     if (url.origin !== location.origin) return;
-
-    // Skip API routes and Next.js RSC data (always need fresh data)
     if (url.pathname.startsWith('/api/')) return;
     if (url.pathname.startsWith('/_next/data/')) return;
 
-    // Cache-first for hashed static assets (safe to cache forever)
     if (url.pathname.startsWith('/_next/static/')) {
       event.respondWith(
         caches.match(req).then((cached) => {
@@ -94,41 +102,24 @@ self.addEventListener('fetch', (event) => {
           }).catch(() => OFFLINE_RESPONSE());
         })
       );
-      return;
     }
-
-    // Network-first for pages — fall back to cache, then offline screen
-    event.respondWith(
-      fetch(req, { cache: 'no-store' })
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, clone));
-          }
-          return res;
-        })
-        .catch(async () => {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-          const root = await caches.match('/');
-          if (root) return root;
-          return OFFLINE_RESPONSE();
-        })
-    );
   } catch {}
 });
 
-// Push notifications
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  let data = {};
-  try { data = event.data.json(); } catch { data = { title: 'Felcin', body: event.data.text() }; }
+  let payload = {};
+  try { payload = event.data.json(); } catch { payload = { title: 'Felcin', body: event.data.text() }; }
+  // FCM data-only: flat fields. FCM display message: nested under notification/data.
+  const title = payload.title || payload.notification?.title || 'Felcin';
+  const body = payload.body || payload.notification?.body || '';
+  const url = payload.url || payload.data?.url || '/';
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Felcin', {
-      body: data.body || '',
-      icon: '/static/logo-nav.svg',
+    self.registration.showNotification(title, {
+      body,
+      icon: payload.icon || '/static/logo-nav.svg',
       badge: '/static/logo-nav.svg',
-      data: { url: data.url || '/' },
+      data: { url },
     })
   );
 });

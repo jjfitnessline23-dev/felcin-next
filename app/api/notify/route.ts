@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const app = getAdmin();
   if (!app) return NextResponse.json({ ok: false, error: "no admin" });
 
-  const { recipientUid, type, senderName, postId } = await req.json().catch(() => ({}));
+  const { recipientUid, type, senderName, postId, senderId, message } = await req.json().catch(() => ({}));
   if (!recipientUid || !type) return NextResponse.json({ ok: false });
 
   try {
@@ -31,23 +31,39 @@ export async function POST(req: NextRequest) {
       like: "New Like",
       comment: "New Comment",
       follow: "New Follower",
+      repost: "New Repost",
+      message: "New Message",
+      tip: "New Tip",
+      subscribe: "New Subscriber",
     };
     const bodies: Record<string, string> = {
       like: `${senderName} liked your post`,
       comment: `${senderName} commented on your post`,
       follow: `${senderName} started following you`,
+      repost: `${senderName} reposted your reel`,
+      message: message ? `${senderName}: ${message}` : `${senderName} sent you a message`,
+      tip: `${senderName} sent you a tip`,
+      subscribe: `${senderName} subscribed to you`,
     };
+
+    const link = type === "message" && senderId
+      ? `https://felcin.com/private-chats?uid=${senderId}`
+      : postId
+        ? `https://felcin.com/comments?postId=${postId}`
+        : "https://felcin.com/";
 
     await app.messaging().send({
       token: fcmToken,
-      notification: {
+      data: {
+        type,
+        postId: postId || "",
+        url: link,
         title: titles[type] || "Felcin",
         body: bodies[type] || `${senderName} interacted with you`,
+        icon: "/static/logo-nav.svg",
       },
-      data: { type, postId: postId || "", url: postId ? `/comments?postId=${postId}` : "/" },
       webpush: {
-        notification: { icon: "/static/logo-nav.svg" },
-        fcmOptions: { link: postId ? `/comments?postId=${postId}` : "/" },
+        fcmOptions: { link },
       },
     });
 

@@ -111,27 +111,24 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
     import("leaflet").then((L) => {
       if (!mapRef.current) return;
 
-      // Route line
-      if (routeRef.current) { routeRef.current.remove(); routeRef.current = null; }
+      const latlngs = displayCoords.map(c => [c.lat, c.lng] as [number, number]);
+
+      // Update polyline in-place to avoid remove/redraw race conditions
       if (displayCoords.length >= 2) {
-        routeRef.current = L.polyline(
-          displayCoords.map(c => [c.lat, c.lng] as [number, number]),
-          { color: "#4ade80", weight: 5, opacity: 0.95 }
-        ).addTo(mapRef.current);
+        if (routeRef.current) {
+          routeRef.current.setLatLngs(latlngs);
+        } else {
+          routeRef.current = L.polyline(latlngs, { color: "#4ade80", weight: 5, opacity: 0.95 }).addTo(mapRef.current);
+        }
+      } else if (routeRef.current) {
+        routeRef.current.remove();
+        routeRef.current = null;
       }
 
       // Start marker at first GPS point
       if (coords.length > 0 && !startMarkerRef.current) {
-        const icon = L.divIcon({
-          className: "",
-          html: START_HTML,
-          iconSize: [22, 30],
-          iconAnchor: [11, 30],
-        });
-        startMarkerRef.current = L.marker(
-          [coords[0].lat, coords[0].lng],
-          { icon, zIndexOffset: 10 }
-        ).addTo(mapRef.current);
+        const icon = L.divIcon({ className: "", html: START_HTML, iconSize: [22, 30], iconAnchor: [11, 30] });
+        startMarkerRef.current = L.marker([coords[0].lat, coords[0].lng], { icon, zIndexOffset: 10 }).addTo(mapRef.current);
       }
     });
   }, [coords, matchedCoords, mapInit]); // eslint-disable-line

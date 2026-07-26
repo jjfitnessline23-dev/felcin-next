@@ -43,20 +43,37 @@ type CapConstraint =
   | { __cap: "or"; constraints: CapConstraint[] };
 type CapQuery = CapColl & { __capConstraints: CapConstraint[] };
 
-// ─── Timestamp (compatible with Firestore Timestamp) ──────────────────────────
-export class Timestamp {
+// ─── Timestamp ────────────────────────────────────────────────────────────────
+// On web: use Firebase's real Timestamp so addDoc/setDoc serialize it correctly.
+// On Capacitor: use a plain-object version serialized via serialize() before
+// being sent to the native plugin.
+class CapTimestamp {
   constructor(public readonly seconds: number, public readonly nanoseconds: number) {}
   toDate() { return new Date(this.seconds * 1000 + Math.round(this.nanoseconds / 1e6)); }
   toMillis() { return this.seconds * 1000 + Math.round(this.nanoseconds / 1e6); }
-  isEqual(o: Timestamp) { return this.seconds === o.seconds && this.nanoseconds === o.nanoseconds; }
-  static now() { return Timestamp.fromMillis(Date.now()); }
-  static fromDate(d: Date) { const ms = d.getTime(); return new Timestamp(Math.floor(ms / 1000), (ms % 1000) * 1e6); }
-  static fromMillis(ms: number) { return new Timestamp(Math.floor(ms / 1000), (ms % 1000) * 1e6); }
+  isEqual(o: CapTimestamp) { return this.seconds === o.seconds && this.nanoseconds === o.nanoseconds; }
+  static now() { return CapTimestamp.fromMillis(Date.now()); }
+  static fromDate(d: Date) { const ms = d.getTime(); return new CapTimestamp(Math.floor(ms / 1000), (ms % 1000) * 1e6); }
+  static fromMillis(ms: number) { return new CapTimestamp(Math.floor(ms / 1000), (ms % 1000) * 1e6); }
 }
+export const Timestamp: typeof fs.Timestamp = IS_CAP
+  ? (CapTimestamp as unknown as typeof fs.Timestamp)
+  : fs.Timestamp;
 
 // ─── FieldValue markers (Capacitor path only) ────────────────────────────────
 class CapFieldValue {
   constructor(public __capFV: string, public __val?: unknown) {}
+}
+
+// ─── Web-path sanitizer: converts any CapTimestamp that leaked through into a
+// real Firebase Timestamp so writes never fail with "Unsupported field value".
+function sanitizeForWeb(v: unknown): unknown {
+  if (v instanceof CapTimestamp) return fs.Timestamp.fromMillis(v.toMillis());
+  if (Array.isArray(v)) return v.map(sanitizeForWeb);
+  if (v && typeof v === "object" && !(v instanceof Date) && !(v instanceof fs.Timestamp)) {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, val]) => [k, sanitizeForWeb(val)]));
+  }
+  return v;
 }
 
 // ─── Data serialization for native plugin ─────────────────────────────────────
@@ -67,7 +84,7 @@ function serialize(v: unknown): unknown {
     if (v.__capFV === "arrayUnion") return { specialValue: "arrayUnion", elements: v.__val };
     if (v.__capFV === "arrayRemove") return { specialValue: "arrayRemove", elements: v.__val };
   }
-  if (v instanceof Timestamp) return { seconds: v.seconds, nanoseconds: v.nanoseconds };
+  if (v instanceof CapTimestamp) return { seconds: v.seconds, nanoseconds: v.nanoseconds };
   if (Array.isArray(v)) return v.map(serialize);
   if (v && typeof v === "object" && !(v instanceof Date)) {
     return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, val]) => [k, serialize(val)]));
@@ -244,14 +261,14 @@ export async function getDocs(queryOrRef: unknown) {
 
 // ─── Document writes ──────────────────────────────────────────────────────────
 export async function setDoc(ref: unknown, data: DocumentData, options?: { merge?: boolean }) {
-  if (!IS_CAP) return fs.setDoc(ref as Parameters<typeof fs.setDoc>[0], data, options as Parameters<typeof fs.setDoc>[2]);
+  if (!IS_CAP) return fs.setDoc(ref as Parameters<typeof fs.setDoc>[0], sanitizeForWeb(data) as DocumentData, options as Parameters<typeof fs.setDoc>[2]);
   const { __capPath } = ref as CapRef;
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   await FirebaseFirestore.setDocument({ reference: __capPath, data: serialize(data) as DocumentData, merge: options?.merge ?? false });
 }
 
 export async function updateDoc(ref: unknown, data: DocumentData) {
-  if (!IS_CAP) return fs.updateDoc(ref as Parameters<typeof fs.updateDoc>[0], data);
+  if (!IS_CAP) return fs.updateDoc(ref as Parameters<typeof fs.updateDoc>[0], sanitizeForWeb(data) as DocumentData);
   const { __capPath } = ref as CapRef;
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   // Native plugin updateDocument uses fields array format
@@ -260,7 +277,7 @@ export async function updateDoc(ref: unknown, data: DocumentData) {
 }
 
 export async function addDoc(collRef: unknown, data: DocumentData) {
-  if (!IS_CAP) return fs.addDoc(collRef as Parameters<typeof fs.addDoc>[0], data);
+  if (!IS_CAP) return fs.addDoc(collRef as Parameters<typeof fs.addDoc>[0], sanitizeForWeb(data) as DocumentData);
   const { __capPath } = collRef as CapColl;
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   const result = await FirebaseFirestore.addDocument({ reference: __capPath, data: serialize(data) as DocumentData });

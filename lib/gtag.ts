@@ -16,8 +16,6 @@ export function gtagEvent(action: string, params?: Record<string, unknown>) {
 // Fire this when a user completes sign-up — tracked as Google Ads conversion
 export function trackSignUp() {
   gtagEvent("sign_up", { method: "felcin" });
-  // If you have a specific conversion label from Google Ads:
-  // gtagEvent("conversion", { send_to: "AW-XXXXXXXXXX/YYYYYYYY" });
 }
 
 // Fire this when a user makes a purchase

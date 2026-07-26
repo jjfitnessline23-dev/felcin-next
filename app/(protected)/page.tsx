@@ -15,6 +15,7 @@ import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { sanitizePost } from "@/lib/sanitize";
 
 interface Post {
   id: string; authorId: string; isStory?: boolean; authorName?: string; authorPhoto?: string;
@@ -195,7 +196,7 @@ export default function HomePage() {
 
     getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE)))
       .then(async (snap) => {
-        const raw: Post[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
+        const raw: Post[] = snap.docs.map((d) => sanitizePost(d.data() as Record<string, unknown>, d.id) as unknown as Post)
           .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
         setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
         setHasMore(snap.docs.length === PAGE_SIZE);
@@ -228,7 +229,7 @@ export default function HomePage() {
     if (!lastDoc || loadingMore || !hasMore) return;
     setLoadingMore(true);
     const snap = await getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), startAfter(lastDoc), limit(PAGE_SIZE)));
-    const raw: Post[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))
+    const raw: Post[] = snap.docs.map((d) => sanitizePost(d.data() as Record<string, unknown>, d.id) as unknown as Post)
       .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
     const enriched = await enrichWithAuthor(raw);
     setPosts((prev) => { const ids = new Set(prev.map((p) => p.id)); return [...prev, ...enriched.filter((p) => !ids.has(p.id))]; });

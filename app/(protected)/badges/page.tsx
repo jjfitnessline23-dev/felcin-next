@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import BadgePaymentModal from "@/components/BadgePaymentModal";
+import { auth } from "@/lib/firebase";
 
 const BADGES = [
   {
@@ -157,6 +158,13 @@ export default function BadgesPage() {
   const [buying, setBuying] = useState<string | null>(null);
   const [currentBadge, setCurrentBadge] = useState<string | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ clientSecret: string; badgeId: string; label: string; amount: number } | null>(null);
+  const [isNative, setIsNative] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.()) {
+      setIsNative(true);
+    }
+  }, []);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
@@ -186,20 +194,29 @@ export default function BadgesPage() {
     if (!user || buying) return;
     setBuying(badgeId);
     try {
-      const token = await user.getIdToken();
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) { showToast("Please log in to continue"); setBuying(null); return; }
+      const token = await firebaseUser.getIdToken(true);
       const res = await fetch("/api/badge-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json", "authorization": `Bearer ${token}` },
         body: JSON.stringify({ badgeId }),
       });
-      const data = await res.json();
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        showToast(`Server error (${res.status}) — please try again`);
+        setBuying(null);
+        return;
+      }
       if (data.clientSecret) {
         setPaymentModal({ clientSecret: data.clientSecret, badgeId, label: data.badgeLabel, amount: data.amount });
       } else {
         showToast(data.error || "Something went wrong");
       }
-    } catch {
-      showToast("Something went wrong — please try again");
+    } catch (e: any) {
+      showToast(e?.message || "Something went wrong — please try again");
     }
     setBuying(null);
   };
@@ -325,25 +342,47 @@ export default function BadgesPage() {
                   ))}
                 </ul>
 
-                <button
-                  onClick={() => !isActive && purchaseBadge(badge.id)}
-                  disabled={!!buying || isActive}
-                  className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
-                  style={{
-                    background: isActive ? "rgba(34,197,94,0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
-                    color: isActive ? "#22c55e" : buying === badge.id ? "#555" : "#fff",
-                    border: isActive ? "1px solid rgba(34,197,94,0.25)" : "none",
-                    boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
-                    cursor: isActive ? "default" : "pointer",
-                  }}>
-                  {isActive ? (
-                    <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
-                  ) : buying === badge.id ? (
-                    <><div className="spinner" style={{ width: 16, height: 16 }} /> Opening checkout…</>
-                  ) : (
-                    <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
-                  )}
-                </button>
+                {isNative ? (
+                  <div
+                    className="w-full py-3 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                    style={{ background: isActive ? "rgba(34,197,94,0.1)" : badge.grad, color: isActive ? "#22c55e" : "#fff", border: isActive ? "1px solid rgba(34,197,94,0.25)" : "none", boxShadow: isActive ? "none" : `0 0 20px ${badge.glow}` }}
+                    onClick={async () => {
+                      if (isActive) return;
+                      try {
+                        const { Browser } = await import("@capacitor/browser");
+                        await Browser.open({ url: "https://felcin.com/badges", presentationStyle: "popover" });
+                      } catch {
+                        (window as any).open("https://felcin.com/badges", "_system");
+                      }
+                    }}
+                  >
+                    {isActive ? (
+                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
+                    ) : (
+                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => !isActive && purchaseBadge(badge.id)}
+                    disabled={!!buying || isActive}
+                    className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
+                    style={{
+                      background: isActive ? "rgba(34,197,94,0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
+                      color: isActive ? "#22c55e" : buying === badge.id ? "#555" : "#fff",
+                      border: isActive ? "1px solid rgba(34,197,94,0.25)" : "none",
+                      boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
+                      cursor: isActive ? "default" : "pointer",
+                    }}>
+                    {isActive ? (
+                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
+                    ) : buying === badge.id ? (
+                      <><div className="spinner" style={{ width: 16, height: 16 }} /> Opening checkout…</>
+                    ) : (
+                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           );
