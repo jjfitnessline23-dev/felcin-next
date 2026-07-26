@@ -35,19 +35,3 @@ export function GhostCardSkeleton() {
     </div>
   );
 }
-
-export function ProfileSkeleton() {
-  return (
-    <div className="px-4 py-6">
-      <div className="flex items-end gap-4 mb-5">
-        <div className="w-20 h-20 rounded-full skeleton" />
-        <div className="flex-1 pb-1">
-          <div className="h-4 rounded-full w-36 mb-2.5 skeleton" />
-          <div className="h-3 rounded-full w-24 skeleton" />
-        </div>
-      </div>
-      <div className="h-3 rounded-full w-full mb-2 skeleton" />
-      <div className="h-3 rounded-full w-2/3 skeleton" />
-    </div>
-  );
-}

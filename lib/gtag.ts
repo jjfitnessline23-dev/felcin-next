@@ -17,13 +17,3 @@ export function gtagEvent(action: string, params?: Record<string, unknown>) {
 export function trackSignUp() {
   gtagEvent("sign_up", { method: "felcin" });
 }
-
-// Fire this when a user makes a purchase
-export function trackPurchase(valueCents: number, currency = "USD", transactionId?: string) {
-  gtagEvent("conversion", {
-    send_to: "AW-18302008959/ePDgCKKjvcscEP_8iZdE",
-    value: valueCents / 100,
-    currency,
-    transaction_id: transactionId ?? Date.now().toString(),
-  });
-}

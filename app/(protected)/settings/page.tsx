@@ -333,10 +333,10 @@ export default function SettingsPage() {
 
         {/* Support & Legal */}
         <Section title="Support & Legal">
-          <Row icon="help" label="Help & Support" href="/legal/support" />
-          <Row icon="privacy_tip" label="Privacy Policy" href="/legal/privacy" />
-          <Row icon="description" label="Terms of Service" href="/legal/terms" />
-          <Row icon="rule" label="Community Guidelines" href="/legal/guidelines" />
+          <Row icon="help" label="Help & Support" href="/support" />
+          <Row icon="privacy_tip" label="Privacy Policy" href="/privacy" />
+          <Row icon="description" label="Terms of Service" href="/terms" />
+          <Row icon="rule" label="Community Guidelines" href="/guidelines" />
         </Section>
 
         {/* Danger zone */}
