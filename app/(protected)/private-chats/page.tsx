@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/lib/auth";
 
 interface Chat { id: string; participants: string[]; lastMessage?: string; lastAt?: { seconds: number }; otherName?: string; otherPhoto?: string; }
-interface Msg { id: string; senderId: string; text: string; createdAt?: { seconds: number }; }
+interface Msg { id: string; senderId: string; text?: string; type?: "text" | "image" | "audio"; imageUrl?: string; audioUrl?: string; createdAt?: { seconds: number }; }
 
 function chatId(a: string, b: string) { return [a, b].sort().join("_"); }
 
@@ -42,14 +43,21 @@ export default function PrivateChatsPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [containerH, setContainerH] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [otherName, setOtherName] = useState("Chat");
   const [otherPhoto, setOtherPhoto] = useState("");
   const [otherOnline, setOtherOnline] = useState(false);
   const [otherLastSeen, setOtherLastSeen] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const chatRootRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
+  // Presence
   useEffect(() => {
     if (!user) return;
     const presenceRef = doc(db, "users", user.uid, "presence", "status");
@@ -65,6 +73,7 @@ export default function PrivateChatsPage() {
     };
   }, [user]);
 
+  // Other user's presence
   useEffect(() => {
     if (!activeChat || !user) return;
     const otherUid = activeChat.split("_").find((id) => id !== user.uid);
@@ -77,6 +86,7 @@ export default function PrivateChatsPage() {
     }, () => {});
   }, [activeChat, user]);
 
+  // Chat list
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "chats"), where("participants", "array-contains", user.uid));
@@ -96,49 +106,39 @@ export default function PrivateChatsPage() {
     }, () => {});
   }, [user]);
 
-  // When keyboard opens in Capacitor WKWebView, window.innerHeight stays fixed but
-  // visualViewport.height shrinks. The chat root sits below env(safe-area-inset-top)
-  // so a height-only fix overflows. Instead: switch to position:fixed when keyboard
-  // is open, pinning the container between safe-area-top and the keyboard top.
+  // Container height — driven by visualViewport.
+  //
+  // capacitor.config.json uses resize:"none", so iOS handles keyboard natively:
+  // the WKWebView visual viewport shrinks when the keyboard opens, firing
+  // visualViewport "resize". We set the container height to
+  // visualViewport.height - containerTop so the input bar always sits exactly
+  // above the keyboard. window "resize" catches the same event on web browsers.
   useEffect(() => {
-    const root = chatRootRef.current;
-    if (!root) return;
     const update = () => {
       const vv = window.visualViewport;
-      if (!vv) return;
-      const isDesktop = window.innerWidth >= 1024;
-      const kbHeight = isDesktop ? 0 : Math.max(0, window.innerHeight - vv.height);
-      const kbOpen = kbHeight > 150;
-      if (kbOpen) {
-        root.style.position = "fixed";
-        root.style.top = "env(safe-area-inset-top, 0px)";
-        root.style.bottom = `${kbHeight}px`;
-        root.style.left = "0";
-        root.style.right = "0";
-        root.style.height = "auto";
-        requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }));
-      } else {
-        root.style.position = "";
-        root.style.top = "";
-        root.style.bottom = "";
-        root.style.left = "";
-        root.style.right = "";
-        root.style.height = "";
+      const vvh = vv ? vv.height : window.innerHeight;
+      const top = containerRef.current?.getBoundingClientRect().top ?? 0;
+      const h = vvh - top;
+      if (h > 100) {
+        setContainerH(h);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 80);
       }
     };
+
     update();
+
     window.visualViewport?.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+
     return () => {
       window.visualViewport?.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
 
+  // Messages
   useEffect(() => {
     if (!activeChat) { setMessages([]); return; }
-    // No orderBy — serverTimestamp() causes pending docs to be excluded from ordered queries
-    // Sort client-side so messages appear immediately on send
     const q = query(collection(db, "chats", activeChat, "messages"));
     const unsub = onSnapshot(q, (snap) => {
       const sorted = snap.docs
@@ -155,36 +155,95 @@ export default function PrivateChatsPage() {
     if (!text.trim() || !user || !activeChat || sending) return;
     setSending(true); const t = text.trim(); setText("");
     try {
-      // Ensure chat document exists with participants BEFORE adding message
-      // (Firestore rules check get(chats/{chatId}).data.participants on message create)
       await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp() }, { merge: true });
-      await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, text: t, createdAt: serverTimestamp() });
+      await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, type: "text", text: t, createdAt: serverTimestamp() });
       const otherUid = activeChat.split("_").find((id) => id !== user.uid);
       if (otherUid) {
         const preview = t.length > 50 ? t.slice(0, 50) + "…" : t;
-        addDoc(collection(db, "notifications"), {
-          recipientId: otherUid, senderId: user.uid,
-          senderName: user.displayName || "Someone",
-          senderPhoto: user.photoURL || "",
-          type: "message",
-          message: preview,
-          read: false, createdAt: serverTimestamp(),
-        }).catch(() => {});
-        fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: preview }),
-        }).catch(() => {});
+        addDoc(collection(db, "notifications"), { recipientId: otherUid, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "message", message: preview, read: false, createdAt: serverTimestamp() }).catch(() => {});
+        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: preview }) }).catch(() => {});
       }
     } catch { setText(t); }
     setSending(false);
+  };
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user || !activeChat) return;
+    setUploading(true);
+    try {
+      const sRef = storageRef(storage, `chat-media/${activeChat}/${Date.now()}-${user.uid}`);
+      const snapshot = await uploadBytes(sRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: "📷 Photo", lastAt: serverTimestamp() }, { merge: true });
+      await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, type: "image", imageUrl: url, createdAt: serverTimestamp() });
+      const otherUid = activeChat.split("_").find((id) => id !== user.uid);
+      if (otherUid) {
+        addDoc(collection(db, "notifications"), { recipientId: otherUid, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "message", message: "📷 Photo", read: false, createdAt: serverTimestamp() }).catch(() => {});
+        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: "📷 Photo" }) }).catch(() => {});
+      }
+    } catch {}
+    setUploading(false);
+  };
+
+  const toggleRecording = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (!user || !activeChat || blob.size < 500) return;
+        setUploading(true);
+        try {
+          const sRef = storageRef(storage, `chat-audio/${activeChat}/${Date.now()}-${user.uid}.webm`);
+          const snapshot = await uploadBytes(sRef, blob);
+          const url = await getDownloadURL(snapshot.ref);
+          await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: "🎤 Voice message", lastAt: serverTimestamp() }, { merge: true });
+          await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, type: "audio", audioUrl: url, createdAt: serverTimestamp() });
+          const otherUid = activeChat.split("_").find((id) => id !== user.uid);
+          if (otherUid) {
+            addDoc(collection(db, "notifications"), { recipientId: otherUid, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "message", message: "🎤 Voice message", read: false, createdAt: serverTimestamp() }).catch(() => {});
+            fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: "🎤 Voice message" }) }).catch(() => {});
+          }
+        } catch {}
+        setUploading(false);
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setRecording(true);
+    } catch {}
   };
 
   const myInitial = (user?.displayName || user?.email || "U").charAt(0).toUpperCase();
   const hasText = text.trim().length > 0;
 
   return (
-    <div ref={chatRootRef} className="private-chats-root flex overflow-hidden" style={{ background: "#090909", height: "calc(100dvh - 4rem - env(safe-area-inset-top, 0px))" }}>
+    <div
+      ref={containerRef}
+      className="private-chats-root flex overflow-hidden"
+      style={{
+        background: "#090909",
+        // position:fixed so the chat sits between the status bar and keyboard.
+        // Height is measured in JS from body.clientHeight (which Capacitor's
+        // resize:"body" shrinks when the keyboard opens) minus containerTop.
+        // This means no Capacitor keyboard events are needed at all.
+        // Desktop (lg:): overridden to static flow by the globals.css media query.
+        position: "fixed",
+        top: "env(safe-area-inset-top, 0px)",
+        left: 0,
+        right: 0,
+        height: containerH ? `${containerH}px` : "calc(100dvh - env(safe-area-inset-top, 0px))",
+      }}
+    >
 
       {/* ── Chat list panel ── */}
       <div className={`shrink-0 flex flex-col ${
@@ -194,7 +253,6 @@ export default function PrivateChatsPage() {
       }`}
         style={{ borderRight: chats.length > 0 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
 
-        {/* Header */}
         <div className="relative overflow-hidden shrink-0"
           style={{ background: "linear-gradient(135deg,#030e14 0%,#061820 100%)", borderBottom: "1px solid rgba(6,182,212,0.15)", paddingTop: "max(12px, env(safe-area-inset-top,12px) + 8px)" }}>
           <div className="absolute pointer-events-none" style={{ top: "-60%", right: "-20%", width: 240, height: 240, background: "radial-gradient(circle,rgba(6,182,212,0.18) 0%,transparent 70%)", animation: "heroGlow 5s ease-in-out infinite" }} />
@@ -212,7 +270,6 @@ export default function PrivateChatsPage() {
           </div>
         </div>
 
-        {/* Chat list or empty */}
         {chats.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-center px-6">
             <div style={{ maxWidth: 400 }}>
@@ -263,7 +320,7 @@ export default function PrivateChatsPage() {
 
       {/* ── Chat window ── */}
       {activeChat ? (
-        <div className={`flex-1 flex flex-col ${!activeChat ? "hidden lg:flex" : ""}`}>
+        <div className={`flex-1 flex flex-col min-w-0 ${!activeChat ? "hidden lg:flex" : ""}`}>
 
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 shrink-0"
@@ -296,7 +353,7 @@ export default function PrivateChatsPage() {
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Messages — flex-1 + overflow-y-auto = only this area scrolls */}
           <div className="flex-1 overflow-y-auto min-h-0" style={{ position: "relative" }}>
 
             {/* Ghost watermark */}
@@ -310,13 +367,10 @@ export default function PrivateChatsPage() {
               </svg>
             </div>
 
-            {/* Inner flex column — minHeight 100% + justify-end pushes messages to bottom */}
             <div style={{ minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "16px", gap: "6px" }}>
 
               {messages.length === 0 && (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 20, position: "relative", zIndex: 1 }}>
-
-                  {/* Ghost icon */}
                   <div style={{ position: "relative", width: 72, height: 72 }}>
                     <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)", animation: "ghostPulse 3s ease-in-out infinite" }} />
                     <div style={{ width: "100%", height: "100%", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(168,85,247,0.2)" }}>
@@ -329,13 +383,10 @@ export default function PrivateChatsPage() {
                       </svg>
                     </div>
                   </div>
-
                   <div style={{ textAlign: "center" }}>
                     <p style={{ fontWeight: 700, fontSize: 15, color: "#f2f2f2", marginBottom: 4 }}>{otherName}</p>
                     <p style={{ fontSize: 13, color: "#555" }}>Say hello 👋</p>
                   </div>
-
-                  {/* Ghost sayings */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", maxWidth: 240 }}>
                     {[
                       { emoji: "👻", text: "The Ghost is listening..." },
@@ -353,22 +404,45 @@ export default function PrivateChatsPage() {
 
               {messages.map((m, i) => {
                 const isMine = m.senderId === user?.uid;
-                const prevSame = i > 0 && messages[i-1].senderId === m.senderId;
+                const prevSame = i > 0 && messages[i - 1].senderId === m.senderId;
+                const msgType = m.type || "text";
+                const bubbleRadius = isMine
+                  ? (prevSame ? "18px 6px 6px 18px" : "18px 18px 6px 18px")
+                  : (prevSame ? "6px 18px 18px 6px" : "18px 18px 18px 6px");
+
                 return (
                   <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`} style={{ marginTop: prevSame ? 2 : 8 }}>
-                    <div className="max-w-[72%] px-4 py-2.5 text-sm leading-relaxed" style={{
-                      background: isMine
-                        ? "linear-gradient(135deg,#7C3AED,#a855f7)"
-                        : "linear-gradient(135deg,#1a1a2a,#131320)",
-                      color: isMine ? "#fff" : "#e0e0e0",
-                      borderRadius: isMine
-                        ? (prevSame ? "18px 6px 6px 18px" : "18px 18px 6px 18px")
-                        : (prevSame ? "6px 18px 18px 6px" : "18px 18px 18px 6px"),
-                      boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
-                      border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
-                    }}>
-                      {m.text}
-                    </div>
+                    {msgType === "image" ? (
+                      <img
+                        src={m.imageUrl}
+                        alt="Photo"
+                        onClick={() => m.imageUrl && window.open(m.imageUrl, "_blank")}
+                        style={{ maxWidth: "72%", maxHeight: 280, borderRadius: bubbleRadius, objectFit: "cover", cursor: "pointer", display: "block" }}
+                      />
+                    ) : msgType === "audio" ? (
+                      <div style={{
+                        padding: "10px 14px",
+                        background: isMine ? "linear-gradient(135deg,#7C3AED,#a855f7)" : "linear-gradient(135deg,#1a1a2a,#131320)",
+                        borderRadius: bubbleRadius,
+                        border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
+                        boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: isMine ? "#fff" : "#a855f7", fontVariationSettings: "'FILL' 1" }}>mic</span>
+                          <audio controls src={m.audioUrl} style={{ height: 28, maxWidth: 180 }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="max-w-[72%] px-4 py-2.5 text-sm leading-relaxed" style={{
+                        background: isMine ? "linear-gradient(135deg,#7C3AED,#a855f7)" : "linear-gradient(135deg,#1a1a2a,#131320)",
+                        color: isMine ? "#fff" : "#e0e0e0",
+                        borderRadius: bubbleRadius,
+                        boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+                        border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
+                      }}>
+                        {m.text}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -377,35 +451,116 @@ export default function PrivateChatsPage() {
           </div>
 
           {/* Input bar */}
-          <div className="flex items-center gap-2.5 px-4 pt-3 pb-3 lg:pb-4 shrink-0 nav-composer"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)" }}>
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
-            ) : (
-              <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                style={{ width: 32, height: 32, background: "#1a1a1a", color: "#888", border: "1px solid rgba(255,255,255,0.08)" }}>
-                {myInitial}
+          <div className="shrink-0 nav-composer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)" }}>
+
+            {/* Recording indicator */}
+            {recording && (
+              <div className="flex items-center gap-2 px-4 pt-2" style={{ color: "#ef4444", fontSize: 12 }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#ef4444", animation: "pulse 1s ease-in-out infinite" }} />
+                Recording… tap mic to send
               </div>
             )}
-            <input type="text" value={text} onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }}
-              onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 350)}
-              placeholder="Type a message…"
-              className="flex-1 px-4 py-2.5 rounded-full outline-none transition-all"
-              style={{
-                background: hasText ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.12)",
-                border: `1px solid ${hasText ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.2)"}`,
-                color: "#f2f2f2", fontSize: 16,
-              }} />
-            <button type="button" onClick={(e) => { e.preventDefault(); sendMsg(); }} disabled={!hasText || sending}
-              className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer transition-all shrink-0"
-              style={{
-                background: hasText ? "linear-gradient(135deg,#7C3AED,#a855f7)" : "rgba(255,255,255,0.05)",
-                boxShadow: hasText ? "0 0 16px rgba(124,58,237,0.4)" : "none",
-                color: hasText ? "#fff" : "#444",
-              }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: "'FILL' 1" }}>send</span>
-            </button>
+
+            <div className="flex items-center gap-2 px-3 pt-2 pb-3 lg:pb-4">
+              {/* Avatar */}
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 30, height: 30 }} />
+              ) : (
+                <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                  style={{ width: 30, height: 30, background: "#1a1a1a", color: "#888", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {myInitial}
+                </div>
+              )}
+
+              {/* Hidden file input */}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+
+              {/* Photo button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || recording || sending}
+                className="shrink-0 flex items-center justify-center rounded-full transition-all"
+                style={{ width: 36, height: 36, background: "rgba(255,255,255,0.05)", color: "#888", border: "none", cursor: "pointer" }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>image</span>
+              </button>
+
+              {/* Text input (hidden while recording) */}
+              {!recording && (
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }}
+                  onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 350)}
+                  placeholder="Type a message…"
+                  className="flex-1 px-4 py-2.5 rounded-full outline-none transition-all"
+                  style={{
+                    background: hasText ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.12)",
+                    border: `1px solid ${hasText ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.2)"}`,
+                    color: "#f2f2f2",
+                    fontSize: 16,
+                    minWidth: 0,
+                  }}
+                />
+              )}
+
+              {/* Recording placeholder (takes same space as text input) */}
+              {recording && (
+                <div className="flex-1 px-4 py-2.5 rounded-full flex items-center gap-2"
+                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", minWidth: 0 }}>
+                  <span style={{ color: "#ef4444", fontSize: 13 }}>Recording…</span>
+                </div>
+              )}
+
+              {/* Mic button — shown when no text is typed */}
+              {!hasText && !uploading && (
+                <button
+                  type="button"
+                  onClick={toggleRecording}
+                  className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all"
+                  style={{
+                    background: recording ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.05)",
+                    boxShadow: recording ? "0 0 14px rgba(239,68,68,0.4)" : "none",
+                    color: recording ? "#ef4444" : "#888",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: "'FILL' 1" }}>
+                    {recording ? "stop_circle" : "mic"}
+                  </span>
+                </button>
+              )}
+
+              {/* Send button — shown when text is typed */}
+              {hasText && !uploading && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); sendMsg(); }}
+                  disabled={sending}
+                  className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all"
+                  style={{
+                    background: "linear-gradient(135deg,#7C3AED,#a855f7)",
+                    boxShadow: "0 0 16px rgba(124,58,237,0.4)",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: "'FILL' 1" }}>send</span>
+                </button>
+              )}
+
+              {/* Upload spinner */}
+              {uploading && (
+                <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <div className="spinner" style={{ width: 18, height: 18 }} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : chats.length > 0 ? (

@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc } from "@/lib/db";
 import { updateProfile, deleteUser } from "firebase/auth";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { db, storage, OWNER_UIDS } from "@/lib/firebase";
+import { db, storage, auth, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -81,7 +81,7 @@ export default function ProfileSettingsPage() {
     setDeleting(true);
     setDeleteError("");
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken();
       await fetch("/api/delete-account", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -290,3 +290,4 @@ export default function ProfileSettingsPage() {
     </div>
   );
 }
+

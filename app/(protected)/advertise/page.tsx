@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { collection, addDoc, getDocs, query, where, orderBy, Timestamp } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
 const AD_TIERS = [
@@ -95,7 +95,7 @@ export default function AdvertisePage() {
     if (!linkUrl.trim()) { showToast("Add a link URL"); return; }
     setSubmitting(true);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/ad-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tier, title: title.trim(), adBody: adBody.trim(), mediaUrl, mediaType, linkUrl: linkUrl.trim(), token }) });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -301,3 +301,4 @@ export default function AdvertisePage() {
     </div>
   );
 }
+

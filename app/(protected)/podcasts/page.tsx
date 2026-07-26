@@ -134,10 +134,10 @@ export default function PodcastsPage() {
     if (!user || isOwner) return;
     getDoc(doc(db, "users", user.uid, "public", "profile")).then((snap) => {
       if (snap.exists()) {
-        setFollowers(snap.data().followersCount ?? 0);
+        const fc = snap.data().followersCount; setFollowers(typeof fc === "number" ? fc : 0);
       } else {
         getDoc(doc(db, "users", user.uid)).then((rootSnap) => {
-          setFollowers(rootSnap.exists() ? (rootSnap.data().followersCount ?? 0) : 0);
+          const fc2 = rootSnap.exists() ? rootSnap.data().followersCount : 0; setFollowers(typeof fc2 === "number" ? fc2 : 0);
         }).catch(() => setFollowers(0));
       }
     }).catch(() => setFollowers(0));

@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -101,7 +101,7 @@ export default function SettingsPage() {
     if (!user || premiumLoading) return;
     setPremiumLoading(true);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/premium-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, token }) });
       const data = await res.json();
       if (data.clientSecret) setPremiumSecret(data.clientSecret);
@@ -365,3 +365,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

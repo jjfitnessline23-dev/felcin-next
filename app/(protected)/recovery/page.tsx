@@ -5,6 +5,7 @@ import { collection, query, orderBy, limit, getDocs } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
+import { useHealthSteps } from "@/hooks/useHealthSteps";
 
 interface LogSet { reps: number; weight: number; }
 interface LogExercise { name: string; sets: LogSet[]; }
@@ -89,7 +90,12 @@ export default function RecoveryPage() {
       }).catch(() => setLoading(false));
   }, [user]);
 
+  const { steps, weekly, granted: hkGranted, loading: stepsLoading } = useHealthSteps();
   const info = result ? (LABELS.find((l) => result.score >= l.min) ?? LABELS[LABELS.length - 1]) : null;
+  const STEP_GOAL = 10_000;
+  const stepPct = steps != null ? Math.min(100, (steps / STEP_GOAL) * 100) : 0;
+  const maxWeekly = Math.max(...weekly.map((d) => d.steps), 1);
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   /* SVG ring */
   const R = 70, STROKE = 14;
@@ -275,6 +281,90 @@ export default function RecoveryPage() {
                 ))}
               </div>
             </div>
+
+            {/* ── Steps ── */}
+            {(hkGranted || stepsLoading) && (
+              <div className="rounded-3xl p-5 relative overflow-hidden"
+                style={{ background: "linear-gradient(135deg,#050f0a,#0a1a12)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                <div className="absolute pointer-events-none" style={{ top: "-40%", right: "-10%", width: 200, height: 200, background: "radial-gradient(circle,rgba(34,197,94,0.12) 0%,transparent 70%)" }} />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)" }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_walk</span>
+                    </div>
+                    <span className="text-xs font-black tracking-widest" style={{ color: "#22c55e", letterSpacing: "0.15em" }}>DAILY STEPS</span>
+                  </div>
+
+                  {stepsLoading ? (
+                    <div className="flex justify-center py-6"><div className="spinner" /></div>
+                  ) : steps == null ? (
+                    <p className="text-sm text-center py-4" style={{ color: "#444" }}>Allow Health access to see steps</p>
+                  ) : (
+                    <>
+                      {/* Big step count */}
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="font-black" style={{ fontSize: "clamp(2.5rem,10vw,3.5rem)", color: "#f2f2f2", letterSpacing: -2 }}>
+                          {steps.toLocaleString()}
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: "#555" }}>steps today</span>
+                      </div>
+
+                      {/* Goal progress bar */}
+                      <div className="flex items-center gap-3 mb-5">
+                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                          <div className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${stepPct}%`, background: stepPct >= 100 ? "#22c55e" : "linear-gradient(90deg,#16a34a,#22c55e)" }} />
+                        </div>
+                        <span className="text-xs font-bold shrink-0" style={{ color: stepPct >= 100 ? "#22c55e" : "#555" }}>
+                          {stepPct >= 100 ? "Goal ✓" : `${STEP_GOAL.toLocaleString()} goal`}
+                        </span>
+                      </div>
+
+                      {/* 7-day bar chart */}
+                      {weekly.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold tracking-widest mb-3" style={{ color: "#333" }}>THIS WEEK</p>
+                          <div className="flex items-end justify-between gap-1" style={{ height: 64 }}>
+                            {weekly.map((d, i) => {
+                              const pct = maxWeekly > 0 ? (d.steps / maxWeekly) * 100 : 0;
+                              const dayLabel = dayLabels[new Date(d.date + "T12:00:00").getDay()];
+                              const isToday = i === weekly.length - 1;
+                              return (
+                                <div key={d.date} className="flex flex-col items-center gap-1 flex-1">
+                                  <div className="w-full rounded-t-md transition-all duration-500 relative"
+                                    style={{ height: `${Math.max(4, pct)}%`, background: isToday ? "#22c55e" : "rgba(34,197,94,0.25)", minHeight: 4 }}>
+                                    {isToday && d.steps > 0 && (
+                                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap" style={{ color: "#22c55e" }}>
+                                        {d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-[9px]" style={{ color: isToday ? "#22c55e" : "#444" }}>{dayLabel}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step stats row */}
+                      <div className="flex gap-3 mt-4">
+                        {[
+                          { label: "Today", value: steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : String(steps), color: "#22c55e" },
+                          { label: "Weekly avg", value: weekly.length > 0 ? `${Math.round(weekly.reduce((s, d) => s + d.steps, 0) / weekly.length).toLocaleString()}` : "—", color: "#f2f2f2" },
+                          { label: "Best day", value: maxWeekly >= 1000 ? `${(maxWeekly / 1000).toFixed(1)}k` : String(maxWeekly), color: "#f2f2f2" },
+                        ].map((s) => (
+                          <div key={s.label} className="flex-1 rounded-2xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                            <div className="text-base font-black mb-0.5" style={{ color: s.color }}>{s.value}</div>
+                            <div className="text-[10px]" style={{ color: "#444" }}>{s.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
           </>
         ) : (

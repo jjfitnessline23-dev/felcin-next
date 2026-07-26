@@ -97,7 +97,7 @@ export default function MobileNav() {
 
   const handleSignOut = async () => { setOpen(false); await signOut(); router.push("/login"); };
 
-  if (pathname.startsWith("/comments")) return null;
+  if (pathname.startsWith("/comments") || pathname.startsWith("/private-chats")) return null;
 
   const profileActive = pathname.startsWith("/profile") || pathname.startsWith("/profile-settings");
   const moreActive = moreItems.some((i) => pathname.startsWith(i.href));

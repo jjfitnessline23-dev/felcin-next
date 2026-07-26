@@ -270,13 +270,13 @@ export default function ReelsPage() {
                 {/* Like */}
                 <button onClick={() => handleLike(reel)} className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
                   <span className="material-symbols-outlined" style={{ fontSize: 30, color: liked ? "#ef4444" : "#fff", fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>favorite</span>
-                  <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(reel.likes ?? 0) > 0 ? (reel.likes ?? 0).toLocaleString() : ""}</span>
+                  <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(typeof reel.likes === "number" && reel.likes > 0) ? reel.likes.toLocaleString() : ""}</span>
                 </button>
                 {/* Comment */}
                 <button className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer"
                   onClick={() => document.getElementById(`reel-comment-${reel.id}`)?.focus()}>
                   <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#fff", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>chat_bubble</span>
-                  <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(reel.comments ?? 0) > 0 ? (reel.comments ?? 0).toLocaleString() : ""}</span>
+                  <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(typeof reel.comments === "number" && reel.comments > 0) ? reel.comments.toLocaleString() : ""}</span>
                 </button>
                 {/* Repost */}
                 <button onClick={() => handleRepost(reel)} disabled={!!repostingId || repostedIds.has(reel.id)}

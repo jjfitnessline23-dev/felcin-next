@@ -37,8 +37,8 @@ export default function DashboardPage() {
       const posts = postsSnap.docs.map((d) => d.data());
       setStats({
         posts: posts.length,
-        likes: posts.reduce((s, p) => s + (p.likes || 0), 0),
-        comments: posts.reduce((s, p) => s + (p.comments || 0), 0),
+        likes: posts.reduce((s, p) => s + (typeof p.likes === "number" ? p.likes : 0), 0),
+        comments: posts.reduce((s, p) => s + (typeof p.comments === "number" ? p.comments : 0), 0),
         followers: followersSnap.size,
       });
     }).catch(() => {}).finally(() => setLoading(false));

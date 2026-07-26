@@ -6,7 +6,7 @@ import {
   collection, doc, getDoc, getDocs, setDoc,
   query, orderBy, limit,
 } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 
@@ -44,7 +44,9 @@ export default function EarningsPage() {
   // Check real Stripe account status
   useEffect(() => {
     if (!user) return;
-    user.getIdToken().then(async (token) => {
+    (async () => {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/creator-stripe-onboard?token=${encodeURIComponent(token)}`);
       const data = await res.json().catch(() => ({}));
       if (data.connected && data.accountId) {
@@ -53,7 +55,7 @@ export default function EarningsPage() {
         await setDoc(doc(db, "users", user.uid, "public", "profile"),
           { stripeAccountId: data.accountId }, { merge: true }).catch(() => {});
       }
-    }).catch(() => {});
+    })().catch(() => {});
   }, [user]);
 
   // Load creator fund stats
@@ -64,8 +66,8 @@ export default function EarningsPage() {
       getDoc(doc(db, "users", user.uid)),
       getDoc(doc(db, "users", user.uid, "monthlyViews", month)),
     ]).then(([userSnap, mvSnap]) => {
-      if (userSnap.exists()) setFollowersCount(userSnap.data().followersCount ?? 0);
-      if (mvSnap.exists()) setMonthlyViews(mvSnap.data().views ?? 0);
+      if (userSnap.exists()) { const fc = userSnap.data().followersCount; setFollowersCount(typeof fc === "number" ? fc : 0); }
+      if (mvSnap.exists()) { const mv = mvSnap.data().views; setMonthlyViews(typeof mv === "number" ? mv : 0); }
     }).catch(() => {});
   }, [user]);
 
@@ -87,9 +89,9 @@ export default function EarningsPage() {
           giftType: data.giftType ?? undefined,
           tier: data.tier ?? undefined,
           month: data.month ?? undefined,
-          views: data.views ?? undefined,
-          amountUsd: data.amountUsd ?? 0,
-          ts: data.timestamp?.seconds ?? 0,
+          views: typeof data.views === "number" ? data.views : undefined,
+          amountUsd: typeof data.amountUsd === "number" ? data.amountUsd : 0,
+          ts: typeof data.timestamp?.seconds === "number" ? data.timestamp.seconds : 0,
         };
       });
       setEarnings(items);
@@ -114,7 +116,8 @@ export default function EarningsPage() {
     if (!user || connecting) return;
     setConnecting(true);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("no token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/creator-stripe-onboard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

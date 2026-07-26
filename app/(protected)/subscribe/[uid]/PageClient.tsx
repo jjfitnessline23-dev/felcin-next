@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, addDoc, collection, Timestamp } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import InAppPaymentModal from "@/components/InAppPaymentModal";
@@ -70,7 +70,7 @@ export default function SubscribePage() {
     if (!user || subscribing) return;
     setSubscribing(tierId);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); if (!token) throw new Error("no token");
       const res = await fetch("/api/subscribe-payment-intent", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tier: tierId, creatorUid, creatorName: profile?.displayName || "Creator", token }),

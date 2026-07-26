@@ -6,7 +6,7 @@ import {
   collection, doc, getDoc, addDoc, updateDoc, onSnapshot, setDoc,
   query, orderBy, limit, serverTimestamp, increment,
 } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import AgoraVideo from "@/components/AgoraVideo";
@@ -324,7 +324,7 @@ export default function StreamViewerPage() {
     if (!user || sending || !stream) return;
     setSending(gift.id);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); if (!token) throw new Error("no token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/gift-checkout`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ giftType: gift.id, streamId, hostId: stream.hostId, token }),

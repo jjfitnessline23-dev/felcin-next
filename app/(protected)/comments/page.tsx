@@ -79,7 +79,7 @@ export default function CommentsPage() {
       if (!snap.exists()) { router.replace("/"); return; }
       const p = snap.data() as Post;
       setPost(p);
-      setLikeCount(p.likes ?? 0);
+      setLikeCount(typeof p.likes === "number" ? p.likes : 0);
       if (user) setLiked(Array.isArray(p.likedBy) && p.likedBy.includes(user.uid));
 
       if (user?.uid !== p.authorId) {

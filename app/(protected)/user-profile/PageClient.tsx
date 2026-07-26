@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -6,7 +6,7 @@ import {
   collection, query, where, getDocs,
   doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, updateDoc, increment,
 } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import InAppPaymentModal from "@/components/InAppPaymentModal";
@@ -83,7 +83,7 @@ export default function UserProfilePage() {
     if (!user || tipping || !profile) return;
     setTipping(true);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/tip-payment-intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creatorUid: uid, creatorName: profile.displayName || "Creator", amountCents: tipAmount, token }) });
       const data = await res.json();
       if (data.clientSecret) { setTipModal(false); setTipPayment({ clientSecret: data.clientSecret, amount: tipAmount }); }
@@ -332,11 +332,11 @@ export default function UserProfilePage() {
             <div className="text-xs font-medium" style={{ color: "#555" }}>Posts</div>
           </div>
           <div className="text-center">
-            <div className="font-black text-xl" style={{ color: "#a78bfa" }}>{(profile.followersCount ?? 0).toLocaleString()}</div>
+            <div className="font-black text-xl" style={{ color: "#a78bfa" }}>{(typeof profile.followersCount === "number" ? profile.followersCount : 0).toLocaleString()}</div>
             <div className="text-xs font-medium" style={{ color: "#555" }}>Followers</div>
           </div>
           <div className="text-center">
-            <div className="font-black text-xl" style={{ color: "#06b6d4" }}>{(profile.followingCount ?? 0).toLocaleString()}</div>
+            <div className="font-black text-xl" style={{ color: "#06b6d4" }}>{(typeof profile.followingCount === "number" ? profile.followingCount : 0).toLocaleString()}</div>
             <div className="text-xs font-medium" style={{ color: "#555" }}>Following</div>
           </div>
         </div>
@@ -380,18 +380,18 @@ export default function UserProfilePage() {
             <p className="text-sm mb-5" style={{ color: "#555" }}>Choose how you'd like to support</p>
 
             {/* Monetization lock notice */}
-            {(profile?.followersCount ?? 0) < 10_000 && (
+            {(typeof profile?.followersCount === "number" ? profile.followersCount : 0) < 10_000 && (
               <div className="flex items-center gap-3 p-3 rounded-2xl mb-1" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#555", fontVariationSettings: "'FILL' 1" }}>lock</span>
                 <p className="text-xs" style={{ color: "#555" }}>
-                  Monetization unlocks at 10K followers · {(profile?.followersCount ?? 0).toLocaleString()} / 10,000
+                  Monetization unlocks at 10K followers · {(typeof profile?.followersCount === "number" ? profile.followersCount : 0).toLocaleString()} / 10,000
                 </p>
               </div>
             )}
 
             <div className="flex flex-col gap-3">
               {/* Subscribe */}
-              {(profile?.followersCount ?? 0) >= 10_000 ? (
+              {(typeof profile?.followersCount === "number" ? profile.followersCount : 0) >= 10_000 ? (
                 <Link href={`/subscribe/${uid}`} onClick={() => setSupportModal(false)}
                   className="flex items-center gap-4 p-4 rounded-2xl no-underline"
                   style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)" }}>
@@ -418,7 +418,7 @@ export default function UserProfilePage() {
               )}
 
               {/* Tip */}
-              {(profile?.followersCount ?? 0) >= 10_000 ? (
+              {(typeof profile?.followersCount === "number" ? profile.followersCount : 0) >= 10_000 ? (
                 <button onClick={() => { setSupportModal(false); setTipModal(true); }}
                   className="flex items-center gap-4 p-4 rounded-2xl border-none cursor-pointer text-left"
                   style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
@@ -620,3 +620,4 @@ export default function UserProfilePage() {
     </div>
   );
 }
+

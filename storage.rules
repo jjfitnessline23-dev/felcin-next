@@ -31,6 +31,22 @@ service firebase.storage {
                        || request.resource.contentType.matches('video/.*'));
     }
 
+    // Chat image attachments — any authenticated user can upload, 25 MB max, images only
+    match /chat-media/{chatId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 25 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Chat voice messages — any authenticated user can upload, 10 MB max, audio only
+    match /chat-audio/{chatId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+    }
+
     // Watermarked videos + thumbnails — written by Cloud Functions, read by anyone
     match /watermarked/{userId}/{fileName} {
       allow read: if true;

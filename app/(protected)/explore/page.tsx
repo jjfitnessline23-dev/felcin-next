@@ -242,7 +242,7 @@ export default function ExplorePage() {
                       : <div className="rounded-full flex items-center justify-center font-bold shrink-0" style={{ width: 46, height: 46, background: "#222", color: "#aaa" }}>{(u.displayName || "U").charAt(0).toUpperCase()}</div>}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{u.displayName || "User"}</p>
-                      {u.followersCount !== undefined && <p className="text-xs" style={{ color: "#555" }}>{u.followersCount.toLocaleString()} followers</p>}
+                      {typeof u.followersCount === "number" && <p className="text-xs" style={{ color: "#555" }}>{u.followersCount.toLocaleString()} followers</p>}
                     </div>
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#333" }}>chevron_right</span>
                   </Link>

@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, or } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -68,21 +68,25 @@ export default function TrainingSessionsPage() {
     if (!stripeSessionId || !user || !trainerId || !date) return;
 
     setVerifying(true);
-    user.getIdToken().then(async (token) => {
-      const res = await fetch("/api/training-session-verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stripeSessionId, token }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setVerifyMsg("Session booked! Your trainer will confirm shortly.");
-        router.replace("/training-sessions");
-      } else {
-        setVerifyMsg(data.error || "Verification failed");
-      }
-      setVerifying(false);
-    }).catch(() => { setVerifyMsg("Verification failed"); setVerifying(false); });
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) { setVerifying(false); return; }
+        const res = await fetch("/api/training-session-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stripeSessionId, token }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setVerifyMsg("Session booked! Your trainer will confirm shortly.");
+          router.replace("/training-sessions");
+        } else {
+          setVerifyMsg(data.error || "Verification failed");
+        }
+        setVerifying(false);
+      } catch { setVerifyMsg("Verification failed"); setVerifying(false); }
+    })();
   }, [user]); // eslint-disable-line
 
   useEffect(() => {
@@ -230,3 +234,4 @@ export default function TrainingSessionsPage() {
     </div>
   );
 }
+

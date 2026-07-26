@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { doc, getDoc, updateDoc, increment, addDoc, collection, serverTimestamp } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 
@@ -41,7 +41,7 @@ export default function GhostSessionPage() {
     if (!user || buying || !workout) return;
     setBuying(true);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); if (!token) throw new Error("no token");
       const res = await fetch("/api/ppv-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: id, postCol: "ghostWorkouts", authorId: workout.authorId || "", authorName: workout.hostName, priceCents: workout.price, caption: workout.title, token }) });
       const data = await res.json();
       if (data.url) window.location.href = data.url;

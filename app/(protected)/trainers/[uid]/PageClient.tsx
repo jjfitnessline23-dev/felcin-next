@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { doc, getDoc } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useParams, useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -43,7 +43,7 @@ export default function TrainerProfileClient() {
     setBooking(true);
     setBookError("");
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); if (!token) throw new Error("no token");
       const sessionDate = `${selectedDate}T${selectedTime}:00`;
       const res = await fetch("/api/training-session-checkout", {
         method: "POST",
