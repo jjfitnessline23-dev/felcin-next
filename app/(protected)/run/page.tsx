@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useAuth } from "@/lib/auth";
 import { db, OWNER_UIDS } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
+import { collection, addDoc, getDocs, query, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
 import { snapToRoads } from "@/lib/mapMatch";
 import { Capacitor } from "@capacitor/core";
 
@@ -116,7 +116,7 @@ export default function RunPage() {
   const [loadingRides, setLoadingRides] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const savingRef = useRef(false);
   const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
   const [matchedCoords, setMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
@@ -286,15 +286,28 @@ export default function RunPage() {
     if (!user) return;
     (async () => {
       try {
-        const q = query(collection(db, "users", user.uid, "runningRoutes"), orderBy("date", "desc"), limit(30));
-        setRuns((await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute)));
-      } catch { } finally { setLoadingRuns(false); }
+        const q = query(collection(db, "users", user.uid, "runningRoutes"), limit(30));
+        const docs = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute));
+        // Sort client-side so mixed/legacy date types don't break orderBy
+        docs.sort((a, b) => {
+          const ta = a.date?.toMillis?.() ?? (a.date?.seconds ? a.date.seconds * 1000 : new Date(a.date).getTime() || 0);
+          const tb = b.date?.toMillis?.() ?? (b.date?.seconds ? b.date.seconds * 1000 : new Date(b.date).getTime() || 0);
+          return tb - ta;
+        });
+        setRuns(docs);
+      } catch (e) { console.error("loadRuns failed:", e); } finally { setLoadingRuns(false); }
     })();
     (async () => {
       try {
-        const q = query(collection(db, "users", user.uid, "cyclingRoutes"), orderBy("date", "desc"), limit(30));
-        setRides((await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute)));
-      } catch { } finally { setLoadingRides(false); }
+        const q = query(collection(db, "users", user.uid, "cyclingRoutes"), limit(30));
+        const docs = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute));
+        docs.sort((a, b) => {
+          const ta = a.date?.toMillis?.() ?? (a.date?.seconds ? a.date.seconds * 1000 : new Date(a.date).getTime() || 0);
+          const tb = b.date?.toMillis?.() ?? (b.date?.seconds ? b.date.seconds * 1000 : new Date(b.date).getTime() || 0);
+          return tb - ta;
+        });
+        setRides(docs);
+      } catch (e) { console.error("loadRides failed:", e); } finally { setLoadingRides(false); }
     })();
   }, [user]);
 
@@ -416,7 +429,7 @@ export default function RunPage() {
     if (!user || savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
-    setSaveError(false);
+    setSaveError(null);
     const isCycle = mode === "cycle";
     const duration = elapsed;
     const avgPace = distance > 0 ? duration / (distance / 1000) : 0;
@@ -438,9 +451,10 @@ export default function RunPage() {
       if (isCycle) setRides(prev => [entry, ...prev]); else setRuns(prev => [entry, ...prev]);
       setLastSaved({ isDistancePR, isPacePR });
       setPhase("idle");
-    } catch (e) {
-      console.error("saveRun failed:", e);
-      setSaveError(true);
+    } catch (e: unknown) {
+      const msg = (e instanceof Error) ? e.message : String(e);
+      console.error("saveRun failed:", msg);
+      setSaveError(msg || "Unknown error");
     } finally {
       savingRef.current = false;
       setIsSaving(false);
@@ -660,15 +674,18 @@ export default function RunPage() {
               ))}
             </div>
             {saveError && (
-              <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#ef4444", flexShrink: 0 }}>error</span>
-                <span style={{ fontSize: 13, color: "#f87171" }}>Could not save — check your connection and try again.</span>
+              <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#ef4444", flexShrink: 0 }}>error</span>
+                  <span style={{ fontSize: 13, color: "#f87171", fontWeight: 600 }}>Could not save your run</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#7f3a3a", paddingLeft: 24, wordBreak: "break-all" }}>{saveError}</span>
               </div>
             )}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={discardRun} disabled={isSaving} style={{ flex: 1, padding: "14px 0", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", background: "transparent", color: "#555", fontSize: 14, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer" }}>Discard</button>
               <button onClick={saveRun} disabled={isSaving} style={{ flex: 2, padding: "14px 0", borderRadius: 14, border: "none", background: isSaving ? "#1a3d27" : ACCENT, color: isSaving ? "#555" : "#fff", fontSize: 15, fontWeight: 800, cursor: isSaving ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
-                {isSaving ? "Saving…" : saveError ? `Retry Save` : `Save ${ACTIVITY_LABEL}`}
+                {isSaving ? "Saving…" : saveError !== null ? `Retry Save` : `Save ${ACTIVITY_LABEL}`}
               </button>
             </div>
           </div>
