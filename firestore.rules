@@ -18,10 +18,20 @@ service cloud.firestore {
         .hasOnly(['likes', 'likedBy', 'comments', 'repostCount', 'viewCount']);
     }
 
+    // Validates a text field exists, is a string, and is within maxLen characters
+    function validText(field, maxLen) {
+      return field in request.resource.data
+          && request.resource.data[field] is string
+          && request.resource.data[field].size() <= maxLen;
+    }
+
     // ── Posts ──
     match /posts/{postId} {
       allow read: if isAuth();
-      allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+      allow create: if isAuth()
+                    && request.resource.data.authorId == request.auth.uid
+                    && (!('text' in request.resource.data) || validText('text', 2000))
+                    && request.resource.data.keys().size() <= 25;
       allow update: if isAuth() && (
         request.auth.uid == resource.data.authorId ||
         onlyEngagementFields() ||
@@ -202,7 +212,9 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow create: if isAuth()
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
-          && request.resource.data.senderId == request.auth.uid;
+          && request.resource.data.senderId == request.auth.uid
+          && validText('text', 1000)
+          && request.resource.data.keys().size() <= 5;
         allow update, delete: if false;
       }
     }
@@ -335,10 +347,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ── Analytics ──
+    // ── Analytics — only specific known fields, no free-form writes ──
     match /analytics/{docId} {
       allow read: if isAdmin();
-      allow write: if isAuth();
+      allow create, update: if isAuth()
+        && request.resource.data.keys().hasOnly([
+             'event', 'uid', 'platform', 'createdAt', 'metadata'
+           ])
+        && validText('event', 100);
+      allow delete: if isAdmin();
     }
   }
 }
