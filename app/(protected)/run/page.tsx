@@ -115,6 +115,8 @@ export default function RunPage() {
   const [rides, setRides] = useState<RunRoute[]>([]);
   const [loadingRides, setLoadingRides] = useState(true);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const savingRef = useRef(false);
   const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
   const [matchedCoords, setMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
@@ -413,6 +415,8 @@ export default function RunPage() {
   const saveRun = async () => {
     if (!user || savingRef.current) return;
     savingRef.current = true;
+    setIsSaving(true);
+    setSaveError(false);
     const isCycle = mode === "cycle";
     const duration = elapsed;
     const avgPace = distance > 0 ? duration / (distance / 1000) : 0;
@@ -433,9 +437,14 @@ export default function RunPage() {
       const entry = { id: ref.id, name, distance, duration, avgPace, date: new Date(), isDistancePR, isPacePR };
       if (isCycle) setRides(prev => [entry, ...prev]); else setRuns(prev => [entry, ...prev]);
       setLastSaved({ isDistancePR, isPacePR });
-    } catch (e) { console.error(e); }
-    savingRef.current = false;
-    setPhase("idle");
+      setPhase("idle");
+    } catch (e) {
+      console.error("saveRun failed:", e);
+      setSaveError(true);
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   };
 
 
@@ -650,9 +659,17 @@ export default function RunPage() {
                 </div>
               ))}
             </div>
+            {saveError && (
+              <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#ef4444", flexShrink: 0 }}>error</span>
+                <span style={{ fontSize: 13, color: "#f87171" }}>Could not save — check your connection and try again.</span>
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={discardRun} style={{ flex: 1, padding: "14px 0", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", background: "transparent", color: "#555", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Discard</button>
-              <button onClick={saveRun} style={{ flex: 2, padding: "14px 0", borderRadius: 14, border: "none", background: ACCENT, color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>Save {ACTIVITY_LABEL}</button>
+              <button onClick={discardRun} disabled={isSaving} style={{ flex: 1, padding: "14px 0", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", background: "transparent", color: "#555", fontSize: 14, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer" }}>Discard</button>
+              <button onClick={saveRun} disabled={isSaving} style={{ flex: 2, padding: "14px 0", borderRadius: 14, border: "none", background: isSaving ? "#1a3d27" : ACCENT, color: isSaving ? "#555" : "#fff", fontSize: 15, fontWeight: 800, cursor: isSaving ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
+                {isSaving ? "Saving…" : saveError ? `Retry Save` : `Save ${ACTIVITY_LABEL}`}
+              </button>
             </div>
           </div>
         </div>

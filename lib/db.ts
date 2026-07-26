@@ -67,8 +67,12 @@ class CapFieldValue {
 
 // ─── Web-path sanitizer: converts any CapTimestamp that leaked through into a
 // real Firebase Timestamp so writes never fail with "Unsupported field value".
+// Firebase FieldValue sentinels (serverTimestamp, increment, arrayUnion, etc.)
+// must be passed through unchanged — Object.entries() on them destroys the
+// sentinel and causes Firestore to reject the write with "Unsupported field value".
 function sanitizeForWeb(v: unknown): unknown {
   if (v instanceof CapTimestamp) return fs.Timestamp.fromMillis(v.toMillis());
+  if (v instanceof fs.FieldValue) return v;
   if (Array.isArray(v)) return v.map(sanitizeForWeb);
   if (v && typeof v === "object" && !(v instanceof Date) && !(v instanceof fs.Timestamp)) {
     return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, val]) => [k, sanitizeForWeb(val)]));
