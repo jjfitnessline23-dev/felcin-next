@@ -126,6 +126,7 @@ export default function AdminPortalPage() {
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [runsLoaded, setRunsLoaded] = useState(false);
   const [runsError, setRunsError] = useState<string | null>(null);
+  const [runsSearch, setRunsSearch] = useState("");
   const [botLogs, setBotLogs] = useState<{ scanned: number; violations: number; bans: { "7d": number; "30d": number; permanent: number }; runAt: { seconds: number } }[]>([]);
   const [stripeStats, setStripeStats] = useState<{
     today: { revenue: number; count: number };
@@ -190,12 +191,12 @@ export default function AdminPortalPage() {
       const td = todaySnap.exists() ? todaySnap.data() : {};
       const yd = yestSnap.exists() ? yestSnap.data() : {};
       setAnalytics({
-        totalPageViews: t.pageViews || 0,
-        totalActiveUsers: t.activeUsers || 0,
-        todayPageViews: td.pageViews || 0,
-        todayActiveUsers: td.activeUsers || 0,
-        yesterdayPageViews: yd.pageViews || 0,
-        yesterdayActiveUsers: yd.activeUsers || 0,
+        totalPageViews: typeof t.pageViews === "number" ? t.pageViews : 0,
+        totalActiveUsers: typeof t.activeUsers === "number" ? t.activeUsers : 0,
+        todayPageViews: typeof td.pageViews === "number" ? td.pageViews : 0,
+        todayActiveUsers: typeof td.activeUsers === "number" ? td.activeUsers : 0,
+        yesterdayPageViews: typeof yd.pageViews === "number" ? yd.pageViews : 0,
+        yesterdayActiveUsers: typeof yd.activeUsers === "number" ? yd.activeUsers : 0,
       });
     }).catch(() => {
       setAnalytics({ totalPageViews: 0, totalActiveUsers: 0, todayPageViews: 0, todayActiveUsers: 0, yesterdayPageViews: 0, yesterdayActiveUsers: 0 });
@@ -808,6 +809,50 @@ export default function AdminPortalPage() {
             })}
           </div>
 
+        ) : tab === "reports" ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs mb-1" style={{ color: "#444" }}>{reports.length} reports · {pendingReports.length} pending review</p>
+            {reports.length === 0 ? (
+              <div className="text-center py-16">
+                <span className="material-symbols-outlined" style={{ fontSize: 44, display: "block", color: "#1e1e1e", marginBottom: 10 }}>flag</span>
+                <p className="text-sm font-semibold" style={{ color: "#444" }}>No reports yet</p>
+              </div>
+            ) : reports.map((r) => (
+              <div key={r.id} className="p-4 rounded-xl"
+                style={{ background: "#131313", border: `1px solid ${r.status === "reviewed" ? "rgba(255,255,255,0.05)" : "rgba(239,68,68,0.2)"}`, opacity: r.status === "reviewed" ? 0.6 : 1 }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: r.status === "reviewed" ? "rgba(255,255,255,0.06)" : "rgba(239,68,68,0.12)", color: r.status === "reviewed" ? "#555" : "#f87171" }}>
+                        {r.status === "reviewed" ? "Reviewed" : "Pending"}
+                      </span>
+                      {r.type && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "#666" }}>{r.type}</span>}
+                    </div>
+                    <p className="text-sm font-medium mb-0.5" style={{ color: "#f2f2f2" }}>{r.reason || "No reason given"}</p>
+                    <p className="text-xs" style={{ color: "#444" }}>
+                      Reporter: {r.reporterId?.slice(0, 10)}…
+                      {r.postId && <> · Post: {r.postId.slice(0, 10)}…</>}
+                      {r.reelId && <> · Reel: {r.reelId.slice(0, 10)}…</>}
+                      {r.createdAt && <> · {new Date(r.createdAt.seconds * 1000).toLocaleDateString()}</>}
+                    </p>
+                  </div>
+                  {r.status !== "reviewed" && (
+                    <button
+                      onClick={async () => {
+                        await updateDoc(doc(db, "reports", r.id), { status: "reviewed" }).catch(() => {});
+                        setReports((prev) => prev.map((x) => x.id === r.id ? { ...x, status: "reviewed" } : x));
+                      }}
+                      className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border-none cursor-pointer"
+                      style={{ background: "rgba(52,211,153,0.1)", color: "#34d399" }}>
+                      Mark reviewed
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
         ) : tab === "analytics" ? (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between mb-1">
@@ -824,7 +869,7 @@ export default function AdminPortalPage() {
                   const t = totals.exists() ? totals.data() : {};
                   const td = todaySnap.exists() ? todaySnap.data() : {};
                   const yd = yestSnap.exists() ? yestSnap.data() : {};
-                  setAnalytics({ totalPageViews: t.pageViews || 0, totalActiveUsers: t.activeUsers || 0, todayPageViews: td.pageViews || 0, todayActiveUsers: td.activeUsers || 0, yesterdayPageViews: yd.pageViews || 0, yesterdayActiveUsers: yd.activeUsers || 0 });
+                  setAnalytics({ totalPageViews: typeof t.pageViews === "number" ? t.pageViews : 0, totalActiveUsers: typeof t.activeUsers === "number" ? t.activeUsers : 0, todayPageViews: typeof td.pageViews === "number" ? td.pageViews : 0, todayActiveUsers: typeof td.activeUsers === "number" ? td.activeUsers : 0, yesterdayPageViews: typeof yd.pageViews === "number" ? yd.pageViews : 0, yesterdayActiveUsers: typeof yd.activeUsers === "number" ? yd.activeUsers : 0 });
                 }).catch(() => setAnalytics({ totalPageViews: 0, totalActiveUsers: 0, todayPageViews: 0, todayActiveUsers: 0, yesterdayPageViews: 0, yesterdayActiveUsers: 0 }));
               }} className="flex items-center gap-1 border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
@@ -987,6 +1032,14 @@ export default function AdminPortalPage() {
                 <span className="text-xs">Refresh</span>
               </button>
             </div>
+            {runsLoaded && runRoutes.length > 0 && (
+              <input
+                placeholder="Search by name…"
+                value={runsSearch}
+                onChange={e => setRunsSearch(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 12, background: "#131313", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 13, outline: "none" }}
+              />
+            )}
 
             {runsLoaded && runRoutes.length > 0 && (() => {
               const totalKm = runRoutes.reduce((s, r) => s + r.distance, 0) / 1000;
@@ -1026,9 +1079,18 @@ export default function AdminPortalPage() {
                 <p className="text-xs mt-2" style={{ color: "#333" }}>Go to /run on the app, complete a run and tap Save — it will appear here.</p>
               </div>
             ) : (
+              (() => {
+                const filtered = runsSearch
+                  ? runRoutes.filter(run => {
+                      const userRecord = users.find(u => u.id === run.userId);
+                      const name = (userRecord?.displayName || run.userId).toLowerCase();
+                      return name.includes(runsSearch.toLowerCase());
+                    })
+                  : runRoutes;
+                return (
               <>
-                <p className="text-xs" style={{ color: "#444" }}>{runRoutes.length} runs · most recent first</p>
-                {runRoutes.map((run) => {
+                <p className="text-xs" style={{ color: "#444" }}>{filtered.length}{runsSearch ? ` of ${runRoutes.length}` : ""} runs · most recent first</p>
+                {filtered.map((run) => {
                   const userRecord = users.find(u => u.id === run.userId);
                   const userName = userRecord?.displayName || run.userId.slice(0, 10) + "…";
                   const userPhoto = userRecord?.photoURL;
@@ -1090,6 +1152,8 @@ export default function AdminPortalPage() {
                   );
                 })}
               </>
+                );
+              })()
             )}
           </div>
 
