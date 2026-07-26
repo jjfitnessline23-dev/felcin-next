@@ -7,10 +7,9 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
 interface Chat { id: string; participants: string[]; lastMessage?: string; lastAt?: { seconds: number }; otherName?: string; otherPhoto?: string; }
-interface Msg { id: string; senderId: string; text: string; createdAt?: { seconds: number }; }
+interface Msg  { id: string; senderId: string; text: string; createdAt?: { seconds: number }; }
 
 function chatId(a: string, b: string) { return [a, b].sort().join("_"); }
-
 function timeAgo(s: number) {
   const d = Math.floor(Date.now() / 1000) - s;
   if (d < 60) return "just now";
@@ -19,60 +18,73 @@ function timeAgo(s: number) {
   return Math.floor(d / 86400) + "d";
 }
 
-export default function PrivateChatsPage() {
-  const { user } = useAuth();
-  const searchParams = useSearchParams();
-  const withUid = searchParams.get("uid");
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [activeChat, setActiveChat] = useState<string | null>(null);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+const INPUT_BAR_H = 68;
 
-  // Track visual viewport height so the layout shrinks when the iOS keyboard opens
+export default function PrivateChatsPage() {
+  const { user }      = useAuth();
+  const searchParams  = useSearchParams();
+  const withUid       = searchParams.get("uid");
+  const [chats, setChats]           = useState<Chat[]>([]);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [messages, setMessages]     = useState<Msg[]>([]);
+  const [text, setText]             = useState("");
+  const [sending, setSending]       = useState(false);
+  const [otherName, setOtherName]   = useState("Chat");
+  const [otherPhoto, setOtherPhoto] = useState("");
+  const [otherOnline, setOtherOnline]     = useState(false);
+  const [otherLastSeen, setOtherLastSeen] = useState<number | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const bottomRef   = useRef<HTMLDivElement>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const inputRef    = useRef<HTMLInputElement>(null);
+
+  // Lock input bar above keyboard using visualViewport
   useEffect(() => {
     const update = () => {
-      if (window.visualViewport) setViewportHeight(window.visualViewport.height);
+      if (!window.visualViewport) return;
+      const kh = Math.max(0, window.innerHeight - window.visualViewport.height);
+      setKeyboardHeight(kh);
     };
-    window.visualViewport?.addEventListener("resize", update);
-    update();
-    return () => window.visualViewport?.removeEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize",  update);
+    window.visualViewport?.addEventListener("scroll",  update);
+    return () => {
+      window.visualViewport?.removeEventListener("resize",  update);
+      window.visualViewport?.removeEventListener("scroll",  update);
+    };
   }, []);
 
+  // Scroll latest message into view whenever keyboard height changes
+  useEffect(() => {
+    clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      120
+    );
+  }, [keyboardHeight]);
+
+  // Open chat from URL param
   useEffect(() => {
     if (!user || !withUid || activeChat) return;
     setActiveChat(chatId(user.uid, withUid));
     getDoc(doc(db, "users", withUid, "public", "profile")).then((snap) => {
-      const data = snap.exists() ? snap.data() : null;
-      if (data) { setOtherName(data.displayName || data.username || "User"); setOtherPhoto(data.photoURL || ""); return; }
-      return getDoc(doc(db, "users", withUid)).then((root) => {
-        if (root.exists()) { const d = root.data(); setOtherName(d.displayName || d.username || "User"); setOtherPhoto(d.photoURL || ""); }
+      const d = snap.exists() ? snap.data() : null;
+      if (d) { setOtherName(d.displayName || d.username || "User"); setOtherPhoto(d.photoURL || ""); return; }
+      return getDoc(doc(db, "users", withUid)).then((r) => {
+        if (r.exists()) { const d2 = r.data(); setOtherName(d2.displayName || d2.username || "User"); setOtherPhoto(d2.photoURL || ""); }
       });
     }).catch(() => {});
   }, [user, withUid, activeChat]);
 
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [otherName, setOtherName] = useState("Chat");
-  const [otherPhoto, setOtherPhoto] = useState("");
-  const [otherOnline, setOtherOnline] = useState(false);
-  const [otherLastSeen, setOtherLastSeen] = useState<number | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  // Scroll to bottom when keyboard opens (viewport shrinks)
-  useEffect(() => {
-    if (viewportHeight === null) return;
-    clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-  }, [viewportHeight]);
-
+  // Own presence
   useEffect(() => {
     if (!user) return;
-    const presenceRef = doc(db, "users", user.uid, "presence", "status");
-    setDoc(presenceRef, { online: true, lastSeen: serverTimestamp() }, { merge: true }).catch(() => {});
-    return () => { updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {}); };
+    const ref = doc(db, "users", user.uid, "presence", "status");
+    setDoc(ref, { online: true, lastSeen: serverTimestamp() }, { merge: true }).catch(() => {});
+    return () => { updateDoc(ref, { online: false, lastSeen: serverTimestamp() }).catch(() => {}); };
   }, [user]);
 
+  // Other user presence
   useEffect(() => {
     if (!activeChat || !user) return;
     const otherUid = activeChat.split("_").find((id) => id !== user.uid);
@@ -85,6 +97,7 @@ export default function PrivateChatsPage() {
     });
   }, [activeChat, user]);
 
+  // Chat list
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "chats"), where("participants", "array-contains", user.uid));
@@ -94,15 +107,9 @@ export default function PrivateChatsPage() {
         const otherId = data.participants.find((p) => p !== user.uid) || "";
         try {
           const pub = await getDoc(doc(db, "users", otherId, "public", "profile"));
-          if (pub.exists()) {
-            const pd = pub.data();
-            return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" };
-          }
+          if (pub.exists()) { const pd = pub.data(); return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" }; }
           const root = await getDoc(doc(db, "users", otherId));
-          if (root.exists()) {
-            const pd = root.data();
-            return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" };
-          }
+          if (root.exists()) { const pd = root.data(); return { ...data, id: d.id, otherName: pd.displayName || pd.username || "User", otherPhoto: pd.photoURL || "" }; }
         } catch {}
         return { ...data, id: d.id };
       }));
@@ -110,6 +117,7 @@ export default function PrivateChatsPage() {
     });
   }, [user]);
 
+  // Messages
   useEffect(() => {
     if (!activeChat) { setMessages([]); return; }
     const q = query(collection(db, "chats", activeChat, "messages"), orderBy("createdAt", "asc"));
@@ -123,7 +131,9 @@ export default function PrivateChatsPage() {
 
   const sendMsg = async () => {
     if (!text.trim() || !user || !activeChat || sending) return;
-    setSending(true); const t = text.trim(); setText("");
+    setSending(true);
+    const t = text.trim();
+    setText("");
     try {
       await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, text: t, createdAt: serverTimestamp() });
       await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp() }, { merge: true });
@@ -132,17 +142,19 @@ export default function PrivateChatsPage() {
   };
 
   const myInitial = (user?.displayName || user?.email || "U").charAt(0).toUpperCase();
-  const containerHeight = viewportHeight ? `${viewportHeight}px` : "100dvh";
+
+  // Safe-area bottom only when keyboard is closed
+  const safeBottom = keyboardHeight > 0 ? 0 : "env(safe-area-inset-bottom, 0px)";
 
   return (
-    <div className="flex overflow-hidden" style={{ height: containerHeight, background: "#090909", maxWidth: "100vw" }}>
-      {/* Chat list */}
+    <div className="flex overflow-hidden" style={{ height: "100dvh", background: "#090909", maxWidth: "100vw" }}>
+
+      {/* ── Chat list ─────────────────────────────────────────── */}
       <div className={`w-full lg:w-80 shrink-0 flex flex-col ${activeChat ? "hidden lg:flex" : "flex"}`}
         style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <h1 className="font-bold text-lg" style={{ color: "#f2f2f2" }}>Messages</h1>
         </div>
-
         {chats.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-center px-6">
             <div>
@@ -150,7 +162,7 @@ export default function PrivateChatsPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#333" }}>chat</span>
               </div>
               <p className="font-medium mb-1" style={{ color: "#f2f2f2" }}>No conversations</p>
-              <p className="text-sm" style={{ color: "#444" }}>Start chatting from someone's profile</p>
+              <p className="text-sm" style={{ color: "#444" }}>Start chatting from someone&apos;s profile</p>
             </div>
           </div>
         ) : (
@@ -162,14 +174,9 @@ export default function PrivateChatsPage() {
                   onClick={() => { setActiveChat(c.id); setOtherName(c.otherName || "User"); setOtherPhoto(c.otherPhoto || ""); }}
                   className="flex items-center gap-3 w-full text-left px-4 py-3 transition-colors"
                   style={{ background: activeChat === c.id ? "rgba(255,255,255,0.06)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  {c.otherPhoto ? (
-                    <img src={c.otherPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 46, height: 46 }} />
-                  ) : (
-                    <div className="rounded-full flex items-center justify-center font-bold text-sm shrink-0"
-                      style={{ width: 46, height: 46, background: "#222", color: "#aaa" }}>
-                      {init}
-                    </div>
-                  )}
+                  {c.otherPhoto
+                    ? <img src={c.otherPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 46, height: 46 }} />
+                    : <div className="rounded-full flex items-center justify-center font-bold text-sm shrink-0" style={{ width: 46, height: 46, background: "#222", color: "#aaa" }}>{init}</div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{c.otherName || "User"}</p>
@@ -184,23 +191,19 @@ export default function PrivateChatsPage() {
         )}
       </div>
 
-      {/* Chat window */}
+      {/* ── Chat window ───────────────────────────────────────── */}
       {activeChat ? (
-        <div className={`flex-1 flex flex-col min-h-0 ${!activeChat ? "hidden lg:flex" : ""}`}>
+        <div className="flex-1 flex flex-col min-h-0">
+
+          {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 shrink-0"
             style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)" }}>
-            <button onClick={() => setActiveChat(null)}
-              className="icon-btn lg:hidden" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
+            <button onClick={() => setActiveChat(null)} className="icon-btn lg:hidden" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
-            {otherPhoto ? (
-              <img src={otherPhoto} alt="" className="rounded-full object-cover" style={{ width: 34, height: 34 }} />
-            ) : (
-              <div className="rounded-full flex items-center justify-center font-bold text-sm"
-                style={{ width: 34, height: 34, background: "#222", color: "#aaa" }}>
-                {otherName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            {otherPhoto
+              ? <img src={otherPhoto} alt="" className="rounded-full object-cover" style={{ width: 34, height: 34 }} />
+              : <div className="rounded-full flex items-center justify-center font-bold text-sm" style={{ width: 34, height: 34, background: "#222", color: "#aaa" }}>{otherName.charAt(0).toUpperCase()}</div>}
             <div>
               <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>{otherName}</p>
               {otherOnline
@@ -211,7 +214,9 @@ export default function PrivateChatsPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 min-h-0">
+          {/* Messages — extra bottom padding so last message clears the fixed input bar */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2"
+            style={{ paddingBottom: INPUT_BAR_H + 8 }}>
             {messages.map((m) => {
               const isMine = m.senderId === user?.uid;
               return (
@@ -229,32 +234,40 @@ export default function PrivateChatsPage() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="flex items-center gap-3 px-4 py-3 shrink-0"
-            style={{
-              borderTop: "1px solid rgba(255,255,255,0.06)",
-              background: "rgba(9,9,9,0.95)",
-              backdropFilter: "blur(20px)",
-              paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
-            }}>
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
-            ) : (
-              <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                style={{ width: 32, height: 32, background: "#222", color: "#aaa" }}>
-                {myInitial}
-              </div>
-            )}
-            <input type="text" value={text} onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMsg()}
-              placeholder="Type a message…"
-              className="flex-1 px-4 py-2.5 rounded-full outline-none"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }} />
-            <button onClick={sendMsg} disabled={!text.trim() || sending}
-              className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer transition-all"
-              style={{ background: text.trim() ? "#fff" : "rgba(255,255,255,0.06)", color: text.trim() ? "#000" : "#555" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: "'FILL' 1" }}>send</span>
-            </button>
+          {/* Input bar — fixed, bottom tracks keyboard height */}
+          <div style={{
+            position:       "fixed",
+            left:           0,
+            right:          0,
+            bottom:         keyboardHeight,
+            zIndex:         50,
+            background:     "rgba(9,9,9,0.97)",
+            backdropFilter: "blur(20px)",
+            borderTop:      "1px solid rgba(255,255,255,0.08)",
+            paddingBottom:  safeBottom,
+          }}>
+            <div className="flex items-center gap-3 px-4 py-3">
+              {user?.photoURL
+                ? <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
+                : <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ width: 32, height: 32, background: "#222", color: "#aaa" }}>{myInitial}</div>}
+              <input
+                ref={inputRef}
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendMsg()}
+                placeholder="Type a message…"
+                className="flex-1 px-4 py-2.5 rounded-full outline-none"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }}
+              />
+              <button onClick={sendMsg} disabled={!text.trim() || sending}
+                className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer transition-all"
+                style={{ background: text.trim() ? "#fff" : "rgba(255,255,255,0.06)", color: text.trim() ? "#000" : "#555" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 19, fontVariationSettings: "'FILL' 1" }}>send</span>
+              </button>
+            </div>
           </div>
+
         </div>
       ) : (
         <div className="hidden lg:flex flex-1 items-center justify-center flex-col gap-3">
