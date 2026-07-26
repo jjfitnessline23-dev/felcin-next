@@ -25,11 +25,21 @@ export default function PrivateChatsPage() {
   const withUid = searchParams.get("uid");
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  // Track visual viewport height so the layout shrinks when the iOS keyboard opens
+  useEffect(() => {
+    const update = () => {
+      if (window.visualViewport) setViewportHeight(window.visualViewport.height);
+    };
+    window.visualViewport?.addEventListener("resize", update);
+    update();
+    return () => window.visualViewport?.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     if (!user || !withUid || activeChat) return;
     setActiveChat(chatId(user.uid, withUid));
-    // Fetch the other user's profile so the chat header shows their name/photo
     getDoc(doc(db, "users", withUid, "public", "profile")).then((snap) => {
       const data = snap.exists() ? snap.data() : null;
       if (data) { setOtherName(data.displayName || data.username || "User"); setOtherPhoto(data.photoURL || ""); return; }
@@ -38,6 +48,7 @@ export default function PrivateChatsPage() {
       });
     }).catch(() => {});
   }, [user, withUid, activeChat]);
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -48,7 +59,13 @@ export default function PrivateChatsPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Set own presence
+  // Scroll to bottom when keyboard opens (viewport shrinks)
+  useEffect(() => {
+    if (viewportHeight === null) return;
+    clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  }, [viewportHeight]);
+
   useEffect(() => {
     if (!user) return;
     const presenceRef = doc(db, "users", user.uid, "presence", "status");
@@ -56,7 +73,6 @@ export default function PrivateChatsPage() {
     return () => { updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {}); };
   }, [user]);
 
-  // Watch other user's presence when chat is active
   useEffect(() => {
     if (!activeChat || !user) return;
     const otherUid = activeChat.split("_").find((id) => id !== user.uid);
@@ -116,9 +132,10 @@ export default function PrivateChatsPage() {
   };
 
   const myInitial = (user?.displayName || user?.email || "U").charAt(0).toUpperCase();
+  const containerHeight = viewportHeight ? `${viewportHeight}px` : "100dvh";
 
   return (
-    <div className="flex overflow-hidden" style={{ height: "100dvh", background: "#090909", maxWidth: "100vw" }}>
+    <div className="flex overflow-hidden" style={{ height: containerHeight, background: "#090909", maxWidth: "100vw" }}>
       {/* Chat list */}
       <div className={`w-full lg:w-80 shrink-0 flex flex-col ${activeChat ? "hidden lg:flex" : "flex"}`}
         style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}>
@@ -169,8 +186,8 @@ export default function PrivateChatsPage() {
 
       {/* Chat window */}
       {activeChat ? (
-        <div className={`flex-1 flex flex-col ${!activeChat ? "hidden lg:flex" : ""}`}>
-          <div className="flex items-center gap-3 px-4 py-3"
+        <div className={`flex-1 flex flex-col min-h-0 ${!activeChat ? "hidden lg:flex" : ""}`}>
+          <div className="flex items-center gap-3 px-4 py-3 shrink-0"
             style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)" }}>
             <button onClick={() => setActiveChat(null)}
               className="icon-btn lg:hidden" style={{ width: 36, height: 36, color: "#f2f2f2" }}>
@@ -194,7 +211,7 @@ export default function PrivateChatsPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 min-h-0">
             {messages.map((m) => {
               const isMine = m.senderId === user?.uid;
               return (
@@ -212,8 +229,13 @@ export default function PrivateChatsPage() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="flex items-center gap-3 px-4 py-3"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)" }}>
+          <div className="flex items-center gap-3 px-4 py-3 shrink-0"
+            style={{
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              background: "rgba(9,9,9,0.95)",
+              backdropFilter: "blur(20px)",
+              paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
+            }}>
             {user?.photoURL ? (
               <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
             ) : (
