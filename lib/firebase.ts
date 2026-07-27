@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, type Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, memoryLocalCache, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -22,13 +22,24 @@ let auth: Auth;
 let db: ReturnType<typeof getFirestore>;
 
 if (IS_CAP_BUILD && typeof window !== "undefined") {
-  // On Capacitor: skip initializeAuth() and initializeFirestore() entirely.
-  // Both are handled by native @capacitor-firebase/* plugins via lib/db.ts and lib/auth.tsx.
-  // Calling these triggers @firebase/installations which makes blocking URLSession
-  // calls on iOS that cause the app to freeze on startup.
-  // auth and db are null — all call sites on Capacitor use native plugins instead.
+  // On Capacitor: skip initializeAuth() — handled by native @capacitor-firebase/authentication.
+  // initializeAuth with browserLocalPersistence triggers @firebase/installations URLSession
+  // calls that block the iOS main thread and freeze the app on startup.
   auth = null as unknown as Auth;
-  db = null as unknown as ReturnType<typeof getFirestore>;
+
+  // Pre-initialize Firestore with memory-only cache (no IndexedDB).
+  // All actual reads/writes go through the native @capacitor-firebase/firestore plugin
+  // in lib/db.ts (IS_CAP=true path). However, that plugin's JS web-fallback internally
+  // calls getFirestore() — which would otherwise create a fresh IndexedDB-backed instance.
+  // IndexedDB in WKWebView is unreliable and crashes with assertion b815:
+  //   "Attempt to get a record from database without an in-progress transaction"
+  // Pre-initializing with memoryLocalCache() makes getFirestore() return this safe
+  // in-memory instance instead, eliminating the crash entirely.
+  try {
+    db = initializeFirestore(app, { localCache: memoryLocalCache() });
+  } catch {
+    db = getFirestore(app);
+  }
 } else {
   // SSR or web browser: full web SDK initialization
   try {
