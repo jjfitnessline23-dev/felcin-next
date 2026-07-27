@@ -46,7 +46,6 @@ export default function PrivateChatsPage() {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [containerH, setContainerH] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [otherName, setOtherName] = useState("Chat");
   const [otherPhoto, setOtherPhoto] = useState("");
@@ -57,6 +56,8 @@ export default function PrivateChatsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // containerH removed — resize:native shrinks the WKWebView viewport directly,
+  // so position:fixed;inset:0 always fills exactly the visible area above the keyboard.
 
   // Presence
   useEffect(() => {
@@ -107,33 +108,16 @@ export default function PrivateChatsPage() {
     }, () => {});
   }, [user]);
 
-  // Container height — driven by visualViewport.
-  //
-  // capacitor.config.json uses resize:"none", so iOS handles keyboard natively:
-  // the WKWebView visual viewport shrinks when the keyboard opens, firing
-  // visualViewport "resize". We set the container height to
-  // visualViewport.height - containerTop so the input bar always sits exactly
-  // above the keyboard. window "resize" catches the same event on web browsers.
+  // Scroll to bottom when keyboard opens (resize:native fires window resize)
   useEffect(() => {
-    const update = () => {
-      const vv = window.visualViewport;
-      const vvh = vv ? vv.height : window.innerHeight;
-      const top = containerRef.current?.getBoundingClientRect().top ?? 0;
-      const h = vvh - top;
-      if (h > 100) {
-        setContainerH(h);
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 80);
-      }
+    const scrollBottom = () => {
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 60);
     };
-
-    update();
-
-    window.visualViewport?.addEventListener("resize", update);
-    window.addEventListener("resize", update);
-
+    window.visualViewport?.addEventListener("resize", scrollBottom);
+    window.addEventListener("resize", scrollBottom);
     return () => {
-      window.visualViewport?.removeEventListener("resize", update);
-      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", scrollBottom);
+      window.removeEventListener("resize", scrollBottom);
     };
   }, []);
 
@@ -233,16 +217,12 @@ export default function PrivateChatsPage() {
       className="private-chats-root flex overflow-hidden"
       style={{
         background: "#090909",
-        // position:fixed so the chat sits between the status bar and keyboard.
-        // Height is measured in JS from body.clientHeight (which Capacitor's
-        // resize:"body" shrinks when the keyboard opens) minus containerTop.
-        // This means no Capacitor keyboard events are needed at all.
-        // Desktop (lg:): overridden to static flow by the globals.css media query.
         position: "fixed",
-        top: "env(safe-area-inset-top, 0px)",
+        top: 0,
         left: 0,
         right: 0,
-        height: containerH ? `${containerH}px` : "calc(100dvh - env(safe-area-inset-top, 0px))",
+        bottom: 0,
+        paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
 
@@ -462,7 +442,7 @@ export default function PrivateChatsPage() {
               </div>
             )}
 
-            <div className="flex items-center gap-2 px-3 pt-2 pb-3 lg:pb-4">
+            <div className="flex items-center gap-2 px-3 pt-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))" }}>
               {/* Avatar */}
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 30, height: 30 }} />
