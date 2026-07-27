@@ -47,6 +47,7 @@ export default function PrivateChatsPage() {
   const [uploading, setUploading] = useState(false);
   const [recording, setRecording] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerH, setContainerH] = useState<number | null>(null);
   const [otherName, setOtherName] = useState("Chat");
   const [otherPhoto, setOtherPhoto] = useState("");
   const [otherOnline, setOtherOnline] = useState(false);
@@ -56,8 +57,6 @@ export default function PrivateChatsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  // containerH removed — resize:native shrinks the WKWebView viewport directly,
-  // so position:fixed;inset:0 always fills exactly the visible area above the keyboard.
 
   // Presence
   useEffect(() => {
@@ -108,16 +107,27 @@ export default function PrivateChatsPage() {
     }, () => {});
   }, [user]);
 
-  // Scroll to bottom when keyboard opens (resize:native fires window resize)
+  // Keyboard-aware height: visualViewport.height is the visible area above the keyboard
+  // in BOTH resize:none (current build) and resize:native (future build).
+  // Setting the container height to exactly that value keeps the input bar
+  // flush above the keyboard in all cases.
   useEffect(() => {
-    const scrollBottom = () => {
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 60);
+    const update = () => {
+      const vv = window.visualViewport;
+      const h = vv ? vv.height + vv.offsetTop : window.innerHeight;
+      if (h > 100) {
+        setContainerH(Math.round(h));
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 60);
+      }
     };
-    window.visualViewport?.addEventListener("resize", scrollBottom);
-    window.addEventListener("resize", scrollBottom);
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
     return () => {
-      window.visualViewport?.removeEventListener("resize", scrollBottom);
-      window.removeEventListener("resize", scrollBottom);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
 
@@ -221,7 +231,7 @@ export default function PrivateChatsPage() {
         top: 0,
         left: 0,
         right: 0,
-        bottom: 0,
+        height: containerH ? `${containerH}px` : "100dvh",
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
