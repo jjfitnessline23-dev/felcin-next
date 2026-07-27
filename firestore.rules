@@ -163,6 +163,11 @@ service cloud.firestore {
         allow read, write: if isAuth() && request.auth.uid == userId;
       }
 
+      // Cycling routes — same rules as running routes
+      match /cyclingRoutes/{docId} {
+        allow read, write: if isAuth() && request.auth.uid == userId;
+      }
+
       // Catch-all: read-only for owner/admin — write is INTENTIONALLY omitted here
       // so the catch-all never silently bypasses the validated rules above (earnings, etc.)
       match /{subcollection}/{docId} {
@@ -347,14 +352,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ── Analytics — only specific known fields, no free-form writes ──
+    // ── Analytics ──
     match /analytics/{docId} {
       allow read: if isAdmin();
+      // Aggregate counters (pageViews, activeUsers) + session docs (uid, date)
       allow create, update: if isAuth()
         && request.resource.data.keys().hasOnly([
-             'event', 'uid', 'platform', 'createdAt', 'metadata'
-           ])
-        && validText('event', 100);
+             'pageViews', 'activeUsers', 'uid', 'date'
+           ]);
       allow delete: if isAdmin();
     }
   }

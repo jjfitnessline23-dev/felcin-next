@@ -6,6 +6,7 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, get
 import { db, storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 
 interface Chat { id: string; participants: string[]; lastMessage?: string; lastAt?: { seconds: number }; otherName?: string; otherPhoto?: string; }
 interface Msg { id: string; senderId: string; text?: string; type?: "text" | "image" | "audio"; imageUrl?: string; audioUrl?: string; createdAt?: { seconds: number }; }
@@ -161,7 +162,7 @@ export default function PrivateChatsPage() {
       if (otherUid) {
         const preview = t.length > 50 ? t.slice(0, 50) + "…" : t;
         addDoc(collection(db, "notifications"), { recipientId: otherUid, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "message", message: preview, read: false, createdAt: serverTimestamp() }).catch(() => {});
-        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: preview }) }).catch(() => {});
+        sendNotification({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: preview });
       }
     } catch { setText(t); }
     setSending(false);
@@ -181,7 +182,7 @@ export default function PrivateChatsPage() {
       const otherUid = activeChat.split("_").find((id) => id !== user.uid);
       if (otherUid) {
         addDoc(collection(db, "notifications"), { recipientId: otherUid, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "message", message: "📷 Photo", read: false, createdAt: serverTimestamp() }).catch(() => {});
-        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: "📷 Photo" }) }).catch(() => {});
+        sendNotification({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: "📷 Photo" });
       }
     } catch {}
     setUploading(false);
@@ -212,7 +213,7 @@ export default function PrivateChatsPage() {
           const otherUid = activeChat.split("_").find((id) => id !== user.uid);
           if (otherUid) {
             addDoc(collection(db, "notifications"), { recipientId: otherUid, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "message", message: "🎤 Voice message", read: false, createdAt: serverTimestamp() }).catch(() => {});
-            fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: "🎤 Voice message" }) }).catch(() => {});
+            sendNotification({ recipientUid: otherUid, type: "message", senderName: user.displayName || "Someone", senderId: user.uid, message: "🎤 Voice message" });
           }
         } catch {}
         setUploading(false);

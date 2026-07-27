@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp, deleteDoc } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -137,8 +138,7 @@ export default function ReelsPage() {
       setRepostedIds((prev) => new Set([...prev, reel.id]));
       setReels((prev) => prev.map((r) => r.id !== reel.id ? r : { ...r, repostCount: (r.repostCount ?? 0) + 1 }));
       if (reel.authorId !== user.uid) {
-        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientUid: reel.authorId, type: "repost", senderName: user.displayName || "Someone", postId: reel.id }) }).catch(() => {});
+        sendNotification({ recipientUid: reel.authorId, type: "repost", senderName: user.displayName || "Someone", senderId: user.uid, postId: reel.id });
       }
     } catch {}
     setRepostingId(null);

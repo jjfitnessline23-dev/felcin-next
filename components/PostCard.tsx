@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 
 interface Post {
   id: string;
@@ -345,7 +346,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const sendLbComment = async () => {
     if (!lbText.trim() || !user || lbSending) return;
     setLbSending(true);
-    const t = lbText.trim(); setLbText("");
+    const t = lbText.trim();
     const col = post.contentType === "reel" ? "reels" : "posts";
     try {
       const ref = await addDoc(collection(db, col, post.id, "comments"), {
@@ -353,9 +354,11 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         authorPhoto: user.photoURL || "", text: t, createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, col, post.id), { comments: increment(1) });
+      setLbText(""); // clear only after successful save
       setLbComments((prev) => [...prev, { id: ref.id, authorName: user.displayName || "User", authorPhoto: user.photoURL || "", text: t }]);
       if (post.authorId && post.authorId !== user.uid) {
         addDoc(collection(db, "notifications"), { recipientId: post.authorId, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "comment", postId: post.id, read: false, createdAt: serverTimestamp() }).catch(() => {});
+        sendNotification({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id });
       }
     } catch {}
     setLbSending(false);
@@ -383,11 +386,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           read: false,
           createdAt: serverTimestamp(),
         }).catch(() => {});
-        fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientUid: post.authorId, type: "like", senderName: user.displayName || "Someone", postId: post.id }),
-        }).catch(() => {});
+        sendNotification({ recipientUid: post.authorId, type: "like", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id });
       }
     } catch {
       setLiked(!newLiked);
@@ -551,8 +550,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
       setReposted(true);
       setRepostCount((c) => c + 1);
       if (post.authorId !== user.uid) {
-        fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientUid: post.authorId, type: "repost", senderName: user.displayName || "Someone", postId: post.id }) }).catch(() => {});
+        sendNotification({ recipientUid: post.authorId, type: "repost", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id });
       }
     } catch {}
     setReposting(false);

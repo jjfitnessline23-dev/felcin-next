@@ -8,6 +8,7 @@ import {
 } from "@/lib/db";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 import Link from "next/link";
 import InAppPaymentModal from "@/components/InAppPaymentModal";
 
@@ -167,11 +168,7 @@ export default function UserProfilePage() {
         read: false,
         createdAt: serverTimestamp(),
       }).catch(() => {});
-      fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientUid: uid, type: "follow", senderName: user.displayName || "Someone" }),
-      }).catch(() => {});
+      sendNotification({ recipientUid: uid, type: "follow", senderName: user.displayName || "Someone", senderId: user.uid });
     }
   };
 

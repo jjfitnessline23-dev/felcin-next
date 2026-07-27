@@ -9,6 +9,7 @@ import {
 } from "@/lib/db";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 import Link from "next/link";
 
 interface Post {
@@ -189,11 +190,7 @@ export default function CommentsPage() {
           read: false,
           createdAt: serverTimestamp(),
         }).catch(() => {});
-        fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", postId }),
-        }).catch(() => {});
+        sendNotification({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId });
       }
     } catch { setText(t); }
     setSending(false);

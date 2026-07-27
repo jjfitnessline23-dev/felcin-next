@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from "@/lib/db";
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendLiveNotification } from "@/lib/notify";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -107,18 +108,12 @@ export default function LivePage() {
         viewerCount: 0,
         startedAt: serverTimestamp(),
       });
-      fetch("/api/notify-live", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hostUid: user.uid,
-          hostName: user.displayName || "Someone",
-          title: streamTitle.trim() || null,
-          privacy,
-        }),
-      }).catch(() => {});
+      sendLiveNotification({ hostUid: user.uid, hostName: user.displayName || "Someone", title: streamTitle.trim() || null, privacy });
       router.push(`/live/${user.uid}`);
     } catch {
+      setStarting(false);
+    } finally {
+      // Reset if still mounted (e.g. navigation failed)
       setStarting(false);
     }
   }

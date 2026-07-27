@@ -12,12 +12,24 @@ function getAdmin() {
   } catch { return null; }
 }
 
+async function verifyToken(req: NextRequest, app: typeof admin) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
+  if (!token) return null;
+  try { return await app.auth().verifyIdToken(token); } catch { return null; }
+}
+
 export async function POST(req: NextRequest) {
   const app = getAdmin();
   if (!app) return NextResponse.json({ ok: false, error: "no admin" });
 
+  const caller = await verifyToken(req, app);
+  if (!caller) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+
   const { recipientUid, type, senderName, postId, senderId, message } = await req.json().catch(() => ({}));
   if (!recipientUid || !type) return NextResponse.json({ ok: false });
+
+  // Caller must match the senderId they claim
+  if (senderId && caller.uid !== senderId) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   try {
     const tokenDoc = await app.firestore()
