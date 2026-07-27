@@ -475,6 +475,7 @@ export default function PrivateChatsPage() {
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }}
                   onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 350)}
+                  maxLength={1000}
                   placeholder="Type a message…"
                   className="flex-1 px-4 py-2.5 rounded-full outline-none transition-all"
                   style={{

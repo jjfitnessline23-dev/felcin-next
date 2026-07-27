@@ -142,9 +142,10 @@ export default function HomePage() {
   useEffect(() => {
     const sessionId = searchParams.get("boost_session_id");
     if (!sessionId || !user || processedBoostRef.current === sessionId) return;
-    processedBoostRef.current = sessionId;
     router.replace("/");
-    fetch(`/api/boost-verify?session_id=${encodeURIComponent(sessionId)}`).catch(() => {});
+    fetch(`/api/boost-verify?session_id=${encodeURIComponent(sessionId)}`)
+      .then((r) => { if (r.ok) processedBoostRef.current = sessionId; })
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user]);
 
@@ -250,7 +251,7 @@ export default function HomePage() {
     setFollowingLoading(true);
     (async () => {
       try {
-        const followSnap = await getDocs(collection(db, "users", user.uid, "following"));
+        const followSnap = await getDocs(query(collection(db, "users", user.uid, "following"), limit(500)));
         const ids = followSnap.docs.map((d) => d.id);
         setFollowingIds(ids);
         if (ids.length === 0) { setFollowingLoading(false); return; }

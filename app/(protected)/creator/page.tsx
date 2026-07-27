@@ -205,7 +205,7 @@ export default function CreatorPage() {
         scheduledAt: scheduledAt ? Timestamp.fromDate(scheduledAt) : null,
         expiresAt: mode === "story" ? Timestamp.fromDate(new Date(Date.now() + 24 * 3600 * 1000)) : null,
         maxViews: mode === "post" && maxViews !== "" ? Number(maxViews) : null,
-        ppvPrice: ppvPrice !== "" ? Math.round(Number(ppvPrice) * 100) : null,
+        ppvPrice: ppvPrice !== "" && Number(ppvPrice) > 0 ? Math.round(Number(ppvPrice) * 100) : null,
         viewCount: 0, tags,
         collabUid: mode === "post" && collabUser ? collabUser.uid : null,
         collabName: mode === "post" && collabUser ? collabUser.displayName : null,

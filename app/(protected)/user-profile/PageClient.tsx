@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  collection, query, where, getDocs,
+  collection, query, where, getDocs, limit,
   doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, updateDoc, increment,
 } from "@/lib/db";
 import { db, auth } from "@/lib/firebase";
@@ -129,10 +129,11 @@ export default function UserProfilePage() {
       })
       .catch(() => setLoading(false));
 
-    // Fetch authored posts + collab posts, merge and dedupe
+    // Fetch authored posts + collab posts, merge and dedupe — limit 100 each to prevent
+    // loading thousands of posts for popular accounts
     Promise.all([
-      getDocs(query(collection(db, "posts"), where("authorId", "==", uid))),
-      getDocs(query(collection(db, "posts"), where("collabUid", "==", uid))),
+      getDocs(query(collection(db, "posts"), where("authorId", "==", uid), limit(100))),
+      getDocs(query(collection(db, "posts"), where("collabUid", "==", uid), limit(50))),
     ]).then(([authorSnap, collabSnap]) => {
       const seen = new Set<string>();
       const all: Post[] = [];

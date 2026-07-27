@@ -90,7 +90,7 @@ export default function NotificationsPage() {
       collection(db, "notifications"),
       where("recipientId", "==", user.uid),
       orderBy("createdAt", "desc"),
-      limit(200)
+      limit(50)
     );
     return onSnapshot(q,
       (snap) => {

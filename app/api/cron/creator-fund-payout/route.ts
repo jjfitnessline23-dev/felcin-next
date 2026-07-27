@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
   const db = a.firestore();
   const month = prevMonth();
 
-  // Query creators with enough followers
-  const usersSnap = await db.collection("users").where("followersCount", ">=", MIN_FOLLOWERS).get();
+  // Query creators with enough followers — limit to 1000 to avoid full collection scan
+  const usersSnap = await db.collection("users").where("followersCount", ">=", MIN_FOLLOWERS).limit(1000).get();
 
   const results: { uid: string; status: string; payout?: number }[] = [];
 

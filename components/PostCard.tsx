@@ -913,6 +913,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
             id={`lb-comment-input-${post.id}`}
             value={lbText} onChange={(e) => setLbText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendLbComment()}
+            maxLength={1000}
             placeholder="Add a comment…"
             className="flex-1 px-4 py-2.5 rounded-full outline-none text-sm"
             style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff" }}

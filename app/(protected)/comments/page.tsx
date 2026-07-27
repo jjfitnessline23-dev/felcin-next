@@ -136,8 +136,9 @@ export default function CommentsPage() {
 
     initialLoadDone.current = false;
     // No orderBy — serverTimestamp() causes pending docs to be excluded from ordered queries.
-    // Sort client-side so comments appear immediately on send.
-    const q = query(collection(db, col, postId, "comments"));
+    // Sort client-side so comments appear immediately on send. Limit to 500 — beyond that
+    // a popular post would crash the client loading tens of thousands of comments.
+    const q = query(collection(db, col, postId, "comments"), limit(500));
     const unsub = onSnapshot(q, (snap) => {
       setComments(
         snap.docs
@@ -169,7 +170,7 @@ export default function CommentsPage() {
   const sendComment = async () => {
     if (!text.trim() || !user || sending) return;
     setSending(true);
-    const t = text.trim(); setText("");
+    const t = text.trim();
     try {
       await addDoc(collection(db, col, postId, "comments"), {
         authorId: user.uid,
@@ -179,6 +180,7 @@ export default function CommentsPage() {
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, col, postId), { comments: increment(1) });
+      setText(""); // clear only after successful save
       if (post && post.authorId && post.authorId !== user.uid) {
         addDoc(collection(db, "notifications"), {
           recipientId: post.authorId,
@@ -192,7 +194,7 @@ export default function CommentsPage() {
         }).catch(() => {});
         sendNotification({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId });
       }
-    } catch { setText(t); }
+    } catch { /* text already preserved since we didn't clear it */ }
     setSending(false);
   };
 
@@ -446,6 +448,7 @@ export default function CommentsPage() {
           )}
           <input ref={inputRef} type="text" value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendComment()}
+            maxLength={1000}
             placeholder="Add a comment…" className="flex-1 px-4 py-2.5 rounded-full outline-none"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }} />
           <button onClick={sendComment} disabled={!text.trim() || sending}
