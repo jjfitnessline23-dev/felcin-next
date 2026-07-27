@@ -131,6 +131,9 @@ export default function RunPage() {
   const pauseStartRef = useRef(0);
   const runWatchRef = useRef<number | null>(null);
 
+  // Heading: bearing in degrees (0=N, 90=E, 180=S, 270=W) derived from last two GPS points
+  const [heading, setHeading] = useState<number | null>(null);
+
   // Activity mode + units
   const [mode, setMode] = useState<ActivityMode>("run");
   const [useMiles, setUseMiles] = useState(false);
@@ -268,6 +271,12 @@ export default function RunPage() {
         if (d > 100) return prev;        // >100 m jump in one tick = bad reading, skip
         distRef.current += d;
         setDistance(distRef.current);
+        // Bearing: angle from previous point to current point
+        const φ1 = last.lat * Math.PI / 180, φ2 = lat * Math.PI / 180;
+        const Δλ = (lng - last.lng) * Math.PI / 180;
+        const y = Math.sin(Δλ) * Math.cos(φ2);
+        const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+        setHeading(((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360);
         writeLivePosition(lat, lng, distRef.current, Math.floor((Date.now() - startTime - pausedMsRef.current) / 1000));
         return [...prev, { lat, lng, ts: Date.now() }];
       });
@@ -600,6 +609,7 @@ export default function RunPage() {
         <RunMap
           coords={coords.map(c => ({ lat: c.lat, lng: c.lng }))}
           currentPos={currentPos}
+          heading={phase === "running" ? heading : null}
           followUser={phase === "idle" || phase === "running"}
           completed={phase === "completed"}
           matchedCoords={matchedCoords ?? undefined}

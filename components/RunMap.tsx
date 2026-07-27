@@ -6,6 +6,7 @@ interface Coord { lat: number; lng: number }
 interface Props {
   coords: Coord[];
   currentPos: Coord | null;
+  heading?: number | null;
   followUser: boolean;
   fullscreen: boolean;
   completed?: boolean;
@@ -28,13 +29,29 @@ const FINISH_HTML = `
     <div style="width:2px;height:8px;background:#22c55e;opacity:0.7"></div>
   </div>`;
 
-const GPS_HTML = `
-  <div style="position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px">
-    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(74,222,128,0.25);animation:runPulse 1.8s ease-out infinite"></div>
-    <div style="width:15px;height:15px;border-radius:50%;background:#4ade80;border:2.5px solid #fff;box-shadow:0 0 14px rgba(74,222,128,0.85);position:relative;z-index:1"></div>
-  </div>`;
+function gpsHtml(heading: number | null | undefined) {
+  if (heading == null) {
+    // No heading yet — plain pulsing dot
+    return `
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px">
+        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(74,222,128,0.25);animation:runPulse 1.8s ease-out infinite"></div>
+        <div style="width:15px;height:15px;border-radius:50%;background:#4ade80;border:2.5px solid #fff;box-shadow:0 0 14px rgba(74,222,128,0.85);position:relative;z-index:1"></div>
+      </div>`;
+  }
+  // Directional arrow pointing in direction of travel
+  return `
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;width:44px;height:44px">
+      <div style="position:absolute;inset:0;border-radius:50%;background:rgba(74,222,128,0.2);animation:runPulse 1.8s ease-out infinite"></div>
+      <div style="transform:rotate(${Math.round(heading)}deg);position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 0 8px rgba(74,222,128,0.9))">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="14" cy="14" r="10" fill="#4ade80" stroke="white" stroke-width="2.5"/>
+          <path d="M14 5L19 17L14 13.5L9 17L14 5Z" fill="white"/>
+        </svg>
+      </div>
+    </div>`;
+}
 
-export default function RunMap({ coords, currentPos, followUser, fullscreen, completed, matchedCoords }: Props) {
+export default function RunMap({ coords, currentPos, heading, followUser, fullscreen, completed, matchedCoords }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const routeRef = useRef<any>(null);
@@ -43,6 +60,7 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
   const hasFlownRef = useRef(false);
   const prevCompletedRef = useRef(false);
   const coordsRef = useRef<Coord[]>([]);
+  const headingRef = useRef<number | null | undefined>(heading);
 
   // Becomes true once Leaflet has initialised — re-triggers all dependent effects
   const [mapInit, setMapInit] = useState(false);
@@ -101,6 +119,17 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
     return () => clearTimeout(t);
   }, [fullscreen]);
 
+  // ── Heading: update the direction arrow without waiting for a position change ──
+  useEffect(() => {
+    headingRef.current = heading;
+    if (!currentMarkerRef.current || completed || heading == null) return;
+    import("leaflet").then((L) => {
+      if (!currentMarkerRef.current) return;
+      const icon = L.divIcon({ className: "", html: gpsHtml(heading), iconSize: [44, 44], iconAnchor: [22, 22] });
+      currentMarkerRef.current.setIcon(icon);
+    });
+  }, [heading, completed]);
+
   // ── Route polyline + start marker ─────────────────────────────────────────
   const displayCoords = matchedCoords && matchedCoords.length >= 2 ? matchedCoords : coords;
 
@@ -145,9 +174,9 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
 
       // Create or update the position marker
       if (!currentMarkerRef.current) {
-        const html = completed ? FINISH_HTML : GPS_HTML;
-        const size: [number, number] = completed ? [22, 30] : [34, 34];
-        const anchor: [number, number] = completed ? [11, 30] : [17, 17];
+        const html = completed ? FINISH_HTML : gpsHtml(headingRef.current);
+        const size: [number, number] = completed ? [22, 30] : [44, 44];
+        const anchor: [number, number] = completed ? [11, 30] : [22, 22];
         const icon = L.divIcon({ className: "", html, iconSize: size, iconAnchor: anchor });
         currentMarkerRef.current = L.marker(
           [currentPos.lat, currentPos.lng],
@@ -157,6 +186,10 @@ export default function RunMap({ coords, currentPos, followUser, fullscreen, com
         currentMarkerRef.current.setLatLng([currentPos.lat, currentPos.lng]);
         if (justCompleted) {
           const icon = L.divIcon({ className: "", html: FINISH_HTML, iconSize: [22, 30], iconAnchor: [11, 30] });
+          currentMarkerRef.current.setIcon(icon);
+        } else if (!completed) {
+          // Refresh the direction arrow whenever position updates
+          const icon = L.divIcon({ className: "", html: gpsHtml(headingRef.current), iconSize: [44, 44], iconAnchor: [22, 22] });
           currentMarkerRef.current.setIcon(icon);
         }
       }
