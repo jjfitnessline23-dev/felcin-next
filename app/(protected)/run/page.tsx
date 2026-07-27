@@ -61,6 +61,7 @@ export default function RunPage() {
   // Location
   const [locState, setLocState] = useState<LocState>("prompt");
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [needsAlwaysLocation, setNeedsAlwaysLocation] = useState(false);
   const idleWatchRef = useRef<any>(null);
   const [waitSecs, setWaitSecs] = useState(0);
   const enablingRef = useRef(false); // prevent double-tap
@@ -78,8 +79,13 @@ export default function RunPage() {
         try {
           const { Geolocation } = await import("@capacitor/geolocation");
           const status = await Geolocation.checkPermissions();
-          if (status.location === "granted") enableLocation();
-          else if (status.location === "denied") setLocState("denied");
+          if (status.location === "granted") {
+            enableLocation();
+            // Check if user only has "When In Use" — background tracking needs "Always"
+            // Capacitor doesn't expose always vs whenInUse directly, so we use a native bridge
+            // check via the window.Capacitor.Plugins path if available
+            checkAlwaysPermission();
+          } else if (status.location === "denied") setLocState("denied");
           // "prompt" = not yet asked, show the Enable button
         } catch { /* plugin unavailable, show Enable button */ }
       } else {
@@ -90,6 +96,26 @@ export default function RunPage() {
       }
     })();
   }, []);
+
+  // Check if the user has "Always" location — required for GPS to continue when screen locks
+  const checkAlwaysPermission = async () => {
+    try {
+      // Try native bridge: CLAuthorizationStatus 3 = authorizedAlways, 4 = authorizedWhenInUse
+      const cap = (window as any).Capacitor;
+      if (!cap?.Plugins?.CapacitorGeolocation) {
+        // Fallback: assume not always if we can't check
+        // We'll show the banner; user can dismiss if they already have Always
+        setNeedsAlwaysLocation(true);
+        return;
+      }
+      const result = await cap.Plugins.CapacitorGeolocation.checkPermissions();
+      // If the plugin returns a specific always status we can check it
+      const isAlways = result?.location === "granted" && result?.always === true;
+      if (!isAlways) setNeedsAlwaysLocation(true);
+    } catch {
+      setNeedsAlwaysLocation(true);
+    }
+  };
 
   // Phase
   const [phase, setPhase] = useState<Phase>("idle");
@@ -148,6 +174,7 @@ export default function RunPage() {
         const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000 });
         setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocState("granted");
+        checkAlwaysPermission();
 
         if (idleWatchRef.current === null) {
           idleWatchRef.current = await Geolocation.watchPosition(
@@ -759,6 +786,26 @@ export default function RunPage() {
       {/* IDLE CONTENT */}
       {phase === "idle" && (
         <div style={{ position: "relative", zIndex: 1, padding: "12px 16px 48px" }}>
+
+          {/* Background location upgrade prompt */}
+          {isNative && needsAlwaysLocation && (
+            <div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 14, background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)", display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f59e0b", fontVariationSettings: "'FILL' 1", flexShrink: 0, marginTop: 1 }}>location_on</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#f2f2f2", marginBottom: 2 }}>Enable background tracking</div>
+                <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>Set location to <strong style={{ color: "#f59e0b" }}>Always</strong> so your run keeps recording when the screen locks.</div>
+                <button
+                  onClick={() => { (window as any).open?.("app-settings:", "_system"); }}
+                  style={{ marginTop: 8, padding: "5px 14px", borderRadius: 20, border: "none", background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Open Settings
+                </button>
+              </div>
+              <button onClick={() => setNeedsAlwaysLocation(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
+            </div>
+          )}
+
           {lastSaved && (lastSaved.isDistancePR || lastSaved.isPacePR) && (
             <div style={{ marginBottom: 14, padding: "14px 16px", borderRadius: 16, background: "linear-gradient(135deg,rgba(251,191,36,0.08),rgba(245,158,11,0.04))", border: "1px solid rgba(251,191,36,0.2)", display: "flex", alignItems: "center", gap: 12 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fbbf24", fontVariationSettings: "'FILL' 1", flexShrink: 0 }}>emoji_events</span>
