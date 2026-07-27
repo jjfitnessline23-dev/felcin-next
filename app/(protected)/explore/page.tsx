@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -45,8 +45,6 @@ function GridSkeleton() {
   return <>{Array.from({ length: 9 }).map((_, i) => <div key={i} className="skeleton" style={{ aspectRatio: "1" }} />)}</>;
 }
 
-let usersCache: UserResult[] | null = null;
-
 const PAGE_SIZE = 12;
 
 export default function ExplorePage() {
@@ -58,7 +56,6 @@ export default function ExplorePage() {
   const [searchUsers, setSearchUsers] = useState<UserResult[]>([]);
   const [searchPosts, setSearchPosts] = useState<PostResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const fetchingUsers = useRef(false);
 
   const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
   const [posts, setPosts] = useState<Post[]>([]);
@@ -82,20 +79,27 @@ export default function ExplorePage() {
   // ── Search ──────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(async () => {
-      if (!searchQ.trim()) { setSearchUsers([]); setSearchPosts([]); return; }
+      const q = searchQ.trim();
+      if (!q) { setSearchUsers([]); setSearchPosts([]); return; }
       setSearchLoading(true);
       try {
         if (searchTab === "people") {
-          if (!usersCache && !fetchingUsers.current) {
-            fetchingUsers.current = true;
-            const snap = await getDocs(query(collection(db, "users"), limit(200)));
-            usersCache = snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Omit<UserResult, "uid">) }));
-            fetchingUsers.current = false;
-          }
-          const tl = searchQ.toLowerCase();
-          setSearchUsers((usersCache ?? []).filter((u) => (u.displayName || "").toLowerCase().includes(tl)).slice(0, 20));
+          // Server-side prefix range query — works at any user count.
+          // Run two queries (original case + lowercase) so "mia" and "Mia" both find "Mia Sterling".
+          const RANGE_SUFFIX = "";
+          const qLow = q.toLowerCase();
+          const [s1, s2] = await Promise.all([
+            getDocs(query(collection(db, "users"), where("displayName", ">=", q), where("displayName", "<=", q + RANGE_SUFFIX), limit(15))),
+            getDocs(query(collection(db, "users"), where("displayName", ">=", qLow), where("displayName", "<=", qLow + RANGE_SUFFIX), limit(15))),
+          ]);
+          const seen = new Set<string>();
+          const results: UserResult[] = [];
+          [...s1.docs, ...s2.docs].forEach((d) => {
+            if (!seen.has(d.id)) { seen.add(d.id); results.push({ uid: d.id, ...(d.data() as Omit<UserResult, "uid">) }); }
+          });
+          setSearchUsers(results.slice(0, 20));
         } else {
-          const tag = searchQ.replace(/^#/, "").toLowerCase();
+          const tag = q.replace(/^#/, "").toLowerCase();
           const snap = await getDocs(query(collection(db, "posts"), where("tags", "array-contains", tag), orderBy("createdAt", "desc"), limit(30)));
           setSearchPosts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PostResult, "id">) })));
         }
