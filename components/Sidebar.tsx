@@ -28,6 +28,7 @@ const secondaryLinks = [
 ];
 
 const moreLinks = [
+  { href: "/ai-studio", icon: "auto_awesome", label: "AI Studio" },
   { href: "/run", icon: "directions_run", label: "Run Tracker" },
   { href: "/progress", icon: "compare", label: "Progress Photos" },
   { href: "/stories", icon: "auto_stories", label: "Stories" },

@@ -50,6 +50,7 @@ const moreGroups = [
     label: "Creator Studio",
     items: [
       { href: "/creator", icon: "add_circle", label: "Create Content" },
+      { href: "/ai-studio", icon: "auto_awesome", label: "AI Studio" },
       { href: "/dashboard", icon: "bar_chart", label: "Dashboard" },
       { href: "/earnings", icon: "payments", label: "Earnings" },
       { href: "/badges", icon: "verified", label: "Badges" },

@@ -56,7 +56,8 @@ export default function DashboardPage() {
   const milestoneRange = next - prev;
   const milestoneProgress = milestoneRange > 0 ? Math.min(100, ((stats.followers - prev) / milestoneRange) * 100) : 100;
 
-  const displayName = user?.displayName?.split(" ")[0] || "Creator";
+  const rawName = user?.displayName?.split(" ")[0] || "Creator";
+  const displayName = rawName.length > 14 ? rawName.slice(0, 14) + "…" : rawName;
 
   const statCards = [
     { label: "Posts", value: stats.posts, icon: "photo_camera", color: "#a78bfa", border: "rgba(167,139,250,0.25)", bg: "rgba(167,139,250,0.08)" },

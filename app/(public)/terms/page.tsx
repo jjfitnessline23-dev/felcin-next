@@ -1,4 +1,11 @@
-﻿import BackBar from "@/components/BackBar";
+﻿import type { Metadata } from "next";
+import BackBar from "@/components/BackBar";
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "Felcin's Terms of Service — the rules and guidelines governing your use of the Felcin fitness social platform.",
+  alternates: { canonical: "https://www.felcin.com/terms" },
+};
 
 export default function TermsPage() {
   return (

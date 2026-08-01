@@ -39,7 +39,11 @@ function MiniRoute({ coords }: { coords?: { lat: number; lng: number }[] }) {
   );
 }
 
-type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts" | "runs" | "marketing";
+type Tab = "overview" | "posts" | "reels" | "users" | "reports" | "ghost" | "analytics" | "settings" | "workouts" | "runs" | "marketing" | "diagnostics";
+
+interface DiagCheck  { label: string; ok: boolean; detail: string; }
+interface DiagGroup  { group: string; checks: DiagCheck[]; }
+interface DiagResult { checks: DiagCheck[]; groups: DiagGroup[]; emailSent: boolean; runAt: string; summary: { total: number; passed: number; failed: number }; }
 
 interface AnalyticsData {
   totalPageViews: number;
@@ -97,6 +101,142 @@ function ReelDiagnostic({ reels }: { reels: { id: string; mediaUrl?: string; cap
   );
 }
 
+function DiagnosticsTab({ diagResult, diagRunning, onRun }: {
+  diagResult: DiagResult | null;
+  diagRunning: boolean;
+  onRun: (sendEmail: boolean) => void;
+}) {
+  const allOk  = diagResult?.summary ? diagResult.summary.failed === 0 : null;
+  const failed = diagResult?.summary?.failed ?? 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Header card */}
+      <div className="p-5 rounded-2xl" style={{ background: "linear-gradient(135deg,#0c1a14,#0d1f18)", border: "1px solid rgba(52,211,153,0.2)" }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+            style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24, color: "#34d399", fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+          </div>
+          <div>
+            <p className="text-base font-bold" style={{ color: "#f2f2f2" }}>Diagnostic Bot</p>
+            <p className="text-xs" style={{ color: "#555" }}>Full platform scan — all pages, APIs, Firebase, Stripe, maps</p>
+          </div>
+        </div>
+
+        {/* Summary stats */}
+        {diagResult?.summary && (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[
+              { label: "Total Checks", value: diagResult.summary.total, color: "#e2e8f0" },
+              { label: "Passed",       value: diagResult.summary.passed, color: "#34d399" },
+              { label: "Failed",       value: diagResult.summary.failed, color: diagResult.summary.failed > 0 ? "#f87171" : "#34d399" },
+            ].map(s => (
+              <div key={s.label} className="text-center p-3 rounded-xl" style={{ background: "rgba(0,0,0,0.3)" }}>
+                <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Status banner */}
+        {diagResult && (
+          <div className="mb-4 p-3 rounded-xl flex items-center gap-2"
+            style={{ background: allOk ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)", border: `1px solid ${allOk ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}` }}>
+            <span style={{ fontSize: 16 }}>{allOk ? "✅" : "⚠️"}</span>
+            <span className="text-sm font-bold" style={{ color: allOk ? "#34d399" : "#f87171" }}>
+              {allOk ? "All Systems OK" : `${failed} Issue${failed > 1 ? "s" : ""} Found`}
+            </span>
+            <span className="text-xs ml-auto" style={{ color: "#444" }}>
+              {new Date(diagResult.runAt).toLocaleTimeString()}
+            </span>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex gap-2">
+          <button onClick={() => onRun(false)} disabled={diagRunning}
+            className="flex-1 py-3 rounded-xl text-sm font-bold border-none cursor-pointer flex items-center justify-center gap-2"
+            style={{ background: diagRunning ? "rgba(255,255,255,0.05)" : "rgba(52,211,153,0.15)", color: diagRunning ? "#555" : "#34d399", border: "1px solid rgba(52,211,153,0.2)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{diagRunning ? "hourglass_empty" : "play_arrow"}</span>
+            {diagRunning ? "Scanning platform…" : "Run Full Scan"}
+          </button>
+          <button onClick={() => onRun(true)} disabled={diagRunning}
+            className="flex-1 py-3 rounded-xl text-sm font-bold border-none cursor-pointer flex items-center justify-center gap-2"
+            style={{ background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>mail</span>
+            Scan &amp; Email
+          </button>
+        </div>
+        {diagResult?.emailSent && (
+          <p className="text-xs mt-2 text-center" style={{ color: "#34d399" }}>📧 Full report emailed to jjfitnessline23@gmail.com</p>
+        )}
+      </div>
+
+      {/* Running spinner */}
+      {diagRunning && (
+        <div className="flex flex-col items-center py-10 gap-3">
+          <div className="spinner" />
+          <p className="text-xs" style={{ color: "#444" }}>Scanning all platform systems…</p>
+        </div>
+      )}
+
+      {/* Grouped results */}
+      {!diagRunning && diagResult?.groups && (
+        <div className="flex flex-col gap-4">
+          {/* Issues first */}
+          {diagResult.groups.some(g => g.checks.some(c => !c.ok)) && (
+            <div className="p-4 rounded-2xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <p className="text-xs font-bold mb-3 tracking-widest" style={{ color: "#f87171" }}>⚠️ ISSUES FOUND</p>
+              <div className="flex flex-col gap-2">
+                {diagResult.groups.flatMap(g => g.checks.filter(c => !c.ok)).map((c, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span style={{ fontSize: 14, marginTop: 1 }}>❌</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>{c.label}</p>
+                      <p className="text-xs" style={{ color: "#f87171" }}>{c.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Groups */}
+          {diagResult.groups.map((g) => (
+            <div key={g.group} className="rounded-2xl overflow-hidden" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0f0f0f" }}>
+                <span className="text-xs font-bold tracking-widest" style={{ color: "#555" }}>{g.group.toUpperCase()}</span>
+                <span className="text-xs font-bold" style={{ color: g.checks.every(c => c.ok) ? "#34d399" : "#f87171" }}>
+                  {g.checks.filter(c => c.ok).length}/{g.checks.length}
+                </span>
+              </div>
+              {g.checks.map((c, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: i < g.checks.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <span style={{ fontSize: 14, width: 20, textAlign: "center", flexShrink: 0 }}>{c.ok ? "✅" : "❌"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: "#e2e8f0" }}>{c.label}</p>
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: c.ok ? "#444" : "#f87171" }}>{c.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!diagRunning && !diagResult && (
+        <div className="text-center py-10">
+          <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", color: "#1e1e1e", marginBottom: 12 }}>monitor_heart</span>
+          <p className="text-sm font-semibold" style={{ color: "#333" }}>Ready to scan</p>
+          <p className="text-xs mt-1" style={{ color: "#2a2a2a" }}>Covers {`>`}50 checks across all platform systems</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPortalPage() {
   const { user, loading: authLoading } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
@@ -138,6 +278,8 @@ export default function AdminPortalPage() {
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingWorkouts, setLoadingWorkouts] = useState(false);
   const [workoutsLoaded, setWorkoutsLoaded] = useState(false);
+  const [diagResult, setDiagResult] = useState<DiagResult | null>(null);
+  const [diagRunning, setDiagRunning] = useState(false);
 
   const router = useRouter();
   const isOwner = user && OWNER_UIDS.includes(user.uid);
@@ -396,6 +538,7 @@ export default function AdminPortalPage() {
     { key: "runs", label: "Runs", icon: "directions_run" },
     { key: "analytics", label: "Analytics", icon: "analytics" },
     { key: "marketing", label: "Marketing", icon: "ads_click" },
+    { key: "diagnostics", label: "Bot", icon: "smart_toy" },
     { key: "settings", label: "Settings", icon: "settings" },
   ];
 
@@ -1156,6 +1299,25 @@ export default function AdminPortalPage() {
               })()
             )}
           </div>
+
+        ) : tab === "diagnostics" ? (
+          <DiagnosticsTab
+            diagResult={diagResult}
+            diagRunning={diagRunning}
+            onRun={async (sendEmail: boolean) => {
+              setDiagRunning(true);
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch("/api/admin/diagnostics", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ sendEmail }),
+                });
+                if (res.ok) setDiagResult(await res.json());
+              } catch { /* silent */ }
+              setDiagRunning(false);
+            }}
+          />
 
         ) : tab === "settings" ? (
           <div className="flex flex-col gap-3">

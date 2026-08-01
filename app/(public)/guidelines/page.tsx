@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import BackBar from "@/components/BackBar";
+
+export const metadata: Metadata = {
+  title: "Community Guidelines",
+  description: "Felcin Community Guidelines — the rules that keep the Felcin fitness community safe, respectful, and positive for everyone.",
+  alternates: { canonical: "https://www.felcin.com/guidelines" },
+};
 
 const SECTIONS = [
   { color: "#ef4444", title: "Zero Tolerance: Immediate Removal", intro: "The following content results in immediate removal and account ban, with no warning:", items: ["Child sexual abuse material (CSAM) or any sexual content involving minors", "Threats of physical violence against specific individuals or groups", "Content that facilitates terrorism or mass violence", "Doxxing (sharing private personal information to harm someone)", "Non-consensual intimate imagery (revenge porn)"] },

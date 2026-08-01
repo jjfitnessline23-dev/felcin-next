@@ -440,15 +440,14 @@ main { animation: pageFadeIn 0.18s ease-out; }
 .ghost-icon-float { animation: ghostIconFloat 5s ease-in-out infinite; }
 .ghost-glow-pulse { animation: ghostGlow 5s ease-in-out infinite; }
 
-/* Private chats: on desktop restore to normal flow so the sidebar is not covered */
+/* Private chats: on desktop keep fixed but offset past the sidebar */
 @media (min-width: 1024px) {
   .private-chats-root {
-    position: static !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    height: calc(100dvh - env(safe-area-inset-top, 0px)) !important;
-    /* MobileNav is hidden on desktop so no bottom offset needed */
+    position: fixed !important;
+    top: 0 !important;
+    left: 240px !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    height: 100dvh !important;
   }
 }

@@ -1,4 +1,11 @@
-﻿import BackBar from "@/components/BackBar";
+﻿import type { Metadata } from "next";
+import BackBar from "@/components/BackBar";
+
+export const metadata: Metadata = {
+  title: "Support",
+  description: "Get help with Felcin. Contact our support team for account issues, technical problems, and questions about the Felcin fitness app.",
+  alternates: { canonical: "https://www.felcin.com/support" },
+};
 
 export default function SupportPage() {
   return (

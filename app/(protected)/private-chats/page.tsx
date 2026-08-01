@@ -224,13 +224,9 @@ export default function PrivateChatsPage() {
   return (
     <div
       ref={containerRef}
-      className="private-chats-root flex overflow-hidden"
+      className="private-chats-root flex overflow-hidden fixed top-0 left-0 right-0 lg:left-60"
       style={{
         background: "#090909",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
         height: containerH ? `${containerH}px` : "100dvh",
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}
@@ -358,7 +354,7 @@ export default function PrivateChatsPage() {
               </svg>
             </div>
 
-            <div style={{ minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "16px", gap: "6px" }}>
+            <div style={{ minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "16px", gap: "6px", maxWidth: 760, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
 
               {messages.length === 0 && (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 20, position: "relative", zIndex: 1 }}>
@@ -402,13 +398,13 @@ export default function PrivateChatsPage() {
                   : (prevSame ? "6px 18px 18px 6px" : "18px 18px 18px 6px");
 
                 return (
-                  <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`} style={{ marginTop: prevSame ? 2 : 8 }}>
+                  <div key={m.id} style={{ display: "flex", width: "100%", justifyContent: isMine ? "flex-end" : "flex-start", marginTop: prevSame ? 2 : 8 }}>
                     {msgType === "image" ? (
                       <img
                         src={m.imageUrl}
                         alt="Photo"
                         onClick={() => m.imageUrl && window.open(m.imageUrl, "_blank")}
-                        style={{ maxWidth: "72%", maxHeight: 280, borderRadius: bubbleRadius, objectFit: "cover", cursor: "pointer", display: "block" }}
+                        style={{ maxWidth: "70%", maxHeight: 280, borderRadius: bubbleRadius, objectFit: "cover", cursor: "pointer", display: "block" }}
                       />
                     ) : msgType === "audio" ? (
                       <div style={{
@@ -424,12 +420,17 @@ export default function PrivateChatsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="max-w-[72%] px-4 py-2.5 text-sm leading-relaxed" style={{
+                      <div style={{
+                        maxWidth: "70%",
+                        padding: "10px 16px",
+                        fontSize: 14,
+                        lineHeight: 1.5,
                         background: isMine ? "linear-gradient(135deg,#7C3AED,#a855f7)" : "linear-gradient(135deg,#1a1a2a,#131320)",
                         color: isMine ? "#fff" : "#e0e0e0",
                         borderRadius: bubbleRadius,
                         boxShadow: isMine ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
                         border: isMine ? "none" : "1px solid rgba(255,255,255,0.06)",
+                        wordBreak: "break-word",
                       }}>
                         {m.text}
                       </div>

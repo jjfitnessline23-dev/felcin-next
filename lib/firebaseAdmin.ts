@@ -5,7 +5,10 @@ export function getAdminApp(): admin.app.App | null {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!sa) return null;
   try {
-    return admin.initializeApp({ credential: admin.credential.cert(JSON.parse(sa)) });
+    return admin.initializeApp({
+      credential:    admin.credential.cert(JSON.parse(sa)),
+      storageBucket: "felcin.firebasestorage.app",
+    });
   } catch { return null; }
 }
 

@@ -159,10 +159,15 @@ export default function BadgesPage() {
   const [currentBadge, setCurrentBadge] = useState<string | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ clientSecret: string; badgeId: string; label: string; amount: number } | null>(null);
   const [isNative, setIsNative] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.()) {
+    const cap = (window as any).Capacitor;
+    if (cap?.isNativePlatform?.()) {
       setIsNative(true);
+      // Only iOS needs the external browser (Apple IAP compliance).
+      // Android can use the same in-app Stripe modal as the web.
+      setIsIOS(cap.getPlatform?.() === "ios");
     }
   }, []);
 
@@ -342,7 +347,8 @@ export default function BadgesPage() {
                   ))}
                 </ul>
 
-                {isNative ? (
+                {isNative && isIOS ? (
+                  // iOS: open browser sheet (Apple IAP compliance)
                   <div
                     className="w-full py-3 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
                     style={{ background: isActive ? "rgba(34,197,94,0.1)" : badge.grad, color: isActive ? "#22c55e" : "#fff", border: isActive ? "1px solid rgba(34,197,94,0.25)" : "none", boxShadow: isActive ? "none" : `0 0 20px ${badge.glow}` }}
@@ -363,6 +369,7 @@ export default function BadgesPage() {
                     )}
                   </div>
                 ) : (
+                  // Web + Android: in-app Stripe payment modal
                   <button
                     onClick={() => !isActive && purchaseBadge(badge.id)}
                     disabled={!!buying || isActive}

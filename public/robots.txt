@@ -13,4 +13,4 @@ Disallow: /static/js/*.map
 Disallow: /static/css/*.map
 
 # Sitemaps
-Sitemap: https://felcin.com/sitemap.xml
+Sitemap: https://www.felcin.com/sitemap.xml

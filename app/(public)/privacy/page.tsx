@@ -1,4 +1,11 @@
-﻿import BackBar from "@/components/BackBar";
+﻿import type { Metadata } from "next";
+import BackBar from "@/components/BackBar";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "Read Felcin's Privacy Policy to understand how we collect, use, and protect your personal data.",
+  alternates: { canonical: "https://www.felcin.com/privacy" },
+};
 
 export default function PrivacyPage() {
   return (

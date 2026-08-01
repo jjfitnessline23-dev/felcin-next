@@ -9,10 +9,36 @@ const manrope = Manrope({
   variable: "--font-manrope",
 });
 
+const APP_DESCRIPTION =
+  "Felcin is the fitness social app — track runs with GPS, share workouts, follow top trainers, join challenges, and connect with your fitness community.";
+
 export const metadata: Metadata = {
-  title: "Felcin",
-  description: "Felcin — Share moments with the world.",
+  title: {
+    default: "Felcin — Fitness Social App",
+    template: "%s | Felcin",
+  },
+  description: APP_DESCRIPTION,
+  keywords: [
+    "fitness app",
+    "workout tracker",
+    "run tracker",
+    "fitness social network",
+    "gym social",
+    "training app",
+    "fitness community",
+    "workout log",
+    "fitness challenge",
+    "trainer app",
+    "GPS run",
+    "fitness creator",
+  ],
+  authors: [{ name: "Felcin", url: "https://www.felcin.com" }],
+  creator: "Felcin",
+  publisher: "Felcin",
   manifest: "/manifest.json",
+  alternates: {
+    canonical: "https://www.felcin.com",
+  },
   icons: {
     icon: [
       { url: "/static/logo-nav.svg", type: "image/svg+xml" },
@@ -22,22 +48,31 @@ export const metadata: Metadata = {
     shortcut: "/logo512.png",
   },
   openGraph: {
-    title: "Felcin",
-    description: "Felcin — Share moments with the world.",
+    title: "Felcin — Fitness Social App",
+    description: APP_DESCRIPTION,
     url: "https://www.felcin.com",
     siteName: "Felcin",
     images: [{ url: "https://www.felcin.com/logo512.png", width: 1024, height: 1024, alt: "Felcin" }],
     type: "website",
+    locale: "en_US",
   },
   twitter: {
-    card: "summary",
-    title: "Felcin",
-    description: "Felcin — Share moments with the world.",
+    card: "summary_large_image",
+    title: "Felcin — Fitness Social App",
+    description: APP_DESCRIPTION,
     images: ["https://www.felcin.com/logo512.png"],
+    site: "@felcin",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
+    title: "Felcin",
+  },
+  appLinks: {
+    ios: {
+      app_store_id: "6763660775",
+      url: "felcin://",
+    },
   },
 };
 
@@ -58,6 +93,49 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" style={{ background: "#000", colorScheme: "dark" }}>
       <head>
         <meta name="apple-itunes-app" content="app-id=6763660775" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": "https://www.felcin.com/#organization",
+                  name: "Felcin",
+                  url: "https://www.felcin.com",
+                  logo: {
+                    "@type": "ImageObject",
+                    url: "https://www.felcin.com/logo512.png",
+                    width: 512,
+                    height: 512,
+                  },
+                  sameAs: [
+                    "https://apps.apple.com/app/felcin/id6763660775",
+                  ],
+                },
+                {
+                  "@type": "MobileApplication",
+                  name: "Felcin",
+                  description:
+                    "Felcin is the fitness social app — track runs with GPS, share workouts, follow top trainers, join challenges, and connect with your fitness community.",
+                  operatingSystem: "iOS, Android",
+                  applicationCategory: "HealthApplication",
+                  offers: {
+                    "@type": "Offer",
+                    price: "0",
+                    priceCurrency: "USD",
+                  },
+                  url: "https://www.felcin.com",
+                  downloadUrl: "https://apps.apple.com/app/felcin/id6763660775",
+                  publisher: {
+                    "@id": "https://www.felcin.com/#organization",
+                  },
+                },
+              ],
+            }),
+          }}
+        />
         {process.env.NEXT_PUBLIC_GOOGLE_ADS_ID && (
           <>
             <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID}`} />

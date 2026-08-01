@@ -320,6 +320,18 @@ export default function CreatorPage() {
         )}
       </div>
 
+      {/* AI Transform button */}
+      {file && (
+        <div className="px-4 py-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0a0a0a" }}>
+          <button onClick={() => router.push("/ai-studio")}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-none cursor-pointer text-xs font-bold"
+            style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.15),rgba(167,139,250,0.1))", border: "1px solid rgba(124,58,237,0.25)", color: "#a78bfa" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
+            Transform this with AI before posting
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
       {file && (
         <div className="overflow-x-auto py-3 px-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0a0a0a", scrollbarWidth: "none" }}>

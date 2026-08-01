@@ -1,6 +1,7 @@
 {
   "short_name": "Felcin",
-  "name": "Felcin",
+  "name": "Felcin — Fitness Social App",
+  "description": "Track runs with GPS, share workouts, follow top trainers, join challenges, and connect with your fitness community.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,20 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#000000",
-  "background_color": "#000000"
+  "background_color": "#000000",
+  "categories": ["health", "fitness", "sports", "social"]
 }

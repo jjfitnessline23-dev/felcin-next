@@ -76,6 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } as unknown as User)
         : null;
 
+      // Track sign-in state in localStorage so we can extend the auth timeout
+      // on the next page load and avoid flashing the login screen.
+      try { u ? localStorage.setItem('_f_auth', '1') : localStorage.removeItem('_f_auth'); } catch {}
+
       setUser(u);
       setLoading(false);
 
@@ -107,9 +111,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // timeout is 60 seconds; on a "semi-connected" network this hangs the app
       // until airplane mode kills the socket.
       //
-      // addAuthStateChangeListener fires immediately from Keychain cache with no
-      // network call, giving us the auth state in <50ms instead of 60 seconds.
-      const capTimeout = setTimeout(() => { if (mounted) setLoading(false); }, 1000);
+      // addAuthStateChangeListener fires immediately from Keychain/AccountManager
+      // cache with no network call. However on Android the plugin initialization
+      // can take >1000ms on cold starts, so if the user was previously signed in
+      // (_f_auth flag) we wait up to 8s — same logic as the web path — to avoid
+      // flashing the login screen on every app open.
+      const prevSignedIn = (() => { try { return localStorage.getItem('_f_auth') === '1'; } catch { return false; } })();
+      const capTimeout = setTimeout(() => { if (mounted) setLoading(false); }, prevSignedIn ? 8000 : 1000);
 
       import("@capacitor-firebase/authentication")
         .then(({ FirebaseAuthentication }) => {
@@ -126,8 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return () => { mounted = false; clearTimeout(capTimeout); };
     }
 
-    // Web: use Firebase web SDK auth
-    const timeout = setTimeout(() => { if (mounted) setLoading(false); }, 500);
+    // Web: use Firebase web SDK auth.
+    // If the user was previously signed in (_f_auth flag), wait up to 8 s for
+    // Firebase to restore the token — far longer than a normal refresh takes.
+    // Without this, the 500 ms fallback fires first, setLoading(false) with
+    // user=null, and ProtectedLayout flashes the login screen.
+    const prevSignedIn = (() => { try { return localStorage.getItem('_f_auth') === '1'; } catch { return false; } })();
+    const timeout = setTimeout(() => { if (mounted) setLoading(false); }, prevSignedIn ? 8000 : 500);
     const unsub = onAuthStateChanged(auth, (u) => {
       clearTimeout(timeout);
       handleUser(u);

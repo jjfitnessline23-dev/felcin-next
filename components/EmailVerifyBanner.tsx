@@ -8,7 +8,9 @@ import { auth } from "@/lib/firebase";
 export default function EmailVerifyBanner() {
   const { user } = useAuth();
   const [sent, setSent] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem("email-banner-dismissed") === "1"; } catch { return false; }
+  });
   const [checking, setChecking] = useState(false);
 
   // Poll every 5 seconds while the banner is visible — as soon as Firebase
@@ -91,7 +93,7 @@ export default function EmailVerifyBanner() {
         </button>
       )}
       <button
-        onClick={() => setDismissed(true)}
+        onClick={() => { try { localStorage.setItem("email-banner-dismissed", "1"); } catch {} setDismissed(true); }}
         style={{ fontSize: 11, color: "#78716c", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", flexShrink: 0 }}>
         ✕
       </button>

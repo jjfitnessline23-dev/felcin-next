@@ -316,7 +316,8 @@ export default function WorkoutsPage() {
       const wasDone = s.exercises[ei]?.sets[si]?.done;
       if (!wasDone) {
         setRestSecs(0); setRestActive(true);
-        setTimeout(() => { const key = `${ei}-${si + 1}-reps`; inputRefs.current[key]?.focus(); inputRefs.current[key]?.select(); }, 60);
+        // Do NOT auto-focus next input — it forces the keyboard open and
+        // pushes End Workout into an accidentally-tappable position.
       }
       return { ...s, exercises: s.exercises.map((e, i) => i !== ei ? e : { ...e, sets: e.sets.map((set, j) => j !== si ? set : { ...set, done: !set.done }) }) };
     });

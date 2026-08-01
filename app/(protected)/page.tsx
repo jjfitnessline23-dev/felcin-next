@@ -110,7 +110,8 @@ export default function HomePage() {
   const [userBadge, setUserBadge] = useState<string | null>(null);
   const processedBoostRef = useRef<string | null>(null);
 
-  const firstName = user?.displayName?.split(" ")[0] || user?.email?.split("@")[0] || "there";
+  const rawFirst = user?.displayName?.split(" ")[0] || user?.email?.split("@")[0] || "there";
+  const firstName = rawFirst.length > 16 ? rawFirst.slice(0, 16) + "…" : rawFirst;
 
   useEffect(() => {
     if (!user) return;
