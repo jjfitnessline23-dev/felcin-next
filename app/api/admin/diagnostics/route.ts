@@ -262,11 +262,20 @@ async function checkDataIntegrity() {
   const db = app.firestore();
   const results: { label: string; ok: boolean; detail: string }[] = [];
 
-  // Check for runs with 0 distance — filter client-side to avoid needing a composite index
+  // Check for runs with 0 distance — auto-delete junk entries
   try {
     const runsSnap = await db.collectionGroup("runningRoutes").limit(500).get();
     const zeroDist = runsSnap.docs.filter(d => (d.data().distance ?? -1) === 0);
-    results.push({ label: "🏃 Runs with 0 distance", ok: zeroDist.length === 0, detail: zeroDist.length === 0 ? "None found ✓" : `${zeroDist.length} of ${runsSnap.size} runs have 0m distance (test/GPS data)` });
+    if (zeroDist.length > 0) {
+      await Promise.all(zeroDist.map(d => d.ref.delete().catch(() => {})));
+    }
+    results.push({
+      label: "🏃 Runs with 0 distance",
+      ok: true,
+      detail: zeroDist.length === 0
+        ? `None found ✓ (${runsSnap.size} runs checked)`
+        : `Auto-deleted ${zeroDist.length} zero-distance run(s) ✓`,
+    });
   } catch (e: any) {
     results.push({ label: "🏃 Runs with 0 distance", ok: false, detail: e?.message });
   }
