@@ -80,6 +80,15 @@ export default function RunMap({ coords, currentPos, heading, followUser, fullsc
     // Snapshot the position NOW so we start the map there, not at [0,0] (Africa)
     const initPos = currentPos;
 
+    // Inject Leaflet CSS via <link> — @import inside dynamic <style> is ignored on some WKWebView versions
+    if (!document.querySelector("link[data-leaflet]")) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.setAttribute("data-leaflet", "");
+      document.head.appendChild(link);
+    }
+
     import("leaflet").then((L) => {
       if (!containerRef.current || mapRef.current) return;
       // @ts-ignore
@@ -238,7 +247,6 @@ export default function RunMap({ coords, currentPos, heading, followUser, fullsc
   return (
     <>
       <style>{`
-        @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
         @keyframes runPulse {
           0%   { transform: scale(1);   opacity: 0.6; }
           100% { transform: scale(2.8); opacity: 0; }

@@ -61,7 +61,7 @@ export default function RunPage() {
   // Location
   const [locState, setLocState] = useState<LocState>("prompt");
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [needsAlwaysLocation, setNeedsAlwaysLocation] = useState(false);
+  const mountedRef = useRef(true);
   const idleWatchRef = useRef<any>(null);
   const [waitSecs, setWaitSecs] = useState(0);
   const enablingRef = useRef(false); // prevent double-tap
@@ -81,10 +81,6 @@ export default function RunPage() {
           const status = await Geolocation.checkPermissions();
           if (status.location === "granted") {
             enableLocation();
-            // Check if user only has "When In Use" — background tracking needs "Always"
-            // Capacitor doesn't expose always vs whenInUse directly, so we use a native bridge
-            // check via the window.Capacitor.Plugins path if available
-            checkAlwaysPermission();
           } else if (status.location === "denied") setLocState("denied");
           // "prompt" = not yet asked, show the Enable button
         } catch { /* plugin unavailable, show Enable button */ }
@@ -97,26 +93,6 @@ export default function RunPage() {
     })();
   }, []);
 
-  // Check if the user has "Always" location — required for GPS to continue when screen locks
-  const checkAlwaysPermission = async () => {
-    try {
-      // Try native bridge: CLAuthorizationStatus 3 = authorizedAlways, 4 = authorizedWhenInUse
-      const cap = (window as any).Capacitor;
-      if (!cap?.Plugins?.CapacitorGeolocation) {
-        // Fallback: assume not always if we can't check
-        // We'll show the banner; user can dismiss if they already have Always
-        setNeedsAlwaysLocation(true);
-        return;
-      }
-      const result = await cap.Plugins.CapacitorGeolocation.checkPermissions();
-      // If the plugin returns a specific always status we can check it
-      const isAlways = result?.location === "granted" && result?.always === true;
-      if (!isAlways) setNeedsAlwaysLocation(true);
-    } catch {
-      setNeedsAlwaysLocation(true);
-    }
-  };
-
   // Phase
   const [phase, setPhase] = useState<Phase>("idle");
   const [countdown, setCountdown] = useState(3);
@@ -124,12 +100,14 @@ export default function RunPage() {
   // Run recording
   const [coords, setCoords] = useState<Coord[]>([]);
   const distRef = useRef(0);
+  const lastCoordRef = useRef<Coord | null>(null);
   const [distance, setDistance] = useState(0);
   const [startTime, setStartTime] = useState(0);
+  const startTimeRef = useRef(0);
   const [elapsed, setElapsed] = useState(0);
   const pausedMsRef = useRef(0);
   const pauseStartRef = useRef(0);
-  const runWatchRef = useRef<number | null>(null);
+  const runWatchRef = useRef<any>(null);
 
   // Heading: bearing in degrees (0=N, 90=E, 180=S, 270=W) derived from last two GPS points
   const [heading, setHeading] = useState<number | null>(null);
@@ -191,7 +169,6 @@ export default function RunPage() {
         const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000 });
         setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocState("granted");
-        checkAlwaysPermission();
 
         if (idleWatchRef.current === null) {
           idleWatchRef.current = await Geolocation.watchPosition(
@@ -252,48 +229,70 @@ export default function RunPage() {
 
   useEffect(() => {
     if (phase !== "running") {
-      if (runWatchRef.current !== null) {
+      // Capture ID before any await — prevents orphan watcher on rapid pause→resume
+      const idToCancel = runWatchRef.current;
+      runWatchRef.current = null;
+      if (idToCancel !== null) {
         (async () => {
           if (isNative) {
             const { Geolocation } = await import("@capacitor/geolocation");
-            await Geolocation.clearWatch({ id: runWatchRef.current as any });
+            await Geolocation.clearWatch({ id: idToCancel });
           } else {
-            navigator.geolocation.clearWatch(runWatchRef.current as any);
+            navigator.geolocation.clearWatch(idToCancel);
           }
-          runWatchRef.current = null;
         })();
       }
       return;
     }
 
-    // accuracy = GPS error radius in metres. Skip noisy readings for the route
-    // but still update the map dot (currentPos) so the pin doesn't freeze.
+    // Stop idle watcher — prevents two concurrent GPS callbacks and dot teleporting
+    const idleId = idleWatchRef.current;
+    if (idleId !== null) {
+      idleWatchRef.current = null;
+      (async () => {
+        if (isNative) {
+          const { Geolocation } = await import("@capacitor/geolocation");
+          await Geolocation.clearWatch({ id: idleId });
+        } else {
+          navigator.geolocation.clearWatch(idleId);
+        }
+      })();
+    }
+
     const onPos = (lat: number, lng: number, accuracy?: number) => {
-      // Always move the map dot, even on imprecise readings
-      if (accuracy === undefined || accuracy <= 50) {
-        setCurrentPos({ lat, lng });
+      // Single threshold: 65m for both dot and route
+      if (accuracy !== undefined && accuracy > 65) return;
+      setCurrentPos({ lat, lng });
+
+      const now = Date.now();
+      const last = lastCoordRef.current;
+      const newCoord: Coord = { lat, lng, ts: now };
+
+      if (last === null) {
+        lastCoordRef.current = newCoord;
+        setCoords([newCoord]);
+        return;
       }
 
-      // Only add to the route if the fix is good (≤65 m accuracy, ≥8 m moved)
-      if (accuracy !== undefined && accuracy > 65) return;
+      const d = haversineDist(last.lat, last.lng, lat, lng);
+      const msSinceLast = now - last.ts;
+      if (d < 8) return; // micro-jitter
+      // Accept large jumps only after a GPS gap (screen wake / tunnel recovery)
+      if (d > 100 && msSinceLast < 15000) return;
 
-      setCoords((prev) => {
-        if (prev.length === 0) return [{ lat, lng, ts: Date.now() }];
-        const last = prev[prev.length - 1];
-        const d = haversineDist(last.lat, last.lng, lat, lng);
-        if (d < 8) return prev;          // raised from 4 → 8 m to cut GPS jitter
-        if (d > 100) return prev;        // >100 m jump in one tick = bad reading, skip
-        distRef.current += d;
-        setDistance(distRef.current);
-        // Bearing: angle from previous point to current point
-        const φ1 = last.lat * Math.PI / 180, φ2 = lat * Math.PI / 180;
-        const Δλ = (lng - last.lng) * Math.PI / 180;
-        const y = Math.sin(Δλ) * Math.cos(φ2);
-        const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-        setHeading(((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360);
-        writeLivePosition(lat, lng, distRef.current, Math.floor((Date.now() - startTime - pausedMsRef.current) / 1000));
-        return [...prev, { lat, lng, ts: Date.now() }];
-      });
+      // Update distance OUTSIDE the setState updater — no StrictMode double-count
+      distRef.current += d;
+      setDistance(distRef.current);
+
+      const φ1 = last.lat * Math.PI / 180, φ2 = lat * Math.PI / 180;
+      const Δλ = (lng - last.lng) * Math.PI / 180;
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      setHeading(((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360);
+      writeLivePosition(lat, lng, distRef.current, Math.floor((now - startTimeRef.current - pausedMsRef.current) / 1000));
+
+      lastCoordRef.current = newCoord;
+      setCoords(prev => [...prev, newCoord]);
     };
 
     (async () => {
@@ -305,30 +304,31 @@ export default function RunPage() {
             if (!err && pos) onPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy ?? undefined);
           }
         );
-        runWatchRef.current = id as any;
+        runWatchRef.current = id;
       } else {
         runWatchRef.current = navigator.geolocation.watchPosition(
           (pos) => onPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
           () => {},
           { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
-        ) as any;
+        );
       }
     })();
 
     return () => {
-      if (runWatchRef.current !== null) {
+      const idToCancel = runWatchRef.current;
+      runWatchRef.current = null;
+      if (idToCancel !== null) {
         (async () => {
           if (isNative) {
             const { Geolocation } = await import("@capacitor/geolocation");
-            await Geolocation.clearWatch({ id: runWatchRef.current as any });
+            await Geolocation.clearWatch({ id: idToCancel });
           } else {
-            navigator.geolocation.clearWatch(runWatchRef.current as any);
+            navigator.geolocation.clearWatch(idToCancel);
           }
-          runWatchRef.current = null;
         })();
       }
     };
-  }, [phase]);
+  }, [phase]); // eslint-disable-line
 
   // ── Load history ─────────────────────────────────────────────────────────
 
@@ -386,8 +386,9 @@ export default function RunPage() {
       // Hold "GO!" for 700ms so it's clearly visible before the run screen appears
       const t = setTimeout(() => {
         distRef.current = 0; pausedMsRef.current = 0; pauseStartRef.current = 0;
+        lastCoordRef.current = null;
         setDistance(0); setCoords([]); setElapsed(0);
-        setStartTime(Date.now()); setPhase("running");
+        const now = Date.now(); startTimeRef.current = now; setStartTime(now); setPhase("running");
       }, 700);
       return () => clearTimeout(t);
     }
@@ -408,10 +409,13 @@ export default function RunPage() {
     return release;
   }, [phase]);
 
+  // Mark unmounted so the visibilitychange handler never re-acquires on a dead component
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   // Re-acquire wake lock when screen wakes (iOS releases it on page hide)
   useEffect(() => {
     const handler = async () => {
-      if (document.visibilityState === "visible" && phase === "running") {
+      if (document.visibilityState === "visible" && phase === "running" && mountedRef.current) {
         try { wakeLockRef.current = await (navigator as any).wakeLock?.request("screen"); } catch {}
       }
     };
@@ -430,7 +434,9 @@ export default function RunPage() {
   // Road-snap when run ends
   useEffect(() => {
     if (phase !== "completed" || coords.length < 2) { setMatchedCoords(null); return; }
-    snapToRoads(coords.map(c => ({ lat: c.lat, lng: c.lng }))).then(m => { if (m) setMatchedCoords(m); }).catch(() => {});
+    let cancelled = false;
+    snapToRoads(coords.map(c => ({ lat: c.lat, lng: c.lng }))).then(m => { if (!cancelled && m) setMatchedCoords(m); }).catch(() => {});
+    return () => { cancelled = true; };
   }, [phase]); // eslint-disable-line
 
   // Road-snap when a historical run detail opens
@@ -517,7 +523,10 @@ export default function RunPage() {
     await stopSharing();
     setPhase("completed");
   };
-  const discardRun = () => { setCoords([]); setDistance(0); setElapsed(0); setPhase("idle"); };
+  const discardRun = () => {
+    distRef.current = 0; pausedMsRef.current = 0; pauseStartRef.current = 0; lastCoordRef.current = null;
+    setCoords([]); setDistance(0); setElapsed(0); setPhase("idle");
+  };
 
   const saveRun = async () => {
     if (!user || savingRef.current) return;
@@ -867,24 +876,6 @@ export default function RunPage() {
       {phase === "idle" && (
         <div style={{ position: "relative", zIndex: 1, padding: "12px 16px 48px" }}>
 
-          {/* Background location upgrade prompt */}
-          {isNative && needsAlwaysLocation && (
-            <div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 14, background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)", display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f59e0b", fontVariationSettings: "'FILL' 1", flexShrink: 0, marginTop: 1 }}>location_on</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#f2f2f2", marginBottom: 2 }}>Enable background tracking</div>
-                <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>Set location to <strong style={{ color: "#f59e0b" }}>Always</strong> so your run keeps recording when the screen locks.</div>
-                <button
-                  onClick={() => { (window as any).open?.("app-settings:", "_system"); }}
-                  style={{ marginTop: 8, padding: "5px 14px", borderRadius: 20, border: "none", background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  Open Settings
-                </button>
-              </div>
-              <button onClick={() => setNeedsAlwaysLocation(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", flexShrink: 0, padding: 0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-              </button>
-            </div>
-          )}
 
           {lastSaved && (lastSaved.isDistancePR || lastSaved.isPacePR) && (
             <div style={{ marginBottom: 14, padding: "16px 18px", borderRadius: 20, background: "linear-gradient(135deg,rgba(251,191,36,0.12),rgba(245,158,11,0.06))", border: "1px solid rgba(251,191,36,0.35)", display: "flex", alignItems: "center", gap: 14, animation: "prPulse 0.6s ease-out" }}>
