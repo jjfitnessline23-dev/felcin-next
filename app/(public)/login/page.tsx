@@ -84,6 +84,16 @@ export default function LoginPage() {
         if (age < 17) { setError("You must be at least 17 years old to create an account."); setBusy(false); return; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         sendEmailVerification(cred.user).catch(() => {});
+        // Fire conversion event for ad attribution
+        try {
+          const utm = JSON.parse(sessionStorage.getItem("felcin_utm") || "{}");
+          if (typeof (window as any).gtag === "function") {
+            (window as any).gtag("event", "sign_up", { method: "email", ...utm });
+          }
+          if (typeof (window as any).fbq === "function") {
+            (window as any).fbq("track", "CompleteRegistration", { content_name: "email" });
+          }
+        } catch {}
         // Stay busy — useEffect will redirect once onAuthStateChanged fires with the new user
         return;
       }
