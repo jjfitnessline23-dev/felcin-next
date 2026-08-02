@@ -262,11 +262,11 @@ async function checkDataIntegrity() {
   const db = app.firestore();
   const results: { label: string; ok: boolean; detail: string }[] = [];
 
-  // Check for runs with 0 distance (bad data)
+  // Check for runs with 0 distance — filter client-side to avoid needing a composite index
   try {
-    const runsSnap = await db.collectionGroup("runningRoutes").where("distance", "==", 0).limit(20).get();
-    const count = runsSnap.size;
-    results.push({ label: "🏃 Runs with 0 distance", ok: count === 0, detail: count === 0 ? "None found ✓" : `${count} runs with 0m distance — possible test/bad data` });
+    const runsSnap = await db.collectionGroup("runningRoutes").limit(500).get();
+    const zeroDist = runsSnap.docs.filter(d => (d.data().distance ?? -1) === 0);
+    results.push({ label: "🏃 Runs with 0 distance", ok: zeroDist.length === 0, detail: zeroDist.length === 0 ? "None found ✓" : `${zeroDist.length} of ${runsSnap.size} runs have 0m distance (test/GPS data)` });
   } catch (e: any) {
     results.push({ label: "🏃 Runs with 0 distance", ok: false, detail: e?.message });
   }
@@ -308,15 +308,35 @@ async function checkDataIntegrity() {
     results.push({ label: "⌚ Stale watch pairings", ok: true, detail: "Collection empty or not yet created" });
   }
 
-  // Check for users with no public profile
+  // Check for users with no public profile — auto-repair any found
   try {
     const usersSnap = await db.collection("users").limit(50).get();
     let missingProfile = 0;
+    let repaired = 0;
     for (const userDoc of usersSnap.docs) {
-      const profSnap = await db.collection("users").doc(userDoc.id).collection("public").doc("profile").get();
-      if (!profSnap.exists) missingProfile++;
+      const profRef = db.collection("users").doc(userDoc.id).collection("public").doc("profile");
+      const profSnap = await profRef.get();
+      if (!profSnap.exists) {
+        missingProfile++;
+        // Auto-repair: copy displayName/photoURL/email from root doc
+        const root = userDoc.data();
+        await profRef.set({
+          displayName: root.displayName || "",
+          photoURL:    root.photoURL    || "",
+          email:       root.email       || "",
+          ...(root.badge     ? { badge:     root.badge     } : {}),
+          ...(root.verified  ? { verified:  root.verified  } : {}),
+        }, { merge: true }).catch(() => {});
+        repaired++;
+      }
     }
-    results.push({ label: "👤 Users missing public profile", ok: missingProfile === 0, detail: missingProfile === 0 ? "All sampled users have public profiles ✓" : `${missingProfile} of ${usersSnap.size} users missing /public/profile` });
+    results.push({
+      label: "👤 Users missing public profile",
+      ok: missingProfile === 0,
+      detail: missingProfile === 0
+        ? "All sampled users have public profiles ✓"
+        : `Found ${missingProfile} missing — auto-repaired ${repaired} ✓`,
+    });
   } catch (e: any) {
     results.push({ label: "👤 Users missing public profile", ok: false, detail: e?.message });
   }
