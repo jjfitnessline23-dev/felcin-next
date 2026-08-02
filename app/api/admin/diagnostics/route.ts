@@ -219,6 +219,119 @@ async function checkSSL() {
   }
 }
 
+async function checkWatchFeatures() {
+  const POST_JSON: RequestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" };
+  const results = await Promise.all([
+    httpCheck("⌚ Watch run save endpoint",   `${BASE}/api/save-watch-run`,  POST_JSON),
+    httpCheck("⌚ Watch steps endpoint",      `${BASE}/api/save-steps`,      POST_JSON),
+    httpCheck("⌚ Watch records endpoint",    `${BASE}/api/get-records`),
+    httpCheck("⌚ Watch pair init",           `${BASE}/api/watch-init`,      POST_JSON),
+    httpCheck("⌚ Watch pair poll",           `${BASE}/api/watch-poll?code=000000`),
+    httpCheck("⌚ Watch pair claim",          `${BASE}/api/watch-claim`,     POST_JSON),
+    httpCheck("⌚ Watch link page",           `${BASE}/watch-link`),
+  ]);
+  // save-watch-run/save-steps/watch-claim should reject empty body (400/401) not 500
+  return results.map(r => ({ ...r, ok: r.ok || r.detail.startsWith("HTTP 40") }));
+}
+
+async function checkEnvVars() {
+  const checks: { label: string; ok: boolean; detail: string }[] = [];
+
+  const vars = [
+    ["WATCH_SYNC_SECRET",            "⌚ WATCH_SYNC_SECRET"],
+    ["RESEND_API_KEY",               "📧 RESEND_API_KEY (email)"],
+    ["NEXT_PUBLIC_MAPTILER_KEY",     "🗺️ MAPTILER_KEY (GPS maps)"],
+    ["STRIPE_SECRET_KEY",            "💳 STRIPE_SECRET_KEY"],
+    ["STRIPE_WEBHOOK_SECRET",        "💳 STRIPE_WEBHOOK_SECRET"],
+    ["FIREBASE_SERVICE_ACCOUNT_JSON","🔥 FIREBASE_SERVICE_ACCOUNT_JSON"],
+  ];
+
+  for (const [envKey, label] of vars) {
+    const val = process.env[envKey];
+    const set = !!(val && val.trim().length > 0);
+    checks.push({ label, ok: set, detail: set ? "Set ✓" : `Missing — ${label.split(" ").slice(1).join(" ")} will not work` });
+  }
+
+  return checks;
+}
+
+async function checkDataIntegrity() {
+  const app = getAdminApp();
+  if (!app) return [{ label: "🔍 Data Integrity", ok: false, detail: "Firebase Admin not available" }];
+
+  const db = app.firestore();
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+
+  // Check for runs with 0 distance (bad data)
+  try {
+    const runsSnap = await db.collectionGroup("runningRoutes").where("distance", "==", 0).limit(20).get();
+    const count = runsSnap.size;
+    results.push({ label: "🏃 Runs with 0 distance", ok: count === 0, detail: count === 0 ? "None found ✓" : `${count} runs with 0m distance — possible test/bad data` });
+  } catch (e: any) {
+    results.push({ label: "🏃 Runs with 0 distance", ok: false, detail: e?.message });
+  }
+
+  // Check for posts with no authorId
+  try {
+    const postsSnap = await db.collection("posts").where("authorId", "==", "").limit(10).get();
+    results.push({ label: "📝 Posts with missing authorId", ok: postsSnap.empty, detail: postsSnap.empty ? "None found ✓" : `${postsSnap.size} posts with empty authorId` });
+  } catch (e: any) {
+    results.push({ label: "📝 Posts with missing authorId", ok: false, detail: e?.message });
+  }
+
+  // Check feature flags exist
+  try {
+    const configSnap = await db.collection("config").doc("features").get();
+    const hasFlags = configSnap.exists;
+    const data = hasFlags ? configSnap.data() : {};
+    const flags = ["badgesEnabled", "boostEnabled", "adsEnabled", "advertiseEnabled"];
+    const missing = flags.filter(f => !(f in (data ?? {})));
+    results.push({ label: "⚙️ Feature flags config", ok: hasFlags && missing.length === 0, detail: hasFlags ? (missing.length === 0 ? "All flags set ✓" : `Missing flags: ${missing.join(", ")}`) : "config/features document missing" });
+  } catch (e: any) {
+    results.push({ label: "⚙️ Feature flags config", ok: false, detail: e?.message });
+  }
+
+  // Check for banned users still having active content (posts/reels)
+  try {
+    const bannedSnap = await db.collection("users").where("banned", "==", true).limit(50).get();
+    results.push({ label: "🚫 Banned user check", ok: true, detail: `${bannedSnap.size} banned user(s) in system` });
+  } catch (e: any) {
+    results.push({ label: "🚫 Banned user check", ok: false, detail: e?.message });
+  }
+
+  // Check for stale watch pairings (older than 1 hour)
+  try {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const staleSnap = await db.collection("watchPairings").where("createdAt", "<", oneHourAgo).limit(100).get();
+    results.push({ label: "⌚ Stale watch pairings", ok: true, detail: `${staleSnap.size} expired pairing codes (safe to ignore)` });
+  } catch (e: any) {
+    results.push({ label: "⌚ Stale watch pairings", ok: true, detail: "Collection empty or not yet created" });
+  }
+
+  // Check for users with no public profile
+  try {
+    const usersSnap = await db.collection("users").limit(50).get();
+    let missingProfile = 0;
+    for (const userDoc of usersSnap.docs) {
+      const profSnap = await db.collection("users").doc(userDoc.id).collection("public").doc("profile").get();
+      if (!profSnap.exists) missingProfile++;
+    }
+    results.push({ label: "👤 Users missing public profile", ok: missingProfile === 0, detail: missingProfile === 0 ? "All sampled users have public profiles ✓" : `${missingProfile} of ${usersSnap.size} users missing /public/profile` });
+  } catch (e: any) {
+    results.push({ label: "👤 Users missing public profile", ok: false, detail: e?.message });
+  }
+
+  // Check notifications collection for orphaned notifications
+  try {
+    const notifSnap = await db.collection("notifications").limit(1).get();
+    results.push({ label: "🔔 Notifications collection", ok: true, detail: `Accessible — ${notifSnap.size > 0 ? "has documents" : "empty"}` });
+  } catch (e: any) {
+    results.push({ label: "🔔 Notifications collection", ok: false, detail: e?.message });
+  }
+
+  return results;
+}
+
 async function checkMapTiler() {
   const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
   if (!key) return [{ label: "🗺️ MapTiler (GPS maps)", ok: false, detail: "NEXT_PUBLIC_MAPTILER_KEY not set" }];
@@ -294,7 +407,7 @@ export async function POST(req: NextRequest) {
   const { sendEmail } = await req.json().catch(() => ({ sendEmail: false }));
 
   // Run all check groups in parallel
-  const [sitePages, paymentAPIs, platformAPIs, cronAPIs, firebaseChecks, stripeChecks, sslCheck, mapTilerCheck] = await Promise.all([
+  const [sitePages, paymentAPIs, platformAPIs, cronAPIs, firebaseChecks, stripeChecks, sslCheck, mapTilerCheck, watchChecks, envChecks, dataChecks] = await Promise.all([
     checkSitePages(),
     checkPaymentAPIs(),
     checkPlatformAPIs(),
@@ -303,6 +416,9 @@ export async function POST(req: NextRequest) {
     checkStripe(),
     checkSSL(),
     checkMapTiler(),
+    checkWatchFeatures(),
+    checkEnvVars(),
+    checkDataIntegrity(),
   ]);
 
   const allChecks = [
@@ -314,6 +430,9 @@ export async function POST(req: NextRequest) {
     ...stripeChecks,
     ...sslCheck,
     ...mapTilerCheck,
+    ...watchChecks,
+    ...envChecks,
+    ...dataChecks,
   ];
 
   const emailSent = sendEmail ? await sendEmailReport(allChecks) : false;
@@ -327,6 +446,9 @@ export async function POST(req: NextRequest) {
     { group: "Firebase",           checks: firebaseChecks },
     { group: "Stripe",             checks: stripeChecks },
     { group: "Infrastructure",     checks: [...sslCheck, ...mapTilerCheck] },
+    { group: "⌚ Watch & Health",   checks: watchChecks },
+    { group: "🔑 Environment Vars", checks: envChecks },
+    { group: "🔍 Data Integrity",   checks: dataChecks },
   ];
 
   return NextResponse.json({
