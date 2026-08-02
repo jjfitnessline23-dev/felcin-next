@@ -71,6 +71,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!user) return;
+    try {
+      (window as any).webkit?.messageHandlers?.felcinWatchSync?.postMessage({ uid: user.uid });
+    } catch {}
+  }, [user?.uid]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!user) return;
     const today = new Date().toISOString().split("T")[0];
     setDoc(doc(db, "analytics", `daily-${today}`), { pageViews: increment(1) }, { merge: true }).catch(() => {});
     setDoc(doc(db, "analytics", "totals"), { pageViews: increment(1) }, { merge: true }).catch(() => {});
