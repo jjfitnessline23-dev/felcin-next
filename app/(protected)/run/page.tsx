@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useAuth } from "@/lib/auth";
-import { db, OWNER_UIDS } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
+import { db, auth, OWNER_UIDS } from "@/lib/firebase";
+import { collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
 import { snapToRoads } from "@/lib/mapMatch";
 import { Capacitor } from "@capacitor/core";
 
@@ -143,6 +143,9 @@ export default function RunPage() {
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [rides, setRides] = useState<RunRoute[]>([]);
   const [loadingRides, setLoadingRides] = useState(true);
+
+  // Daily steps (last 7 days from Watch)
+  const [stepHistory, setStepHistory] = useState<{ date: string; steps: number }[]>([]);
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -161,6 +164,14 @@ export default function RunPage() {
   // ── Location: uses @capacitor/geolocation on native, navigator on web ────
 
   const isNative = Capacitor.isNativePlatform();
+
+  // ── Sync UID to Apple Watch via native bridge so Watch can save runs ────
+  useEffect(() => {
+    if (!user || !isNative) return;
+    try {
+      (window as any).webkit?.messageHandlers?.felcinWatchSync?.postMessage({ uid: user.uid });
+    } catch {}
+  }, [user?.uid, isNative]); // eslint-disable-line
 
   const enableLocation = async () => {
     if (enablingRef.current) return;
@@ -260,8 +271,8 @@ export default function RunPage() {
         setCurrentPos({ lat, lng });
       }
 
-      // Only add to the route if the fix is good (≤30 m accuracy, ≥8 m moved)
-      if (accuracy !== undefined && accuracy > 30) return;
+      // Only add to the route if the fix is good (≤65 m accuracy, ≥8 m moved)
+      if (accuracy !== undefined && accuracy > 65) return;
 
       setCoords((prev) => {
         if (prev.length === 0) return [{ lat, lng, ts: Date.now() }];
@@ -322,7 +333,7 @@ export default function RunPage() {
     if (!user) return;
     (async () => {
       try {
-        const q = query(collection(db, "users", user.uid, "runningRoutes"), limit(30));
+        const q = query(collection(db, "users", user.uid, "runningRoutes"), limit(500));
         const docs = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute));
         // Sort client-side so mixed/legacy date types don't break orderBy
         docs.sort((a, b) => {
@@ -335,7 +346,7 @@ export default function RunPage() {
     })();
     (async () => {
       try {
-        const q = query(collection(db, "users", user.uid, "cyclingRoutes"), limit(30));
+        const q = query(collection(db, "users", user.uid, "cyclingRoutes"), limit(500));
         const docs = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() } as RunRoute));
         docs.sort((a, b) => {
           const ta = a.date?.toMillis?.() ?? (a.date?.seconds ? a.date.seconds * 1000 : new Date(a.date).getTime() || 0);
@@ -346,6 +357,23 @@ export default function RunPage() {
       } catch (e) { console.error("loadRides failed:", e); } finally { setLoadingRides(false); }
     })();
   }, [user]);
+
+  // ── Daily steps ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user) return;
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split("T")[0];
+    });
+    Promise.all(
+      days.map(date =>
+        getDoc(doc(db, "users", user.uid, "steps", date))
+          .then((snap: any) => ({ date, steps: snap.exists() ? (snap.data()?.steps ?? 0) : 0 }))
+          .catch(() => ({ date, steps: 0 }))
+      )
+    ).then(results => setStepHistory(results)).catch(() => {});
+  }, [user]); // eslint-disable-line
 
   // ── Countdown ────────────────────────────────────────────────────────────
 
@@ -478,14 +506,26 @@ export default function RunPage() {
     if (coords.length > 1000) { const step = Math.ceil(coords.length / 1000); stored = coords.filter((_, i) => i % step === 0); }
     const day = new Date().toLocaleDateString("en-US", { weekday: "short" });
     const name = isCycle ? `${day} Ride` : `${day} Run`;
-    const col = isCycle ? "cyclingRoutes" : "runningRoutes";
     try {
-      const ref = await addDoc(collection(db, "users", user.uid, col), {
-        coordinates: stored, distance, duration, avgPace, date: serverTimestamp(), isDistancePR, isPacePR, name,
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/save-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          distance, duration, avgPace, name,
+          coordinates: stored.map(c => ({ lat: c.lat, lng: c.lng })),
+          activityType: isCycle ? "cycle" : "run",
+        }),
       });
-      const entry = { id: ref.id, name, distance, duration, avgPace, date: new Date(), isDistancePR, isPacePR };
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Save failed");
+      const entry = {
+        id: data.id, name, distance, duration, avgPace, date: new Date(),
+        isDistancePR: data.isDistancePR, isPacePR: data.isPacePR,
+        coordinates: stored.map(c => ({ lat: c.lat, lng: c.lng })),
+      };
       if (isCycle) setRides(prev => [entry, ...prev]); else setRuns(prev => [entry, ...prev]);
-      setLastSaved({ isDistancePR, isPacePR });
+      setLastSaved({ isDistancePR: data.isDistancePR, isPacePR: data.isPacePR });
       setPhase("idle");
     } catch (e: unknown) {
       const msg = (e instanceof Error) ? e.message : String(e);
@@ -817,14 +857,54 @@ export default function RunPage() {
           )}
 
           {lastSaved && (lastSaved.isDistancePR || lastSaved.isPacePR) && (
-            <div style={{ marginBottom: 14, padding: "14px 16px", borderRadius: 16, background: "linear-gradient(135deg,rgba(251,191,36,0.08),rgba(245,158,11,0.04))", border: "1px solid rgba(251,191,36,0.2)", display: "flex", alignItems: "center", gap: 12 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fbbf24", fontVariationSettings: "'FILL' 1", flexShrink: 0 }}>emoji_events</span>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#f2f2f2" }}>New Personal Record!</div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{[lastSaved.isDistancePR && `Longest ${ACTIVITY_LABEL.toLowerCase()}`, lastSaved.isPacePR && (isCycle ? "Best speed" : "Best pace")].filter(Boolean).join(" · ")}</div>
+            <div style={{ marginBottom: 14, padding: "16px 18px", borderRadius: 20, background: "linear-gradient(135deg,rgba(251,191,36,0.12),rgba(245,158,11,0.06))", border: "1px solid rgba(251,191,36,0.35)", display: "flex", alignItems: "center", gap: 14, animation: "prPulse 0.6s ease-out" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
               </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#fbbf24", letterSpacing: "-0.2px" }}>🏆 New Personal Record!</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 3 }}>{[lastSaved.isDistancePR && `Longest ${ACTIVITY_LABEL.toLowerCase()}`, lastSaved.isPacePR && (isCycle ? "Best speed" : "Best pace")].filter(Boolean).join(" · ")}</div>
+              </div>
+              <button onClick={() => setLastSaved(null)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", padding: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
             </div>
           )}
+
+          {/* ── Personal Records card ── */}
+          {(() => {
+            const currentRuns = isCycle ? rides : runs;
+            const validRuns = currentRuns.filter(r => r.distance > 100);
+            const distPR = validRuns.sort((a, b) => b.distance - a.distance)[0];
+            const pacePR = validRuns.filter(r => r.avgPace > 0 && r.distance >= 500).sort((a, b) => a.avgPace - b.avgPace)[0];
+            if (!distPR && !pacePR) return null;
+            const fmtKm  = (m: number) => (m / 1000).toFixed(2) + " km";
+            const fmtPace = (s: number) => (!s || !isFinite(s) || s <= 0) ? "--:--" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}/km`;
+            return (
+              <div style={{ marginBottom: 14, borderRadius: 20, overflow: "hidden", border: "1px solid rgba(251,191,36,0.2)", background: "linear-gradient(135deg,#0d0b00,#131000)" }}>
+                <div style={{ padding: "12px 16px 8px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(251,191,36,0.1)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#fbbf24", letterSpacing: "0.1em" }}>YOUR PERSONAL RECORDS</span>
+                </div>
+                <div style={{ display: "flex" }}>
+                  {distPR && (
+                    <div onClick={() => setExpandedRun(distPR)} style={{ flex: 1, padding: "12px 16px", borderRight: pacePR ? "1px solid rgba(251,191,36,0.1)" : "none", cursor: "pointer" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#555", letterSpacing: "0.08em", marginBottom: 4 }}>LONGEST {isCycle ? "RIDE" : "RUN"}</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>{fmtKm(distPR.distance)}</div>
+                      <div style={{ fontSize: 10, color: "#444", marginTop: 2 }}>{formatDate(distPR.date)} · tap to view map</div>
+                    </div>
+                  )}
+                  {pacePR && (
+                    <div onClick={() => setExpandedRun(pacePR)} style={{ flex: 1, padding: "12px 16px", cursor: "pointer" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#555", letterSpacing: "0.08em", marginBottom: 4 }}>{isCycle ? "BEST SPEED" : "BEST PACE"}</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: "#a78bfa", letterSpacing: "-0.5px" }}>{isCycle ? `${((pacePR.distance / pacePR.duration) * 3.6).toFixed(1)} km/h` : fmtPace(pacePR.avgPace)}</div>
+                      <div style={{ fontSize: 10, color: "#444", marginTop: 2 }}>{formatDate(pacePR.date)} · tap to view map</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Mode toggle */}
           <div style={{ display: "flex", background: "#131313", borderRadius: 16, padding: 4, gap: 4, marginBottom: 14, border: "1px solid rgba(255,255,255,0.05)" }}>
@@ -848,6 +928,56 @@ export default function RunPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>{ACTIVITY_ICON}</span>
             Start {ACTIVITY_LABEL}
           </button>
+
+          {/* ── Daily Steps ── */}
+          {stepHistory.length > 0 && (() => {
+            const GOAL = 10000;
+            const today = stepHistory[stepHistory.length - 1];
+            const maxSteps = Math.max(...stepHistory.map(d => d.steps), GOAL);
+            const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+            return (
+              <div style={{ marginTop: 24, marginBottom: 24, borderRadius: 20, background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f97316", fontVariationSettings: "'FILL' 1" }}>directions_walk</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>DAILY STEPS</span>
+                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 22, fontWeight: 900, color: today.steps >= GOAL ? "#22c55e" : "#f97316", letterSpacing: "-0.5px" }}>
+                      {today.steps > 0 ? today.steps.toLocaleString() : "--"}
+                    </span>
+                    {today.steps >= GOAL && (
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ padding: "14px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 56 }}>
+                    {stepHistory.map((d, i) => {
+                      const pct = maxSteps > 0 ? d.steps / maxSteps : 0;
+                      const isToday = i === stepHistory.length - 1;
+                      const hitGoal = d.steps >= GOAL;
+                      const barColor = hitGoal ? "#22c55e" : isToday ? "#f97316" : "#333";
+                      const dateObj = new Date(d.date + "T12:00:00");
+                      const label = dayLabels[dateObj.getDay()];
+                      return (
+                        <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                          <div style={{ width: "100%", height: 44, display: "flex", alignItems: "flex-end" }}>
+                            <div style={{ width: "100%", height: `${Math.max(pct * 100, d.steps > 0 ? 8 : 3)}%`, background: barColor, borderRadius: "4px 4px 2px 2px", transition: "height 0.3s ease", opacity: isToday ? 1 : 0.7 }} />
+                          </div>
+                          <span style={{ fontSize: 9, color: isToday ? "#aaa" : "#444", fontWeight: isToday ? 700 : 500 }}>{label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 10, color: "#333" }}>Goal: {GOAL.toLocaleString()} steps/day</span>
+                    {today.steps > 0 && today.steps < GOAL && (
+                      <span style={{ fontSize: 10, color: "#555" }}>{(GOAL - today.steps).toLocaleString()} to go</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ marginTop: 28 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#333", letterSpacing: "0.12em", marginBottom: 12 }}>{isCycle ? "RIDE HISTORY" : "RUN HISTORY"}</p>
