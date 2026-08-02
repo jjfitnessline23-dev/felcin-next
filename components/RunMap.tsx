@@ -61,11 +61,17 @@ export default function RunMap({ coords, currentPos, heading, followUser, fullsc
   const prevCompletedRef = useRef(false);
   const coordsRef = useRef<Coord[]>([]);
   const headingRef = useRef<number | null | undefined>(heading);
+  const currentPosRef = useRef<Coord | null>(currentPos);
+  const followUserRef = useRef(followUser);
 
   // Becomes true once Leaflet has initialised — re-triggers all dependent effects
   const [mapInit, setMapInit] = useState(false);
   // Stays true until the map is centred on the user — hides the [0,0] Africa flash
   const [mapCover, setMapCover] = useState(true);
+
+  // Keep refs in sync so the resume handler always has fresh values
+  useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
+  useEffect(() => { followUserRef.current = followUser; }, [followUser]);
 
   // ── Mount: initialise Leaflet at the user's current position ─────────────
   useEffect(() => {
@@ -100,7 +106,23 @@ export default function RunMap({ coords, currentPos, heading, followUser, fullsc
       setMapInit(true);
     });
 
+    // When the screen wakes from lock, Leaflet's cached container size is stale
+    // which makes the dot render at the wrong position. invalidateSize() fixes it.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible" || !mapRef.current) return;
+      setTimeout(() => {
+        if (!mapRef.current) return;
+        mapRef.current.invalidateSize();
+        const pos = currentPosRef.current;
+        if (pos && followUserRef.current) {
+          mapRef.current.setView([pos.lat, pos.lng], mapRef.current.getZoom(), { animate: false });
+        }
+      }, 300);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
