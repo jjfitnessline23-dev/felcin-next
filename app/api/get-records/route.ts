@@ -5,13 +5,8 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const uid    = searchParams.get("uid") ?? "";
-    const secret = searchParams.get("secret") ?? "";
+    const uid = searchParams.get("uid") ?? "";
 
-    const expectedSecret = process.env.WATCH_SYNC_SECRET;
-    if (!expectedSecret || secret !== expectedSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     if (!uid) return NextResponse.json({ error: "Missing uid" }, { status: 400 });
 
     const app = getAdminApp();
