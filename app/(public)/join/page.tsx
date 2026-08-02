@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 
 const FEATURES = [
   { icon: "directions_run", title: "GPS Run Tracking", desc: "Track every run with live maps, pace, distance and route replay.", color: "#22c55e" },
@@ -19,10 +19,8 @@ const STATS = [
   { value: "iOS", label: "Apple Watch Sync" },
 ];
 
-export default function JoinPage() {
+function UTMCapture() {
   const searchParams = useSearchParams();
-
-  // Capture UTM parameters so you know which ad drove the signup
   useEffect(() => {
     const utm: Record<string, string> = {};
     ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach(k => {
@@ -33,8 +31,13 @@ export default function JoinPage() {
       try { sessionStorage.setItem("felcin_utm", JSON.stringify(utm)); } catch {}
     }
   }, [searchParams]);
+  return null;
+}
 
+export default function JoinPage() {
   return (
+    <>
+      <Suspense fallback={null}><UTMCapture /></Suspense>
     <div style={{ background: "#090909", minHeight: "100dvh", fontFamily: "var(--font-manrope, system-ui, sans-serif)" }}>
 
       {/* Nav */}
@@ -136,5 +139,6 @@ export default function JoinPage() {
         }
       `}</style>
     </div>
+    </>
   );
 }
