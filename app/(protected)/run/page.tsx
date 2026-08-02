@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useAuth } from "@/lib/auth";
 import { db, auth, OWNER_UIDS } from "@/lib/firebase";
-import { collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, doc, setDoc, updateDoc } from "@/lib/db";
+import { collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, doc, setDoc, updateDoc, deleteDoc } from "@/lib/db";
 import { snapToRoads } from "@/lib/mapMatch";
 import { Capacitor } from "@capacitor/core";
 
@@ -576,6 +576,31 @@ export default function RunPage() {
     }
   };
 
+  const deleteRun = async (run: RunRoute, runMode: ActivityMode) => {
+    if (!user) return;
+    const col = runMode === "cycle" ? "cyclingRoutes" : "runningRoutes";
+    try {
+      await deleteDoc(doc(db, "users", user.uid, col, run.id));
+      const remaining = (runMode === "cycle" ? rides : runs).filter(r => r.id !== run.id);
+      // Recalculate PRs on remaining runs
+      const valid = remaining.filter(r => r.distance > 100);
+      const bestDist = valid.reduce((m, r) => Math.max(m, r.distance), 0);
+      const bestPace = valid.filter(r => r.avgPace > 0 && r.distance >= 500)
+        .reduce((m, r) => Math.min(m, r.avgPace), Infinity);
+      const updated = remaining.map(r => ({
+        ...r,
+        isDistancePR: r.distance === bestDist && bestDist > 0,
+        isPacePR: r.avgPace > 0 && r.distance >= 500 && r.avgPace === bestPace && isFinite(bestPace),
+      }));
+      // Persist any changed PR flags
+      await Promise.all(
+        updated.filter((r, i) => r.isDistancePR !== remaining[i]?.isDistancePR || r.isPacePR !== remaining[i]?.isPacePR)
+          .map(r => updateDoc(doc(db, "users", user.uid, col, r.id), { isDistancePR: r.isDistancePR, isPacePR: r.isPacePR }))
+      );
+      if (runMode === "cycle") setRides(updated); else setRuns(updated);
+      if (expandedRun?.id === run.id) setExpandedRun(null);
+    } catch (e) { console.error("deleteRun failed:", e); }
+  };
 
   const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const speedKmh = elapsed > 0 ? (distance / elapsed) * 3.6 : 0;
@@ -868,6 +893,18 @@ export default function RunPage() {
                 <span style={{ fontSize: 12, color: "#444" }}>{expandedRun.coordinates!.length} GPS points recorded</span>
               </div>
             )}
+
+            {/* Delete */}
+            <button
+              onClick={() => {
+                const runMode = expandedRun.name?.toLowerCase().includes("ride") || mode === "cycle" ? "cycle" : "run";
+                deleteRun(expandedRun, runMode);
+              }}
+              style={{ marginTop: 16, width: "100%", padding: "12px 0", borderRadius: 14, border: "1px solid rgba(239,68,68,0.25)", background: "rgba(239,68,68,0.06)", color: "#ef4444", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+              Delete {isCycle ? "Ride" : "Run"}
+            </button>
           </div>
         </div>
       )}
@@ -1014,7 +1051,7 @@ export default function RunPage() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {rides.map(ride => <RunCard key={ride.id} run={ride} mode="cycle" onTap={() => setExpandedRun(ride)} />)}
+                  {rides.map(ride => <RunCard key={ride.id} run={ride} mode="cycle" onTap={() => setExpandedRun(ride)} onDelete={() => deleteRun(ride, "cycle")} />)}
                 </div>
               )
             ) : (
@@ -1029,7 +1066,7 @@ export default function RunPage() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {runs.map(run => <RunCard key={run.id} run={run} onTap={() => setExpandedRun(run)} />)}
+                  {runs.map(run => <RunCard key={run.id} run={run} onTap={() => setExpandedRun(run)} onDelete={() => deleteRun(run, "run")} />)}
                 </div>
               )
             )}
@@ -1040,7 +1077,8 @@ export default function RunPage() {
   );
 }
 
-function RunCard({ run, mode = "run", onTap }: { run: RunRoute; mode?: ActivityMode; onTap?: () => void }) {
+function RunCard({ run, mode = "run", onTap, onDelete }: { run: RunRoute; mode?: ActivityMode; onTap?: () => void; onDelete?: () => void }) {
+  const [confirming, setConfirming] = useState(false);
   const hasPR = run.isDistancePR || run.isPacePR;
   const isCycle = mode === "cycle";
   const accent = isCycle ? "#f97316" : "#22c55e";
@@ -1050,6 +1088,19 @@ function RunCard({ run, mode = "run", onTap }: { run: RunRoute; mode?: ActivityM
   const fmtP = (s: number) => (!s || !isFinite(s) || s <= 0) ? "--:--" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const speedStr = run.duration > 0 ? `${((run.distance / run.duration) * 3.6).toFixed(1)} km/h` : "--";
   const thirdStat = isCycle ? speedStr : `${fmtP(run.avgPace)}/km`;
+
+  if (confirming) {
+    return (
+      <div style={{ background: "#1a0a0a", borderRadius: 16, padding: "14px 16px", border: "1px solid rgba(239,68,68,0.25)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <span style={{ fontSize: 13, color: "#f87171", fontWeight: 600 }}>Delete this {isCycle ? "ride" : "run"}?</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setConfirming(false)} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#555", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => { setConfirming(false); onDelete?.(); }} style={{ padding: "6px 14px", borderRadius: 10, border: "none", background: "#ef4444", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Delete</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div onClick={onTap} style={{ background: "#131313", borderRadius: 16, padding: "14px 16px", border: hasPR ? "1px solid rgba(251,191,36,0.18)" : "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 14, cursor: onTap ? "pointer" : "default", WebkitTapHighlightColor: "transparent" }}>
       <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: accentBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1063,7 +1114,17 @@ function RunCard({ run, mode = "run", onTap }: { run: RunRoute; mode?: ActivityM
         </div>
         <div style={{ fontSize: 12, color: "#555" }}>{(run.distance / 1000).toFixed(2)} km · {fmtT(run.duration)} · {thirdStat}</div>
       </div>
-      <div style={{ fontSize: 11, color: "#333", flexShrink: 0 }}>{formatDate(run.date)}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div style={{ fontSize: 11, color: "#333" }}>{formatDate(run.date)}</div>
+        {onDelete && (
+          <button
+            onClick={e => { e.stopPropagation(); setConfirming(true); }}
+            style={{ background: "none", border: "none", color: "#333", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center" }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
