@@ -158,14 +158,16 @@ service cloud.firestore {
         allow write: if isAuth() && request.auth.uid == userId;
       }
 
-      // Running routes — owner writes, admin reads via collectionGroup below
+      // Running routes — anyone authenticated can read (for PR display on profiles)
       match /runningRoutes/{docId} {
-        allow read, write: if isAuth() && request.auth.uid == userId;
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == userId;
       }
 
-      // Cycling routes — same rules as running routes
+      // Cycling routes — anyone authenticated can read
       match /cyclingRoutes/{docId} {
-        allow read, write: if isAuth() && request.auth.uid == userId;
+        allow read: if isAuth();
+        allow write: if isAuth() && request.auth.uid == userId;
       }
 
       // Catch-all: read-only for owner/admin — write is INTENTIONALLY omitted here
@@ -344,6 +346,12 @@ service cloud.firestore {
       allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && request.auth.uid == resource.data.uid;
       allow delete: if isAuth() && request.auth.uid == resource.data.uid;
+    }
+
+    // ── Watch pairing — Watch polls without auth; only server writes via Admin SDK ──
+    match /watchPairings/{code} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ── Config (feature flags) ──
