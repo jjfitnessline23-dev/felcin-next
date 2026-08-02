@@ -138,6 +138,9 @@ export default function RunPage() {
   const [mode, setMode] = useState<ActivityMode>("run");
   const [useMiles, setUseMiles] = useState(false);
 
+  // Wake lock — keeps screen on during a run so JS watchPosition never suspends
+  const wakeLockRef = useRef<any>(null);
+
   // History
   const [runs, setRuns] = useState<RunRoute[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
@@ -380,14 +383,41 @@ export default function RunPage() {
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown <= 0) {
-      distRef.current = 0; pausedMsRef.current = 0; pauseStartRef.current = 0;
-      setDistance(0); setCoords([]); setElapsed(0);
-      setStartTime(Date.now()); setPhase("running");
-      return;
+      // Hold "GO!" for 700ms so it's clearly visible before the run screen appears
+      const t = setTimeout(() => {
+        distRef.current = 0; pausedMsRef.current = 0; pauseStartRef.current = 0;
+        setDistance(0); setCoords([]); setElapsed(0);
+        setStartTime(Date.now()); setPhase("running");
+      }, 700);
+      return () => clearTimeout(t);
     }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [phase, countdown]);
+
+  // ── Screen wake lock — prevents iOS from suspending JS during a run ────────
+  useEffect(() => {
+    const acquire = async () => {
+      try { wakeLockRef.current = await (navigator as any).wakeLock?.request("screen"); } catch {}
+    };
+    const release = () => {
+      wakeLockRef.current?.release().catch(() => {}); wakeLockRef.current = null;
+    };
+    if (phase === "running") acquire();
+    else release();
+    return release;
+  }, [phase]);
+
+  // Re-acquire wake lock when screen wakes (iOS releases it on page hide)
+  useEffect(() => {
+    const handler = async () => {
+      if (document.visibilityState === "visible" && phase === "running") {
+        try { wakeLockRef.current = await (navigator as any).wakeLock?.request("screen"); } catch {}
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [phase]);
 
   // ── Timer ────────────────────────────────────────────────────────────────
 
