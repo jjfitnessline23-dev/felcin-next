@@ -4,10 +4,9 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 
 const REPLICATE_API = "https://api.replicate.com/v1";
 
-// Image model: stability-ai img2img
-const IMAGE_MODEL = "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4af4b51808d3547c73e4b9462b6ecd8ea5";
-// Video model: zeroscope
-const VIDEO_MODEL  = "anotherjesse/zeroscope-v2-xl:9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351";
+// Use /models/{owner}/{name}/predictions — always runs the latest public version, no hash needed
+const IMAGE_MODEL_PATH = "stability-ai/stable-diffusion-img2img";
+const VIDEO_MODEL_PATH  = "anotherjesse/zeroscope-v2-xl";
 
 async function verifyUser(req: NextRequest): Promise<string | null> {
   try {
@@ -26,6 +25,24 @@ async function urlToBase64(url: string): Promise<string> {
   const b64 = Buffer.from(buf).toString("base64");
   const mime = res.headers.get("content-type") || "image/jpeg";
   return `data:${mime};base64,${b64}`;
+}
+
+async function createPrediction(modelPath: string, input: Record<string, unknown>, key: string, retries = 3): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(`${REPLICATE_API}/models/${modelPath}/predictions`, {
+      method: "POST",
+      headers: { Authorization: `Token ${key}`, "Content-Type": "application/json", "Prefer": "wait" },
+      body: JSON.stringify({ input }),
+    });
+    if (res.status === 429) {
+      // Rate limited — wait and retry
+      const retryAfter = parseInt(res.headers.get("retry-after") || "10", 10);
+      await new Promise((r) => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+    return res;
+  }
+  throw new Error("Rate limit exceeded. Please try again in a moment.");
 }
 
 export async function POST(req: NextRequest) {
@@ -56,48 +73,38 @@ export async function POST(req: NextRequest) {
 
       const b64 = await urlToBase64(imageUrl);
 
-      const res = await fetch(`${REPLICATE_API}/predictions`, {
-        method: "POST",
-        headers: { Authorization: `Token ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          version: IMAGE_MODEL,
-          input: {
-            image: b64,
-            prompt: fullPrompt,
-            strength: strength ?? 0.7,
-            guidance_scale: 7.5,
-            num_inference_steps: 30,
-          },
-        }),
-      });
+      const res = await createPrediction(IMAGE_MODEL_PATH, {
+        image: b64,
+        prompt: fullPrompt,
+        strength: strength ?? 0.7,
+        guidance_scale: 7.5,
+        num_inference_steps: 30,
+      }, key);
 
       const prediction = await res.json();
       if (!res.ok) return NextResponse.json({ error: prediction.detail || "Replicate error" }, { status: 500 });
 
-      // Poll for result
+      // If synchronous result (Prefer: wait), return immediately
+      if (prediction.output) return NextResponse.json({ output: prediction.output, status: "succeeded" });
+
       const result = await pollPrediction(prediction.id, key);
       return NextResponse.json(result);
     }
 
     if (type === "video") {
-      const res = await fetch(`${REPLICATE_API}/predictions`, {
-        method: "POST",
-        headers: { Authorization: `Token ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          version: VIDEO_MODEL,
-          input: {
-            prompt: fullPrompt,
-            num_frames: 24,
-            width: 576,
-            height: 320,
-            guidance_scale: 17.5,
-            num_inference_steps: 50,
-          },
-        }),
-      });
+      const res = await createPrediction(VIDEO_MODEL_PATH, {
+        prompt: fullPrompt,
+        num_frames: 24,
+        width: 576,
+        height: 320,
+        guidance_scale: 17.5,
+        num_inference_steps: 50,
+      }, key);
 
       const prediction = await res.json();
       if (!res.ok) return NextResponse.json({ error: prediction.detail || "Replicate error" }, { status: 500 });
+
+      if (prediction.output) return NextResponse.json({ output: prediction.output, status: "succeeded" });
 
       const result = await pollPrediction(prediction.id, key);
       return NextResponse.json(result);
