@@ -149,12 +149,6 @@ export default function ProfileSettingsPage() {
         <p className="mt-2.5 text-sm font-medium" style={{ color: uploading ? "#444" : "#aaa" }}>
           {uploading ? "Uploading…" : "Tap to change photo"}
         </p>
-        <button onClick={() => router.push("/ai-studio")}
-          className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-full border-none cursor-pointer text-xs font-bold"
-          style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.15),rgba(167,139,250,0.1))", border: "1px solid rgba(124,58,237,0.3)", color: "#a78bfa" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
-          Transform with AI
-        </button>
       </div>
 
       {/* Form fields */}

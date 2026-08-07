@@ -48,6 +48,7 @@ export default function UserProfilePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [prStats, setPrStats] = useState<{ distPR: number | null; pacePR: number | null }>({ distPR: null, pacePR: null });
   const [blocked, setBlocked] = useState(false);
   const [blockedByThem, setBlockedByThem] = useState(false);
   const [tipModal, setTipModal] = useState(false);
@@ -128,6 +129,15 @@ export default function UserProfilePage() {
         }
       })
       .catch(() => setLoading(false));
+
+    // Load PR stats from runningRoutes — calculate dynamically from all runs
+    getDocs(query(collection(db, "users", uid, "runningRoutes"), limit(500)))
+      .then((snap) => {
+        const routes = snap.docs.map(d => d.data()).filter(r => r.distance > 100);
+        const distPR = routes.sort((a, b) => b.distance - a.distance)[0];
+        const pacePR = routes.filter(r => r.avgPace > 0 && r.distance >= 500).sort((a, b) => a.avgPace - b.avgPace)[0];
+        setPrStats({ distPR: distPR?.distance ?? null, pacePR: pacePR?.avgPace ?? null });
+      }).catch(() => {});
 
     // Fetch authored posts + collab posts, merge and dedupe — limit 100 each to prevent
     // loading thousands of posts for popular accounts
@@ -339,6 +349,32 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* ── PR Badges ── */}
+      {(prStats.distPR !== null || prStats.pacePR !== null) && (
+        <div className="flex gap-2 px-4 pb-3">
+          {prStats.distPR !== null && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
+              <div>
+                <div style={{ fontSize: 10, color: "#555", fontWeight: 700 }}>LONGEST RUN</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>{(prStats.distPR / 1000).toFixed(2)} km</div>
+              </div>
+            </div>
+          )}
+          {prStats.pacePR !== null && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>speed</span>
+              <div>
+                <div style={{ fontSize: 10, color: "#555", fontWeight: 700 }}>BEST PACE</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#a78bfa" }}>
+                  {Math.floor(prStats.pacePR / 60)}:{String(Math.floor(prStats.pacePR % 60)).padStart(2, "0")}/km
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Action buttons row (other users only) ── */}
       {!isSelf && (
