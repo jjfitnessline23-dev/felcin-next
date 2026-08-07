@@ -416,13 +416,22 @@ async function checkAPIResponseBodies() {
     results.push({ label: "🏋️ Exercise browse — returns array", ok: res.ok && isArray, detail: isArray ? `Returns ${(parsed as unknown[]).length} exercises ✓` : `Got: ${text.slice(0, 60)}` });
   } catch (e: any) { results.push({ label: "🏋️ Exercise browse — returns array", ok: false, detail: e.message }); }
 
-  // Proxy media — should return image content-type (use a guaranteed-public URL)
+  // Proxy media — only allows Firebase Storage URLs (403 for others is correct security behavior)
   try {
-    const testImg = encodeURIComponent("https://www.gstatic.com/webp/gallery/1.webp");
-    const res = await fetch(`${BASE}/api/proxy-media?url=${testImg}`, { cache: "no-store" });
-    const ct = res.headers.get("content-type") || "";
-    results.push({ label: "🖼️ Proxy media — returns image", ok: res.ok && (ct.includes("image") || ct.includes("webp")), detail: res.ok ? `Content-Type: ${ct} ✓` : `HTTP ${res.status} — proxy may be broken` });
-  } catch (e: any) { results.push({ label: "🖼️ Proxy media — returns image", ok: false, detail: e.message }); }
+    const [noUrlRes, badUrlRes] = await Promise.all([
+      fetch(`${BASE}/api/proxy-media`, { cache: "no-store" }),
+      fetch(`${BASE}/api/proxy-media?url=${encodeURIComponent("https://example.com/img.jpg")}`, { cache: "no-store" }),
+    ]);
+    const missingOk = noUrlRes.status === 400;
+    const nonFirebaseOk = badUrlRes.status === 403;
+    results.push({
+      label: "🖼️ Proxy media — security guards",
+      ok: missingOk && nonFirebaseOk,
+      detail: missingOk && nonFirebaseOk
+        ? "Returns 400 (no url) and 403 (non-Firebase url) ✓ — security working correctly"
+        : `Expected 400+403, got ${noUrlRes.status}+${badUrlRes.status} — proxy security may be misconfigured`,
+    });
+  } catch (e: any) { results.push({ label: "🖼️ Proxy media — security guards", ok: false, detail: e.message }); }
 
   // AI generate — should reject unauthenticated request with 401, not 500
   try {
