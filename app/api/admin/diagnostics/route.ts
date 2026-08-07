@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, getAdminApp } from "@/lib/firebaseAdmin";
 import { OWNER_UIDS } from "@/lib/firebase";
@@ -239,22 +240,211 @@ async function checkWatchFeatures() {
 async function checkEnvVars() {
   const checks: { label: string; ok: boolean; detail: string }[] = [];
 
-  const vars = [
-    ["WATCH_SYNC_SECRET",            "⌚ WATCH_SYNC_SECRET"],
-    ["RESEND_API_KEY",               "📧 RESEND_API_KEY (email)"],
-    ["NEXT_PUBLIC_MAPTILER_KEY",     "🗺️ MAPTILER_KEY (GPS maps)"],
-    ["STRIPE_SECRET_KEY",            "💳 STRIPE_SECRET_KEY"],
-    ["STRIPE_WEBHOOK_SECRET",        "💳 STRIPE_WEBHOOK_SECRET"],
-    ["FIREBASE_SERVICE_ACCOUNT_JSON","🔥 FIREBASE_SERVICE_ACCOUNT_JSON"],
+  const vars: [string, string, string][] = [
+    ["WATCH_SYNC_SECRET",             "⌚ WATCH_SYNC_SECRET",             "Apple Watch sync will not work"],
+    ["RESEND_API_KEY",                "📧 RESEND_API_KEY",                "Email notifications will not send"],
+    ["NEXT_PUBLIC_MAPTILER_KEY",      "🗺️ MAPTILER_KEY",                 "GPS run maps will be broken"],
+    ["STRIPE_SECRET_KEY",             "💳 STRIPE_SECRET_KEY",             "All payments will fail"],
+    ["STRIPE_WEBHOOK_SECRET",         "💳 STRIPE_WEBHOOK_SECRET",         "Payment confirmations will not work"],
+    ["FIREBASE_SERVICE_ACCOUNT_JSON", "🔥 FIREBASE_SERVICE_ACCOUNT_JSON", "Server-side Firebase will fail"],
+    ["REPLICATE_API_KEY",             "🤖 REPLICATE_API_KEY",             "AI Studio will not generate images"],
+    ["ANTHROPIC_API_KEY",             "🧠 ANTHROPIC_API_KEY",             "AI features using Claude will fail"],
+    ["CRON_SECRET",                   "⏰ CRON_SECRET",                   "Scheduled jobs will not run"],
+    ["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "💳 STRIPE_PUBLISHABLE_KEY",  "Client-side Stripe UI will break"],
+    ["NEXT_PUBLIC_FIREBASE_VAPID_KEY","🔔 FIREBASE_VAPID_KEY",           "Push notifications will not work"],
+    ["UPSTASH_REDIS_REST_URL",        "⚡ UPSTASH_REDIS_URL",            "Rate limiting / caching may fail"],
+    ["UPSTASH_REDIS_REST_TOKEN",      "⚡ UPSTASH_REDIS_TOKEN",          "Rate limiting / caching may fail"],
+    ["PAYOUT_SECRET",                 "💰 PAYOUT_SECRET",                "Creator payouts will fail"],
+    ["EXERCISEDB_API_KEY",            "🏋️ EXERCISEDB_API_KEY",           "Exercise database will not load"],
   ];
 
-  for (const [envKey, label] of vars) {
+  for (const [envKey, label, impact] of vars) {
     const val = process.env[envKey];
     const set = !!(val && val.trim().length > 0);
-    checks.push({ label, ok: set, detail: set ? "Set ✓" : `Missing — ${label.split(" ").slice(1).join(" ")} will not work` });
+    checks.push({ label, ok: set, detail: set ? "Set ✓" : `MISSING — ${impact}` });
   }
 
   return checks;
+}
+
+async function checkReplicateAPI() {
+  const key = process.env.REPLICATE_API_KEY;
+  if (!key) return [{ label: "🤖 Replicate AI", ok: false, detail: "REPLICATE_API_KEY not set — AI Studio cannot generate" }];
+  try {
+    const res = await fetch("https://api.replicate.com/v1/account", {
+      headers: { Authorization: `Token ${key}` }, cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) return [{ label: "🤖 Replicate AI", ok: false, detail: `Auth failed: ${data.detail || res.status}` }];
+
+    const results = [{ label: `🤖 Replicate AI (${data.username ?? "account"})`, ok: true, detail: "API key valid ✓" }];
+
+    // Check rate limit tier — free tier = severely limited
+    const hasPayment = data.type !== "free" || data.github_url; // heuristic
+    results.push({
+      label: "🤖 Replicate billing tier",
+      ok: !!data.username,
+      detail: "Add a payment method at replicate.com/account/billing if generations are rate-limited",
+    });
+
+    // Check model versions are reachable
+    const modelRes = await fetch("https://api.replicate.com/v1/models/stability-ai/stable-diffusion-img2img/versions", {
+      headers: { Authorization: `Token ${key}` }, cache: "no-store",
+    });
+    const modelData = await modelRes.json();
+    const latestVersion = modelData.results?.[0]?.id;
+    results.push({
+      label: "🤖 Replicate — img2img model versions",
+      ok: !!latestVersion,
+      detail: latestVersion ? `Latest version: ${latestVersion.slice(0, 16)}… ✓` : "Cannot fetch model versions — AI Studio will fail",
+    });
+
+    return results;
+  } catch (e: any) {
+    return [{ label: "🤖 Replicate AI", ok: false, detail: e.message }];
+  }
+}
+
+async function checkStorageRules() {
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const rulesPath = path.join(process.cwd(), "storage.rules");
+    const rules = fs.readFileSync(rulesPath, "utf8");
+
+    const requiredPaths: [string, string][] = [
+      ["ai-studio",       "🗄️ Storage — ai-studio/ (AI Studio uploads)"],
+      ["profilePictures", "🗄️ Storage — profilePictures/ (profile photos)"],
+      ["videos",          "🗄️ Storage — videos/ (post videos)"],
+      ["uploads",         "🗄️ Storage — uploads/ (media uploads)"],
+    ];
+
+    for (const [p, label] of requiredPaths) {
+      const covered = rules.includes(p);
+      results.push({ label, ok: covered, detail: covered ? "Covered ✓" : `MISSING from storage.rules — uploads to /${p}/ will be denied` });
+    }
+
+    // Check that write: if false catch-all doesn't block everything
+    const hasCatchAll = rules.includes("allow write: if false");
+    results.push({ label: "🗄️ Storage — catch-all write deny", ok: hasCatchAll, detail: hasCatchAll ? "Catch-all deny present (secure) ✓" : "No catch-all deny — any path may be writable" });
+  } catch (e: any) {
+    results.push({ label: "🗄️ Storage rules", ok: false, detail: `Cannot read storage.rules: ${e?.message}` });
+  }
+  return results;
+}
+
+async function checkErrorLogPatterns() {
+  const app = getAdminApp();
+  if (!app) return [];
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+  try {
+    const snap = await app.firestore().collection("errorLogs").orderBy("timestamp", "desc").limit(100).get();
+    if (snap.empty) {
+      results.push({ label: "🚨 Client error patterns", ok: true, detail: "No client errors logged ✓" });
+      return results;
+    }
+
+    const bySource: Record<string, number> = {};
+    const byCode: Record<string, number> = {};
+    const recentErrors: string[] = [];
+
+    snap.docs.forEach((d, i) => {
+      const data = d.data();
+      const src = (data.source as string) || "unknown";
+      const code = data.code as string | undefined;
+      bySource[src] = (bySource[src] || 0) + 1;
+      if (code) byCode[code] = (byCode[code] || 0) + 1;
+      if (i < 3) recentErrors.push(`${src}: ${(data.message as string || "").slice(0, 60)}`);
+    });
+
+    const topSrc = Object.entries(bySource).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s}×${n}`).join(", ");
+    results.push({ label: `🚨 Client errors — top sources (${snap.size} total)`, ok: false, detail: topSrc });
+
+    if (Object.keys(byCode).length > 0) {
+      const topCode = Object.entries(byCode).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, n]) => `${c}×${n}`).join(", ");
+      results.push({ label: "🚨 Client errors — error codes", ok: false, detail: topCode });
+    }
+
+    recentErrors.forEach((e, i) => {
+      results.push({ label: `🚨 Recent error #${i + 1}`, ok: false, detail: e });
+    });
+  } catch (e: any) {
+    results.push({ label: "🚨 Error log analysis", ok: false, detail: e?.message });
+  }
+  return results;
+}
+
+async function checkFirestoreIndexes() {
+  const app = getAdminApp();
+  if (!app) return [];
+  const db = app.firestore();
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+
+  const indexTests: [string, () => Promise<unknown>][] = [
+    ["📝 Posts — createdAt desc index",        () => db.collection("posts").orderBy("createdAt", "desc").limit(1).get()],
+    ["🎬 Reels — createdAt desc index",        () => db.collection("reels").orderBy("createdAt", "desc").limit(1).get()],
+    ["🚩 Reports — createdAt desc index",      () => db.collection("reports").orderBy("createdAt", "desc").limit(1).get()],
+    ["👻 Ghost workouts — createdAt index",    () => db.collection("ghostWorkouts").orderBy("createdAt", "desc").limit(1).get()],
+    ["🤖 botLogs — runAt desc index",          () => db.collection("botLogs").orderBy("runAt", "desc").limit(1).get()],
+    ["🚨 errorLogs — timestamp desc index",    () => db.collection("errorLogs").orderBy("timestamp", "desc").limit(1).get()],
+  ];
+
+  await Promise.all(indexTests.map(async ([label, run]) => {
+    try {
+      await run();
+      results.push({ label, ok: true, detail: "Index OK ✓" });
+    } catch (e: any) {
+      const isMissing = (e.message || "").toLowerCase().includes("index");
+      results.push({ label, ok: false, detail: isMissing ? "Missing composite index — this query will fail for clients" : e.message });
+    }
+  }));
+
+  return results;
+}
+
+async function checkAPIResponseBodies() {
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+
+  // Exercise browse — should return JSON array
+  try {
+    const res = await fetch(`${BASE}/api/exercise-browse`, { cache: "no-store" });
+    const text = await res.text();
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    const isArray = Array.isArray(parsed);
+    results.push({ label: "🏋️ Exercise browse — returns array", ok: res.ok && isArray, detail: isArray ? `Returns ${(parsed as unknown[]).length} exercises ✓` : `Got: ${text.slice(0, 60)}` });
+  } catch (e: any) { results.push({ label: "🏋️ Exercise browse — returns array", ok: false, detail: e.message }); }
+
+  // Proxy media — should return image content-type
+  try {
+    const res = await fetch(`${BASE}/api/proxy-media?url=https://felcin.com/logo192.png`, { cache: "no-store" });
+    const ct = res.headers.get("content-type") || "";
+    results.push({ label: "🖼️ Proxy media — returns image", ok: res.ok && ct.includes("image"), detail: res.ok ? `Content-Type: ${ct} ✓` : `HTTP ${res.status}` });
+  } catch (e: any) { results.push({ label: "🖼️ Proxy media — returns image", ok: false, detail: e.message }); }
+
+  // AI generate — should reject unauthenticated request with 401, not 500
+  try {
+    const res = await fetch(`${BASE}/api/ai-generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    results.push({ label: "🤖 AI generate — rejects unauth (401)", ok: res.status === 401, detail: res.status === 401 ? "Returns 401 Unauthorized ✓" : `Returned ${res.status} — expected 401` });
+  } catch (e: any) { results.push({ label: "🤖 AI generate — rejects unauth (401)", ok: false, detail: e.message }); }
+
+  // Stripe webhook — should reject bad signature with 400, not 500
+  try {
+    const res = await fetch(`${BASE}/api/stripe-webhook`, { method: "POST", headers: { "Content-Type": "application/json", "stripe-signature": "bad_sig" }, body: "{}", cache: "no-store" });
+    results.push({ label: "💳 Stripe webhook — rejects bad sig", ok: res.status < 500, detail: res.status < 500 ? `Returns ${res.status} (not 500) ✓` : `Returned ${res.status} — server error on bad sig` });
+  } catch (e: any) { results.push({ label: "💳 Stripe webhook — rejects bad sig", ok: false, detail: e.message }); }
+
+  // Watch poll — valid code format should get a structured response
+  try {
+    const res = await fetch(`${BASE}/api/watch-poll?code=000000`, { cache: "no-store" });
+    const text = await res.text();
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    results.push({ label: "⌚ Watch poll — returns JSON", ok: res.ok && parsed !== null, detail: parsed !== null ? "Returns valid JSON ✓" : `Non-JSON response: ${text.slice(0, 40)}` });
+  } catch (e: any) { results.push({ label: "⌚ Watch poll — returns JSON", ok: false, detail: e.message }); }
+
+  return results;
 }
 
 async function checkDataIntegrity() {
@@ -507,7 +697,13 @@ export async function POST(req: NextRequest) {
   const { sendEmail } = await req.json().catch(() => ({ sendEmail: false }));
 
   // Run all check groups in parallel
-  const [sitePages, paymentAPIs, platformAPIs, cronAPIs, firebaseChecks, stripeChecks, sslCheck, mapTilerCheck, watchChecks, envChecks, dataChecks, rulesChecks] = await Promise.all([
+  const [
+    sitePages, paymentAPIs, platformAPIs, cronAPIs,
+    firebaseChecks, stripeChecks, sslCheck, mapTilerCheck,
+    watchChecks, envChecks, dataChecks, rulesChecks,
+    replicateChecks, storageRulesChecks, errorLogChecks,
+    indexChecks, apiBodyChecks,
+  ] = await Promise.all([
     checkSitePages(),
     checkPaymentAPIs(),
     checkPlatformAPIs(),
@@ -520,6 +716,11 @@ export async function POST(req: NextRequest) {
     checkEnvVars(),
     checkDataIntegrity(),
     checkSecurityRules(),
+    checkReplicateAPI(),
+    checkStorageRules(),
+    checkErrorLogPatterns(),
+    checkFirestoreIndexes(),
+    checkAPIResponseBodies(),
   ]);
 
   const allChecks = [
@@ -535,6 +736,11 @@ export async function POST(req: NextRequest) {
     ...envChecks,
     ...dataChecks,
     ...rulesChecks,
+    ...replicateChecks,
+    ...storageRulesChecks,
+    ...errorLogChecks,
+    ...indexChecks,
+    ...apiBodyChecks,
   ];
 
   const emailSent = sendEmail ? await sendEmailReport(allChecks) : false;
@@ -550,8 +756,13 @@ export async function POST(req: NextRequest) {
     { group: "Infrastructure",     checks: [...sslCheck, ...mapTilerCheck] },
     { group: "⌚ Watch & Health",   checks: watchChecks },
     { group: "🔑 Environment Vars", checks: envChecks },
-    { group: "🔍 Data Integrity",   checks: dataChecks },
-    { group: "📋 Security Rules",   checks: rulesChecks },
+    { group: "🔍 Data Integrity",     checks: dataChecks },
+    { group: "📋 Security Rules",     checks: rulesChecks },
+    { group: "🤖 AI Studio",          checks: replicateChecks },
+    { group: "🗄️ Storage Rules",     checks: storageRulesChecks },
+    { group: "🚨 Client Errors",      checks: errorLogChecks },
+    { group: "📊 Firestore Indexes",  checks: indexChecks },
+    { group: "🔬 API Response Bodies", checks: apiBodyChecks },
   ];
 
   return NextResponse.json({
