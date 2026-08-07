@@ -320,10 +320,6 @@ export default function CreatorPage() {
         )}
       </div>
 
-      {file && (
-        <div className="px-4 py-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0a0a0a" }}>
-      )}
-
       {/* Filters */}
       {file && (
         <div className="overflow-x-auto py-3 px-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0a0a0a", scrollbarWidth: "none" }}>
