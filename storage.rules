@@ -47,6 +47,32 @@ service firebase.storage {
                    && request.resource.contentType.matches('audio/.*');
     }
 
+    // AI Studio — image/video transforms, owner read/write only
+    match /ai-studio/{userId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 50 * 1024 * 1024;
+    }
+
+    // Profile pictures (legacy path from older app versions)
+    match /profilePictures/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Post videos (legacy path from older app versions)
+    match /videos/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 200 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*');
+    }
+
     // Watermarked videos + thumbnails — written by Cloud Functions, read by anyone
     match /watermarked/{userId}/{fileName} {
       allow read: if true;
@@ -55,6 +81,11 @@ service firebase.storage {
     match /thumbnails/{userId}/{fileName} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // Catch-all deny
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

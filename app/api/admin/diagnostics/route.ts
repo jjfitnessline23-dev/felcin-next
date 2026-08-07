@@ -416,11 +416,12 @@ async function checkAPIResponseBodies() {
     results.push({ label: "🏋️ Exercise browse — returns array", ok: res.ok && isArray, detail: isArray ? `Returns ${(parsed as unknown[]).length} exercises ✓` : `Got: ${text.slice(0, 60)}` });
   } catch (e: any) { results.push({ label: "🏋️ Exercise browse — returns array", ok: false, detail: e.message }); }
 
-  // Proxy media — should return image content-type
+  // Proxy media — should return image content-type (use a guaranteed-public URL)
   try {
-    const res = await fetch(`${BASE}/api/proxy-media?url=https://felcin.com/logo192.png`, { cache: "no-store" });
+    const testImg = encodeURIComponent("https://www.gstatic.com/webp/gallery/1.webp");
+    const res = await fetch(`${BASE}/api/proxy-media?url=${testImg}`, { cache: "no-store" });
     const ct = res.headers.get("content-type") || "";
-    results.push({ label: "🖼️ Proxy media — returns image", ok: res.ok && ct.includes("image"), detail: res.ok ? `Content-Type: ${ct} ✓` : `HTTP ${res.status}` });
+    results.push({ label: "🖼️ Proxy media — returns image", ok: res.ok && (ct.includes("image") || ct.includes("webp")), detail: res.ok ? `Content-Type: ${ct} ✓` : `HTTP ${res.status} — proxy may be broken` });
   } catch (e: any) { results.push({ label: "🖼️ Proxy media — returns image", ok: false, detail: e.message }); }
 
   // AI generate — should reject unauthenticated request with 401, not 500
@@ -435,13 +436,14 @@ async function checkAPIResponseBodies() {
     results.push({ label: "💳 Stripe webhook — rejects bad sig", ok: res.status < 500, detail: res.status < 500 ? `Returns ${res.status} (not 500) ✓` : `Returned ${res.status} — server error on bad sig` });
   } catch (e: any) { results.push({ label: "💳 Stripe webhook — rejects bad sig", ok: false, detail: e.message }); }
 
-  // Watch poll — valid code format should get a structured response
+  // Watch poll — any response that returns valid JSON (200 or 4xx) is fine; 500 is a bug
   try {
     const res = await fetch(`${BASE}/api/watch-poll?code=000000`, { cache: "no-store" });
     const text = await res.text();
     let parsed: unknown;
     try { parsed = JSON.parse(text); } catch { parsed = null; }
-    results.push({ label: "⌚ Watch poll — returns JSON", ok: res.ok && parsed !== null, detail: parsed !== null ? "Returns valid JSON ✓" : `Non-JSON response: ${text.slice(0, 40)}` });
+    const isServerError = res.status >= 500;
+    results.push({ label: "⌚ Watch poll — returns JSON", ok: !isServerError && parsed !== null, detail: parsed !== null && !isServerError ? `HTTP ${res.status} — returns valid JSON ✓` : isServerError ? `Server error ${res.status}` : `Non-JSON: ${text.slice(0, 40)}` });
   } catch (e: any) { results.push({ label: "⌚ Watch poll — returns JSON", ok: false, detail: e.message }); }
 
   return results;
