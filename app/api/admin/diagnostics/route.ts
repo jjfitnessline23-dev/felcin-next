@@ -131,6 +131,8 @@ async function checkFirebase() {
     ["challenges",     "🏆 Firestore — challenges"],
     ["payments",       "💰 Firestore — payments"],
     ["config",         "⚙️ Firestore — config"],
+    ["botLogs",        "🤖 Firestore — botLogs"],
+    ["errorLogs",      "🚨 Firestore — errorLogs"],
   ];
 
   for (const [col, label] of collections) {
@@ -317,6 +319,39 @@ async function checkDataIntegrity() {
     results.push({ label: "⌚ Stale watch pairings", ok: true, detail: "Collection empty or not yet created" });
   }
 
+  // Check all expected feature flags exist
+  try {
+    const configSnap = await db.collection("config").doc("features").get();
+    const data = configSnap.exists ? (configSnap.data() ?? {}) : {};
+    const expectedFlags = ["badgesEnabled", "boostEnabled", "adsEnabled", "advertiseEnabled", "aiStudioEnabled"];
+    const missing = expectedFlags.filter(f => !(f in data));
+    results.push({
+      label: "⚙️ Feature flags completeness",
+      ok: missing.length === 0,
+      detail: missing.length === 0
+        ? `All ${expectedFlags.length} flags present ✓`
+        : `Missing flags: ${missing.join(", ")} — toggles will use defaults until set`,
+    });
+  } catch (e: any) {
+    results.push({ label: "⚙️ Feature flags completeness", ok: false, detail: e?.message });
+  }
+
+  // Read recent client-side errors from errorLogs
+  try {
+    const errSnap = await db.collection("errorLogs").orderBy("timestamp", "desc").limit(5).get();
+    if (errSnap.empty) {
+      results.push({ label: "🚨 Recent client errors", ok: true, detail: "No client errors logged ✓" });
+    } else {
+      const errors = errSnap.docs.map(d => {
+        const data = d.data();
+        return `${data.source}: ${data.message}`;
+      });
+      results.push({ label: `🚨 Recent client errors (${errSnap.size})`, ok: false, detail: errors.join(" | ") });
+    }
+  } catch (e: any) {
+    results.push({ label: "🚨 Recent client errors", ok: false, detail: `Cannot read errorLogs: ${e?.message}` });
+  }
+
   // Check for users with no public profile — auto-repair any found
   try {
     const usersSnap = await db.collection("users").limit(50).get();
@@ -358,6 +393,42 @@ async function checkDataIntegrity() {
     results.push({ label: "🔔 Notifications collection", ok: false, detail: e?.message });
   }
 
+  return results;
+}
+
+async function checkSecurityRules() {
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const rulesPath = path.join(process.cwd(), "firestore.rules");
+    const rules = fs.readFileSync(rulesPath, "utf8");
+
+    // Collections that MUST be explicitly covered in Firestore rules
+    const requiredCollections = [
+      ["posts",           "📝 posts in rules"],
+      ["reels",           "🎬 reels in rules"],
+      ["users",           "👤 users in rules"],
+      ["config",          "⚙️ config in rules"],
+      ["botLogs",         "🤖 botLogs in rules"],
+      ["errorLogs",       "🚨 errorLogs in rules"],
+      ["notifications",   "🔔 notifications in rules"],
+      ["reports",         "🚩 reports in rules"],
+      ["ghostWorkouts",   "👻 ghostWorkouts in rules"],
+      ["analytics",       "📊 analytics in rules"],
+    ];
+
+    for (const [col, label] of requiredCollections) {
+      const covered = rules.includes(`/${col}/{`) || rules.includes(`match /${col}/`);
+      results.push({
+        label,
+        ok: covered,
+        detail: covered ? "Covered ✓" : `MISSING from firestore.rules — client reads/writes will be denied`,
+      });
+    }
+  } catch (e: any) {
+    results.push({ label: "📋 Security rules file", ok: false, detail: `Cannot read firestore.rules: ${e?.message}` });
+  }
   return results;
 }
 
@@ -436,7 +507,7 @@ export async function POST(req: NextRequest) {
   const { sendEmail } = await req.json().catch(() => ({ sendEmail: false }));
 
   // Run all check groups in parallel
-  const [sitePages, paymentAPIs, platformAPIs, cronAPIs, firebaseChecks, stripeChecks, sslCheck, mapTilerCheck, watchChecks, envChecks, dataChecks] = await Promise.all([
+  const [sitePages, paymentAPIs, platformAPIs, cronAPIs, firebaseChecks, stripeChecks, sslCheck, mapTilerCheck, watchChecks, envChecks, dataChecks, rulesChecks] = await Promise.all([
     checkSitePages(),
     checkPaymentAPIs(),
     checkPlatformAPIs(),
@@ -448,6 +519,7 @@ export async function POST(req: NextRequest) {
     checkWatchFeatures(),
     checkEnvVars(),
     checkDataIntegrity(),
+    checkSecurityRules(),
   ]);
 
   const allChecks = [
@@ -462,6 +534,7 @@ export async function POST(req: NextRequest) {
     ...watchChecks,
     ...envChecks,
     ...dataChecks,
+    ...rulesChecks,
   ];
 
   const emailSent = sendEmail ? await sendEmailReport(allChecks) : false;
@@ -478,6 +551,7 @@ export async function POST(req: NextRequest) {
     { group: "⌚ Watch & Health",   checks: watchChecks },
     { group: "🔑 Environment Vars", checks: envChecks },
     { group: "🔍 Data Integrity",   checks: dataChecks },
+    { group: "📋 Security Rules",   checks: rulesChecks },
   ];
 
   return NextResponse.json({
