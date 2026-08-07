@@ -282,6 +282,8 @@ export default function AdminPortalPage() {
   const [workoutsLoaded, setWorkoutsLoaded] = useState(false);
   const [diagResult, setDiagResult] = useState<DiagResult | null>(null);
   const [diagRunning, setDiagRunning] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const router = useRouter();
   const isOwner = user && OWNER_UIDS.includes(user.uid);
@@ -293,23 +295,23 @@ export default function AdminPortalPage() {
     const unsubs = [
       onSnapshot(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200)),
         (snap) => { setPosts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Post, "id">) }))); setDataLoading(false); },
-        () => setDataLoading(false)),
+        (err) => { setLoadError(`posts: ${err.message}`); setDataLoading(false); }),
 
       onSnapshot(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(200)),
         (snap) => setReels(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) }))),
-        () => {}),
+        (err) => setLoadError(`reels: ${err.message}`)),
 
       onSnapshot(query(collection(db, "users"), limit(500)),
         (snap) => setUsers(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserRecord, "id">) }))),
-        () => {}),
+        (err) => setLoadError(`users: ${err.message}`)),
 
       onSnapshot(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(200)),
         (snap) => setReports(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Report, "id">) }))),
-        () => {}),
+        (err) => setLoadError(`reports: ${err.message}`)),
 
       onSnapshot(query(collection(db, "ghostWorkouts"), orderBy("createdAt", "desc"), limit(200)),
         (snap) => setGhosts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<GhostWorkout, "id">) }))),
-        () => {}),
+        (err) => setLoadError(`ghostWorkouts: ${err.message}`)),
     ];
 
     // Load feature flags
@@ -466,60 +468,30 @@ export default function AdminPortalPage() {
     setUsers((u) => u.map((x) => x.id === id ? { ...x, banned: !currentlyBanned } : x));
   };
 
-  const toggleBadges = async () => {
-    if (togglingBadges || badgesEnabled === null) return;
-    setTogglingBadges(true);
-    const next = !badgesEnabled;
+  const doToggle = async (
+    field: string,
+    current: boolean | null,
+    setToggling: (v: boolean) => void,
+    setVal: (v: boolean) => void,
+  ) => {
+    if (current === null) return;
+    setToggling(true);
+    setToggleError(null);
+    const next = !current;
     try {
-      await setDoc(doc(db, "config", "features"), { badgesEnabled: next }, { merge: true });
-      setBadgesEnabled(next);
-    } catch {}
-    setTogglingBadges(false);
+      await setDoc(doc(db, "config", "features"), { [field]: next }, { merge: true });
+      setVal(next);
+    } catch (e: any) {
+      setToggleError(`Toggle failed: ${e.message} (uid: ${auth.currentUser?.uid ?? "not signed in"})`);
+    }
+    setToggling(false);
   };
 
-  const toggleBoost = async () => {
-    if (togglingBoost || boostEnabled === null) return;
-    setTogglingBoost(true);
-    const next = !boostEnabled;
-    try {
-      await setDoc(doc(db, "config", "features"), { boostEnabled: next }, { merge: true });
-      setBoostEnabled(next);
-    } catch {}
-    setTogglingBoost(false);
-  };
-
-  const toggleAds = async () => {
-    if (togglingAds || adsEnabled === null) return;
-    setTogglingAds(true);
-    const next = !adsEnabled;
-    try {
-      await setDoc(doc(db, "config", "features"), { adsEnabled: next }, { merge: true });
-      setAdsEnabled(next);
-    } catch {}
-    setTogglingAds(false);
-  };
-
-  const toggleAdvertise = async () => {
-    if (togglingAdvertise || advertiseEnabled === null) return;
-    setTogglingAdvertise(true);
-    const next = !advertiseEnabled;
-    try {
-      await setDoc(doc(db, "config", "features"), { advertiseEnabled: next }, { merge: true });
-      setAdvertiseEnabled(next);
-    } catch {}
-    setTogglingAdvertise(false);
-  };
-
-  const toggleAiStudio = async () => {
-    if (togglingAiStudio || aiStudioEnabled === null) return;
-    setTogglingAiStudio(true);
-    const next = !aiStudioEnabled;
-    try {
-      await setDoc(doc(db, "config", "features"), { aiStudioEnabled: next }, { merge: true });
-      setAiStudioEnabled(next);
-    } catch {}
-    setTogglingAiStudio(false);
-  };
+  const toggleBadges    = () => doToggle("badgesEnabled",    badgesEnabled,    setTogglingBadges,    setBadgesEnabled);
+  const toggleBoost     = () => doToggle("boostEnabled",     boostEnabled,     setTogglingBoost,     setBoostEnabled);
+  const toggleAds       = () => doToggle("adsEnabled",       adsEnabled,       setTogglingAds,       setAdsEnabled);
+  const toggleAdvertise = () => doToggle("advertiseEnabled", advertiseEnabled, setTogglingAdvertise, setAdvertiseEnabled);
+  const toggleAiStudio  = () => doToggle("aiStudioEnabled",  aiStudioEnabled,  setTogglingAiStudio,  setAiStudioEnabled);
 
   const pendingReports = reports.filter((r) => r.status !== "reviewed");
 
@@ -697,6 +669,32 @@ export default function AdminPortalPage() {
             </button>
           ))}
         </div>
+
+        {/* Error banners */}
+        {loadError && (
+          <div className="p-4 rounded-xl mb-4 flex items-start gap-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+            <span className="material-symbols-outlined shrink-0 mt-0.5" style={{ fontSize: 16, color: "#f87171" }}>error</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold mb-0.5" style={{ color: "#f87171" }}>Data load error</p>
+              <p className="text-xs break-all" style={{ color: "#f87171", opacity: 0.8 }}>{loadError}</p>
+            </div>
+            <button onClick={() => setLoadError(null)} className="border-none bg-transparent cursor-pointer shrink-0" style={{ color: "#f87171" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+            </button>
+          </div>
+        )}
+        {toggleError && (
+          <div className="p-4 rounded-xl mb-4 flex items-start gap-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+            <span className="material-symbols-outlined shrink-0 mt-0.5" style={{ fontSize: 16, color: "#f87171" }}>error</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold mb-0.5" style={{ color: "#f87171" }}>Toggle error</p>
+              <p className="text-xs break-all" style={{ color: "#f87171", opacity: 0.8 }}>{toggleError}</p>
+            </div>
+            <button onClick={() => setToggleError(null)} className="border-none bg-transparent cursor-pointer shrink-0" style={{ color: "#f87171" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+            </button>
+          </div>
+        )}
 
         {dataLoading ? (
           <div className="flex justify-center py-10"><div className="spinner" /></div>

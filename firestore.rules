@@ -360,6 +360,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Bot moderation logs ──
+    match /botLogs/{docId} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Client-side error logs ──
+    match /errorLogs/{docId} {
+      allow create: if isAuth();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
     // ── Analytics ──
     match /analytics/{docId} {
       allow read: if isAdmin();
