@@ -1,12 +1,14 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 
 const REPLICATE_API = "https://api.replicate.com/v1";
 
-// Use /models/{owner}/{name}/predictions — always runs the latest public version, no hash needed
-const IMAGE_MODEL_PATH = "stability-ai/stable-diffusion-img2img";
-const VIDEO_MODEL_PATH  = "anotherjesse/zeroscope-v2-xl";
+// Model paths — version resolved dynamically at runtime so it never goes stale
+const IMAGE_MODEL = "stability-ai/stable-diffusion-img2img";
+const VIDEO_MODEL = "anotherjesse/zeroscope-v2-xl";
 
 async function verifyUser(req: NextRequest): Promise<string | null> {
   try {
@@ -27,15 +29,26 @@ async function urlToBase64(url: string): Promise<string> {
   return `data:${mime};base64,${b64}`;
 }
 
-async function createPrediction(modelPath: string, input: Record<string, unknown>, key: string, retries = 3): Promise<Response> {
+// Fetch the latest version hash for a model so we never use a stale hash
+async function getLatestVersion(modelPath: string, key: string): Promise<string> {
+  const res = await fetch(`${REPLICATE_API}/models/${modelPath}/versions`, {
+    headers: { Authorization: `Token ${key}` },
+  });
+  if (!res.ok) throw new Error(`Could not fetch versions for ${modelPath}: ${res.status}`);
+  const data = await res.json();
+  const version = data.results?.[0]?.id;
+  if (!version) throw new Error(`No versions found for ${modelPath}`);
+  return version;
+}
+
+async function createPrediction(version: string, input: Record<string, unknown>, key: string, retries = 3): Promise<Response> {
   for (let attempt = 0; attempt < retries; attempt++) {
-    const res = await fetch(`${REPLICATE_API}/models/${modelPath}/predictions`, {
+    const res = await fetch(`${REPLICATE_API}/predictions`, {
       method: "POST",
-      headers: { Authorization: `Token ${key}`, "Content-Type": "application/json", "Prefer": "wait" },
-      body: JSON.stringify({ input }),
+      headers: { Authorization: `Token ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ version, input }),
     });
     if (res.status === 429) {
-      // Rate limited — wait and retry
       const retryAfter = parseInt(res.headers.get("retry-after") || "10", 10);
       await new Promise((r) => setTimeout(r, retryAfter * 1000));
       continue;
@@ -52,7 +65,7 @@ export async function POST(req: NextRequest) {
   const key = process.env.REPLICATE_API_KEY;
   if (!key) return NextResponse.json({ error: "AI not configured" }, { status: 500 });
 
-  const { type, imageUrl, videoUrl, prompt, style, strength } = await req.json();
+  const { type, imageUrl, prompt, style, strength } = await req.json();
 
   const stylePrompts: Record<string, string> = {
     anime:      "anime style, vibrant colors, detailed, Studio Ghibli inspired",
@@ -71,40 +84,46 @@ export async function POST(req: NextRequest) {
     if (type === "image") {
       if (!imageUrl) return NextResponse.json({ error: "No image provided" }, { status: 400 });
 
-      const b64 = await urlToBase64(imageUrl);
+      const [b64, version] = await Promise.all([
+        urlToBase64(imageUrl),
+        getLatestVersion(IMAGE_MODEL, key),
+      ]);
 
-      const res = await createPrediction(IMAGE_MODEL_PATH, {
+      const res = await createPrediction(version, {
         image: b64,
         prompt: fullPrompt,
         strength: strength ?? 0.7,
         guidance_scale: 7.5,
-        num_inference_steps: 30,
+        num_inference_steps: 25,
       }, key);
 
       const prediction = await res.json();
-      if (!res.ok) return NextResponse.json({ error: prediction.detail || "Replicate error" }, { status: 500 });
-
-      // If synchronous result (Prefer: wait), return immediately
-      if (prediction.output) return NextResponse.json({ output: prediction.output, status: "succeeded" });
+      if (!res.ok) {
+        console.error("[ai-generate] image prediction error:", prediction);
+        return NextResponse.json({ error: prediction.detail || JSON.stringify(prediction) }, { status: 500 });
+      }
 
       const result = await pollPrediction(prediction.id, key);
       return NextResponse.json(result);
     }
 
     if (type === "video") {
-      const res = await createPrediction(VIDEO_MODEL_PATH, {
+      const version = await getLatestVersion(VIDEO_MODEL, key);
+
+      const res = await createPrediction(version, {
         prompt: fullPrompt,
         num_frames: 24,
         width: 576,
         height: 320,
         guidance_scale: 17.5,
-        num_inference_steps: 50,
+        num_inference_steps: 40,
       }, key);
 
       const prediction = await res.json();
-      if (!res.ok) return NextResponse.json({ error: prediction.detail || "Replicate error" }, { status: 500 });
-
-      if (prediction.output) return NextResponse.json({ output: prediction.output, status: "succeeded" });
+      if (!res.ok) {
+        console.error("[ai-generate] video prediction error:", prediction);
+        return NextResponse.json({ error: prediction.detail || JSON.stringify(prediction) }, { status: 500 });
+      }
 
       const result = await pollPrediction(prediction.id, key);
       return NextResponse.json(result);
@@ -112,12 +131,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   } catch (e: any) {
-    console.error("[ai-generate]", e);
+    console.error("[ai-generate] exception:", e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
-async function pollPrediction(id: string, key: string, maxAttempts = 60): Promise<{ output: string | string[] | null; status: string; error?: string }> {
+async function pollPrediction(id: string, key: string, maxAttempts = 18): Promise<{ output: string | string[] | null; status: string; error?: string }> {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 3000));
     const res = await fetch(`${REPLICATE_API}/predictions/${id}`, {
@@ -127,5 +146,5 @@ async function pollPrediction(id: string, key: string, maxAttempts = 60): Promis
     if (data.status === "succeeded") return { output: data.output, status: "succeeded" };
     if (data.status === "failed") return { output: null, status: "failed", error: data.error };
   }
-  return { output: null, status: "timeout" };
+  return { output: null, status: "timeout", error: "Generation took too long. Try a lower strength or simpler style." };
 }
