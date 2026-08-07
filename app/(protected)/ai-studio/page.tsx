@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { auth, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/lib/auth";
+import { logError } from "@/lib/logError";
 
 const STYLES = [
   { id: "anime",      label: "Anime",      emoji: "⛩️" },
@@ -78,6 +79,7 @@ export default function AIStudioPage() {
       const output = Array.isArray(data.output) ? data.output[0] : data.output;
       setResult(output);
     } catch (e: any) {
+      logError("AIStudio.generate", e);
       setError(e.message);
     } finally {
       setLoading(false);
