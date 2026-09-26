@@ -27,7 +27,7 @@ interface TrainingSession {
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#f59e0b",
-  accepted: "#22c55e",
+  accepted: "var(--fx-accent)",
   declined: "#ef4444",
   completed: "#a78bfa",
 };
@@ -155,14 +155,14 @@ export default function SessionDetailClient() {
 
       {/* Timer (trainee only, during session) */}
       {isTrainee && session.status === "accepted" && (
-        <div className="mx-4 mt-3 flex items-center gap-3 p-3 rounded-2xl" style={{ background: timerActive ? "rgba(34,197,94,0.07)" : "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 20, color: timerActive ? "#22c55e" : "#444" }}>timer</span>
-          <span className="text-xl font-bold tabular-nums flex-1" style={{ color: timerActive ? "#22c55e" : "#555" }}>
+        <div className="mx-4 mt-3 flex items-center gap-3 p-3 rounded-2xl" style={{ background: timerActive ? "rgba(var(--fx-accent-rgb),0.07)" : "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20, color: timerActive ? "var(--fx-accent)" : "#444" }}>timer</span>
+          <span className="text-xl font-bold tabular-nums flex-1" style={{ color: timerActive ? "var(--fx-accent)" : "#555" }}>
             {fmtTimer(elapsed)}
           </span>
           <button onClick={() => setTimerActive((v) => !v)}
             className="px-3 py-1.5 rounded-xl text-xs font-bold border-none cursor-pointer"
-            style={{ background: timerActive ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)", color: timerActive ? "#f87171" : "#22c55e" }}>
+            style={{ background: timerActive ? "rgba(239,68,68,0.12)" : "rgba(var(--fx-accent-rgb),0.12)", color: timerActive ? "#f87171" : "var(--fx-accent)" }}>
             {timerActive ? "Pause" : elapsed > 0 ? "Resume" : "Start Session"}
           </button>
           {elapsed > 0 && (
@@ -179,11 +179,11 @@ export default function SessionDetailClient() {
         <div className="mx-4 mt-3 p-3 rounded-2xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold" style={{ color: "#888" }}>Workout Progress</span>
-            <span className="text-xs font-bold" style={{ color: progress === 100 ? "#22c55e" : "#f2f2f2" }}>{progress}%</span>
+            <span className="text-xs font-bold" style={{ color: progress === 100 ? "var(--fx-accent)" : "#f2f2f2" }}>{progress}%</span>
           </div>
           <div className="rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
             <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: progress === 100 ? "#22c55e" : "#a78bfa" }} />
+              style={{ width: `${progress}%`, background: progress === 100 ? "var(--fx-accent)" : "#a78bfa" }} />
           </div>
           <p className="text-[10px] mt-1.5" style={{ color: "#444" }}>{completedSets} of {totalSets} sets done</p>
         </div>
@@ -230,14 +230,14 @@ export default function SessionDetailClient() {
                         {isTrainee && (
                           <button onClick={() => toggleSet(key)}
                             className="border-none cursor-pointer rounded-lg flex items-center justify-center transition-all"
-                            style={{ width: 28, height: 28, background: done ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.05)" }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: done ? "#22c55e" : "#333", fontVariationSettings: done ? "'FILL' 1" : "'FILL' 0" }}>
+                            style={{ width: 28, height: 28, background: done ? "rgba(var(--fx-accent-rgb),0.15)" : "rgba(255,255,255,0.05)" }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: done ? "var(--fx-accent)" : "#333", fontVariationSettings: done ? "'FILL' 1" : "'FILL' 0" }}>
                               check_circle
                             </span>
                           </button>
                         )}
                         {isTrainer && done && (
-                          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: "#22c55e", width: 28, fontVariationSettings: "'FILL' 1" }}>
+                          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: "var(--fx-accent)", width: 28, fontVariationSettings: "'FILL' 1" }}>
                             check_circle
                           </span>
                         )}

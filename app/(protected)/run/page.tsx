@@ -613,8 +613,8 @@ export default function RunPage() {
   const speedKmh = elapsed > 0 ? (distance / elapsed) * 3.6 : 0;
   const isTracking = phase === "running" || phase === "paused";
   const isCycle = mode === "cycle";
-  const ACCENT = isCycle ? "#f97316" : "#22c55e";
-  const ACCENT_GLOW = isCycle ? "rgba(249,115,22,0.28)" : "rgba(34,197,94,0.28)";
+  const ACCENT = isCycle ? "#f97316" : "var(--fx-accent)";
+  const ACCENT_GLOW = isCycle ? "rgba(249,115,22,0.28)" : "rgba(var(--fx-accent-rgb),0.28)";
   const ACTIVITY_ICON = isCycle ? "directions_bike" : "directions_run";
   const ACTIVITY_LABEL = isCycle ? "Ride" : "Run";
 
@@ -634,8 +634,8 @@ export default function RunPage() {
       <div style={{ minHeight: "100dvh", background: "#090909", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 80px)", textAlign: "center" }}>
         <style>{`@keyframes locPulse{0%,100%{opacity:1}50%{opacity:0.35}} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-        <div style={{ width: 88, height: 88, borderRadius: 24, marginBottom: 28, background: locState === "denied" ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.1)", border: `1px solid ${locState === "denied" ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 44, color: locState === "denied" ? "#ef4444" : "#22c55e", fontVariationSettings: "'FILL' 1", animation: locState === "waiting" ? "locPulse 1.5s ease-in-out infinite" : "none" }}>
+        <div style={{ width: 88, height: 88, borderRadius: 24, marginBottom: 28, background: locState === "denied" ? "rgba(239,68,68,0.08)" : "rgba(var(--fx-accent-rgb),0.1)", border: `1px solid ${locState === "denied" ? "rgba(239,68,68,0.2)" : "rgba(var(--fx-accent-rgb),0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 44, color: locState === "denied" ? "#ef4444" : "var(--fx-accent)", fontVariationSettings: "'FILL' 1", animation: locState === "waiting" ? "locPulse 1.5s ease-in-out infinite" : "none" }}>
             {locState === "denied" ? "location_off" : "location_on"}
           </span>
         </div>
@@ -656,7 +656,7 @@ export default function RunPage() {
                 { n: 3, text: 'Tap Location → select "While Using"' },
               ].map(({ n, text }) => (
                 <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: n < 3 ? 14 : 0 }}>
-                  <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#22c55e", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{n}</div>
+                  <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--fx-accent)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{n}</div>
                   <p style={{ fontSize: 13, color: "#ccc", lineHeight: 1.5, margin: 0 }}>{text}</p>
                 </div>
               ))}
@@ -671,7 +671,7 @@ export default function RunPage() {
                   window.location.reload();
                 }
               }}
-              style={{ width: "100%", maxWidth: 320, padding: "16px 0", borderRadius: 16, border: "none", background: "#22c55e", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 20px rgba(34,197,94,0.25)", marginBottom: 12 }}>
+              style={{ width: "100%", maxWidth: 320, padding: "16px 0", borderRadius: 16, border: "none", background: "var(--fx-accent)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 20px rgba(var(--fx-accent-rgb),0.25)", marginBottom: 12 }}>
               {isNative ? "Open Felcin Settings" : "Done — Reload Page"}
             </button>
             {isNative && (
@@ -699,7 +699,7 @@ export default function RunPage() {
             <p style={{ fontSize: 14, color: "#555", lineHeight: 1.65, maxWidth: 290, marginBottom: 32 }}>
               Felcin uses your location to draw your route live, measure distance, and log PRs.
             </p>
-            <button onClick={enableLocation} style={{ width: "100%", maxWidth: 320, padding: "17px 0", borderRadius: 18, border: "none", background: "#22c55e", color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 4px 24px rgba(34,197,94,0.3)" }}>
+            <button onClick={enableLocation} style={{ width: "100%", maxWidth: 320, padding: "17px 0", borderRadius: 18, border: "none", background: "var(--fx-accent)", color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 4px 24px rgba(var(--fx-accent-rgb),0.3)" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}>my_location</span>
               Enable Location
             </button>
@@ -739,7 +739,7 @@ export default function RunPage() {
       {/* COUNTDOWN */}
       {phase === "countdown" && (
         <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-          <div style={{ fontSize: 100, fontWeight: 900, lineHeight: 1, letterSpacing: "-4px", fontVariantNumeric: "tabular-nums", color: countdown === 0 ? "#4ade80" : "#fff" }}>
+          <div style={{ fontSize: 100, fontWeight: 900, lineHeight: 1, letterSpacing: "-4px", fontVariantNumeric: "tabular-nums", color: countdown === 0 ? "var(--fx-accent-2)" : "#fff" }}>
             {countdown === 0 ? "GO!" : countdown}
           </div>
           <p style={{ color: "#555", fontSize: 12, fontWeight: 700, letterSpacing: "0.14em" }}>GET READY</p>
@@ -781,9 +781,9 @@ export default function RunPage() {
             onClick={isSharing ? shareAgain : startSharing}
             style={{
               width: 58, height: 58, borderRadius: "50%",
-              background: isSharing ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.08)",
-              border: isSharing ? "1.5px solid rgba(34,197,94,0.5)" : "1.5px solid rgba(255,255,255,0.15)",
-              color: isSharing ? "#22c55e" : "#888",
+              background: isSharing ? "rgba(var(--fx-accent-rgb),0.15)" : "rgba(255,255,255,0.08)",
+              border: isSharing ? "1.5px solid rgba(var(--fx-accent-rgb),0.5)" : "1.5px solid rgba(255,255,255,0.15)",
+              color: isSharing ? "var(--fx-accent)" : "#888",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               cursor: "pointer", gap: 2,
             }}
@@ -791,7 +791,7 @@ export default function RunPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>
               {shareCopied ? "check" : "share"}
             </span>
-            {shareCopied && <span style={{ fontSize: 8, fontWeight: 700, color: "#22c55e" }}>COPIED</span>}
+            {shareCopied && <span style={{ fontSize: 8, fontWeight: 700, color: "var(--fx-accent)" }}>COPIED</span>}
           </button>
           </div>
         </>
@@ -805,7 +805,7 @@ export default function RunPage() {
               <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)" }} />
             </div>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6, color: isCycle ? "#fb923c" : "#4ade80" }}>{isCycle ? "RIDE COMPLETE" : "RUN COMPLETE"}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6, color: isCycle ? "#fb923c" : "var(--fx-accent-2)" }}>{isCycle ? "RIDE COMPLETE" : "RUN COMPLETE"}</div>
               <div style={{ fontSize: 42, fontWeight: 900, color: "#f2f2f2", letterSpacing: "-1.5px", lineHeight: 1 }}>
                 {distDisplay}<span style={{ fontSize: 18, fontWeight: 600, color: "#555", marginLeft: 6 }}>{useMiles ? "mi" : "km"}</span>
               </div>
@@ -976,7 +976,7 @@ export default function RunPage() {
             {(["run", "cycle"] as const).map(m => (
               <button key={m} onClick={() => setMode(m)} style={{
                 flex: 1, padding: "11px 0", borderRadius: 12, border: "none", cursor: "pointer",
-                background: mode === m ? (m === "run" ? "#22c55e" : "#f97316") : "transparent",
+                background: mode === m ? (m === "run" ? "var(--fx-accent)" : "#f97316") : "transparent",
                 color: mode === m ? "#fff" : "#555",
                 fontSize: 13, fontWeight: 700, transition: "all 0.18s",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -1006,11 +1006,11 @@ export default function RunPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f97316", fontVariationSettings: "'FILL' 1" }}>directions_walk</span>
                   <span style={{ fontSize: 11, fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>DAILY STEPS</span>
                   <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 22, fontWeight: 900, color: today.steps >= GOAL ? "#22c55e" : "#f97316", letterSpacing: "-0.5px" }}>
+                    <span style={{ fontSize: 22, fontWeight: 900, color: today.steps >= GOAL ? "var(--fx-accent)" : "#f97316", letterSpacing: "-0.5px" }}>
                       {today.steps > 0 ? today.steps.toLocaleString() : "--"}
                     </span>
                     {today.steps >= GOAL && (
-                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--fx-accent)", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                     )}
                   </div>
                 </div>
@@ -1020,7 +1020,7 @@ export default function RunPage() {
                       const pct = maxSteps > 0 ? d.steps / maxSteps : 0;
                       const isToday = i === stepHistory.length - 1;
                       const hitGoal = d.steps >= GOAL;
-                      const barColor = hitGoal ? "#22c55e" : isToday ? "#f97316" : "#333";
+                      const barColor = hitGoal ? "var(--fx-accent)" : isToday ? "#f97316" : "#333";
                       const dateObj = new Date(d.date + "T12:00:00");
                       const label = dayLabels[dateObj.getDay()];
                       return (
@@ -1088,8 +1088,8 @@ function RunCard({ run, mode = "run", onTap, onDelete }: { run: RunRoute; mode?:
   const [confirming, setConfirming] = useState(false);
   const hasPR = run.isDistancePR || run.isPacePR;
   const isCycle = mode === "cycle";
-  const accent = isCycle ? "#f97316" : "#22c55e";
-  const accentBg = isCycle ? "rgba(249,115,22,0.1)" : "rgba(34,197,94,0.1)";
+  const accent = isCycle ? "#f97316" : "var(--fx-accent)";
+  const accentBg = isCycle ? "rgba(249,115,22,0.1)" : "rgba(var(--fx-accent-rgb),0.1)";
   const icon = isCycle ? "directions_bike" : "directions_run";
   const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const fmtP = (s: number) => (!s || !isFinite(s) || s <= 0) ? "--:--" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;

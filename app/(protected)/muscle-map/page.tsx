@@ -55,7 +55,7 @@ function matchMuscles(name: string): MuscleKey[] {
    freq 3 → lime   (2-3d)
    freq 4 → green  (today / yesterday)
 */
-const MODEL_COLORS = ["#f97316", "#eab308", "#84cc16", "#22c55e"];
+const MODEL_COLORS = ["#f97316", "#eab308", "#84cc16", "var(--fx-accent)"];
 
 function daysToFreq(days: number | null): number | null {
   if (days === null) return null;
@@ -170,7 +170,7 @@ export default function MuscleMapPage() {
           <p className="text-sm" style={{ color: "#555" }}>Real-time heatmap of your trained muscle groups</p>
           {!loading && hasLogs && (
             <div className="flex items-center gap-4 mt-3">
-              <div><span className="text-base font-black" style={{ color: "#22c55e" }}>{trained}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>trained</span></div>
+              <div><span className="text-base font-black" style={{ color: "var(--fx-accent)" }}>{trained}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>trained</span></div>
               <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} />
               <div><span className="text-base font-black" style={{ color: "#f97316" }}>{needsWork.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>need work</span></div>
               <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} />
@@ -199,7 +199,7 @@ export default function MuscleMapPage() {
           {/* ── Stats row ── */}
           <div className="flex gap-2 px-4 pt-3 pb-3">
             {[
-              { label: "Trained",     value: trained,   color: "#22c55e", bg: "rgba(34,197,94,0.1)",   border: "rgba(34,197,94,0.2)"   },
+              { label: "Trained",     value: trained,   color: "var(--fx-accent)", bg: "rgba(var(--fx-accent-rgb),0.1)",   border: "rgba(var(--fx-accent-rgb),0.2)"   },
               { label: "Overdue",     value: overdue,   color: "#f97316", bg: "rgba(249,115,22,0.1)",  border: "rgba(249,115,22,0.2)"  },
               { label: "Not Trained", value: untrained, color: "#555",    bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.07)" },
             ].map((s) => (
@@ -219,8 +219,8 @@ export default function MuscleMapPage() {
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
               <p className="text-xs font-bold tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>MUSCLE HEATMAP</p>
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e", boxShadow: "0 0 6px #22c55e" }}/>
-                <span className="text-[10px]" style={{ color: "#22c55e" }}>Live</span>
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--fx-accent)", boxShadow: "0 0 6px var(--fx-accent)" }}/>
+                <span className="text-[10px]" style={{ color: "var(--fx-accent)" }}>Live</span>
               </div>
             </div>
 
@@ -255,7 +255,7 @@ export default function MuscleMapPage() {
             {/* Color legend */}
             <div className="flex justify-center gap-4 pb-4">
               {[
-                { color: "#22c55e", label: "Today" },
+                { color: "var(--fx-accent)", label: "Today" },
                 { color: "#84cc16", label: "2-3d" },
                 { color: "#eab308", label: "4-5d" },
                 { color: "#f97316", label: "6-7d" },

@@ -905,8 +905,8 @@ async function sendEmailReport(allChecks: { label: string; ok: boolean; detail: 
         <div style="padding:22px;background:#17171f;border-bottom:1px solid #2a2a3a;">
           <h2 style="margin:0 0 4px;color:#fff;font-size:20px;">⚡ Felcin Full Platform Diagnostic</h2>
           <p style="margin:0;color:#6b7280;font-size:12px;">${new Date().toLocaleString()} · ${allChecks.length} checks run</p>
-          <div style="margin-top:14px;padding:12px 16px;border-radius:8px;background:${allOk?"rgba(34,197,94,.1)":"rgba(239,68,68,.1)"};border:1px solid ${allOk?"#22c55e":"#ef4444"}40;">
-            <span style="font-weight:800;font-size:16px;color:${allOk?"#22c55e":"#ef4444"};">${allOk?"✅ ALL SYSTEMS OK":`⚠️ ${issues.length} ISSUE${issues.length>1?"S":""} FOUND`}</span>
+          <div style="margin-top:14px;padding:12px 16px;border-radius:8px;background:${allOk?"rgba(var(--fx-accent-rgb),.1)":"rgba(239,68,68,.1)"};border:1px solid ${allOk?"var(--fx-accent)":"#ef4444"}40;">
+            <span style="font-weight:800;font-size:16px;color:${allOk?"var(--fx-accent)":"#ef4444"};">${allOk?"✅ ALL SYSTEMS OK":`⚠️ ${issues.length} ISSUE${issues.length>1?"S":""} FOUND`}</span>
           </div>
         </div>
         <div style="padding:16px;">${issueRows}</div>

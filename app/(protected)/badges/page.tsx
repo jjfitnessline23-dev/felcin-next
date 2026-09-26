@@ -310,7 +310,7 @@ export default function BadgesPage() {
               )}
               {isActive && (
                 <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold"
-                  style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }}>
+                  style={{ background: "rgba(var(--fx-accent-rgb),0.15)", color: "var(--fx-accent)", border: "1px solid rgba(var(--fx-accent-rgb),0.3)" }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 11, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                   Active
                 </div>
@@ -351,7 +351,7 @@ export default function BadgesPage() {
                   // iOS: open browser sheet (Apple IAP compliance)
                   <div
                     className="w-full py-3 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
-                    style={{ background: isActive ? "rgba(34,197,94,0.1)" : badge.grad, color: isActive ? "#22c55e" : "#fff", border: isActive ? "1px solid rgba(34,197,94,0.25)" : "none", boxShadow: isActive ? "none" : `0 0 20px ${badge.glow}` }}
+                    style={{ background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : badge.grad, color: isActive ? "var(--fx-accent)" : "#fff", border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none", boxShadow: isActive ? "none" : `0 0 20px ${badge.glow}` }}
                     onClick={async () => {
                       if (isActive) return;
                       try {
@@ -375,9 +375,9 @@ export default function BadgesPage() {
                     disabled={!!buying || isActive}
                     className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
                     style={{
-                      background: isActive ? "rgba(34,197,94,0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
-                      color: isActive ? "#22c55e" : buying === badge.id ? "#555" : "#fff",
-                      border: isActive ? "1px solid rgba(34,197,94,0.25)" : "none",
+                      background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
+                      color: isActive ? "var(--fx-accent)" : buying === badge.id ? "#555" : "#fff",
+                      border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none",
                       boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
                       cursor: isActive ? "default" : "pointer",
                     }}>

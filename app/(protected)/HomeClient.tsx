@@ -119,7 +119,7 @@ const QUICK_LINKS = [
   { href: "/ghost",      icon: "sprint",              label: "Ghost",      color: "#a78bfa" },
   { href: "/progress",   icon: "compare",             label: "Progress",   color: "#818cf8" },
   { href: "/live",       icon: "live_tv",             label: "Live",       color: "#ef4444" },
-  { href: "/workouts",   icon: "fitness_center",      label: "Workouts",   color: "#22c55e" },
+  { href: "/workouts",   icon: "fitness_center",      label: "Workouts",   color: "var(--fx-accent)" },
   { href: "/challenges", icon: "link",                label: "Challenges", color: "#f59e0b" },
   { href: "/trainers",   icon: "sports_martial_arts", label: "Trainers",   color: "#06b6d4" },
   { href: "/podcasts",   icon: "mic",                 label: "Podcast",    color: "#7C3AED" },

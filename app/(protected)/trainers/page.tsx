@@ -124,7 +124,7 @@ export default function TrainersPage() {
                     ))}
                     {t.sessionCount ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold ml-auto"
-                        style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                        style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>
                         {t.sessionCount} sessions
                       </span>
                     ) : null}

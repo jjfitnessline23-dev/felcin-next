@@ -331,14 +331,14 @@ export default function PrivateChatsPage() {
                 </div>
               )}
               {otherOnline && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full" style={{ background: "#22c55e", border: "2px solid #090909" }} />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full" style={{ background: "var(--fx-accent)", border: "2px solid #090909" }} />
               )}
             </div>
             <div>
               <p className="font-bold text-sm" style={{ color: "#f2f2f2" }}>{otherName}</p>
               {otherOnline
-                ? <p className="text-xs flex items-center gap-1" style={{ color: "#22c55e" }}>
-                    <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e" }} /> Online now
+                ? <p className="text-xs flex items-center gap-1" style={{ color: "var(--fx-accent)" }}>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--fx-accent)" }} /> Online now
                   </p>
                 : otherLastSeen
                   ? <p className="text-xs" style={{ color: "#444" }}>Active {timeAgo(otherLastSeen)}</p>

@@ -26,7 +26,7 @@ function timeAgo(seconds: number) {
 
 const TYPE_CONFIG: Record<ChallengeType, { icon: string; color: string; bg: string; border: string; label: string }> = {
   general: { icon: "link",           color: "#f59e0b", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.3)",  label: "Challenge" },
-  run:     { icon: "directions_run", color: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.3)",   label: "Run Challenge" },
+  run:     { icon: "directions_run", color: "var(--fx-accent)", bg: "rgba(var(--fx-accent-rgb),0.12)",  border: "rgba(var(--fx-accent-rgb),0.3)",   label: "Run Challenge" },
   cycle:   { icon: "directions_bike",color: "#f97316", bg: "rgba(249,115,22,0.12)", border: "rgba(249,115,22,0.3)",  label: "Cycling Challenge" },
 };
 

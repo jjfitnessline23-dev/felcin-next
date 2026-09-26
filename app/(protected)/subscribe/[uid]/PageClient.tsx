@@ -105,9 +105,9 @@ export default function SubscribePage() {
 
       {success && (
         <div className="rounded-2xl p-4 mb-6 flex items-center gap-3"
-          style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#4ade80", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-          <p className="text-sm font-semibold" style={{ color: "#4ade80" }}>Subscription activated! Enjoy your perks.</p>
+          style={{ background: "rgba(var(--fx-accent-rgb),0.1)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22, color: "var(--fx-accent-2)", fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+          <p className="text-sm font-semibold" style={{ color: "var(--fx-accent-2)" }}>Subscription activated! Enjoy your perks.</p>
         </div>
       )}
 

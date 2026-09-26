@@ -159,8 +159,8 @@ export default function NemesisPage() {
             <div className="rounded-2xl p-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
               {challenged ? (
                 <div className="flex flex-col items-center gap-2 py-3">
-                  <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#22c55e" }}>check_circle</span>
-                  <p className="text-sm font-bold" style={{ color: "#22c55e" }}>Challenge Accepted</p>
+                  <span className="material-symbols-outlined" style={{ fontSize: 32, color: "var(--fx-accent)" }}>check_circle</span>
+                  <p className="text-sm font-bold" style={{ color: "var(--fx-accent)" }}>Challenge Accepted</p>
                   <p className="text-xs text-center" style={{ color: "#555" }}>You&apos;ve accepted this challenge. Every workout closes the gap.</p>
                 </div>
               ) : (

@@ -221,7 +221,7 @@ export default function ProgressPage() {
                 {(["before","after"] as const).map((side) => {
                   const selected = side === "before" ? beforePhoto : afterPhoto;
                   const selectedId = side === "before" ? beforeId : afterId;
-                  const sideColor = side === "before" ? "#60a5fa" : "#22c55e";
+                  const sideColor = side === "before" ? "#60a5fa" : "var(--fx-accent)";
                   return (
                     <div key={side}>
                       <p className="text-[10px] font-black tracking-widest mb-1.5 px-1" style={{ color: sideColor }}>
@@ -295,7 +295,7 @@ export default function ProgressPage() {
 
                     {/* Labels */}
                     <div className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(96,165,250,0.85)", color: "#000" }}>BEFORE</div>
-                    <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(34,197,94,0.85)", color: "#000" }}>AFTER</div>
+                    <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(var(--fx-accent-rgb),0.85)", color: "#000" }}>AFTER</div>
                   </div>
 
                   {/* Stats comparison */}
@@ -307,14 +307,14 @@ export default function ProgressPage() {
                       </div>
                       <div className="p-3 rounded-2xl text-center" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)" }}>
                         <p className="text-xs mb-1" style={{ color: "#a78bfa" }}>Change</p>
-                        <p className="text-lg font-black" style={{ color: beforePhoto.weight && afterPhoto.weight ? (afterPhoto.weight < beforePhoto.weight ? "#22c55e" : "#ef4444") : "#555" }}>
+                        <p className="text-lg font-black" style={{ color: beforePhoto.weight && afterPhoto.weight ? (afterPhoto.weight < beforePhoto.weight ? "var(--fx-accent)" : "#ef4444") : "#555" }}>
                           {beforePhoto.weight && afterPhoto.weight
                             ? `${afterPhoto.weight - beforePhoto.weight > 0 ? "+" : ""}${(afterPhoto.weight - beforePhoto.weight).toFixed(1)}kg`
                             : "—"}
                         </p>
                       </div>
-                      <div className="p-3 rounded-2xl text-center" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
-                        <p className="text-xs mb-1" style={{ color: "#22c55e" }}>After</p>
+                      <div className="p-3 rounded-2xl text-center" style={{ background: "rgba(var(--fx-accent-rgb),0.08)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)" }}>
+                        <p className="text-xs mb-1" style={{ color: "var(--fx-accent)" }}>After</p>
                         <p className="text-lg font-black" style={{ color: "#f2f2f2" }}>{afterPhoto.weight ? `${afterPhoto.weight}kg` : "—"}</p>
                       </div>
                     </div>

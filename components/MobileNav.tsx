@@ -145,7 +145,7 @@ export default function MobileNav() {
         }}>
 
         {tabs.map((tab) => {
-          const activeColor = tab.run ? "#22c55e" : tab.accent ? "#a78bfa" : "#fff";
+          const activeColor = tab.run ? "var(--fx-accent)" : tab.accent ? "#a78bfa" : "#fff";
           const inactiveColor = tab.run ? "#2a5c3a" : tab.accent ? "#6d51c4" : "#555";
           return (
             <Link key={tab.href} href={tab.href}

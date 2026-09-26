@@ -112,8 +112,8 @@ export default function OfflineBanner() {
 
   const isReconnected = status === "reconnected";
 
-  const bg = isReconnected ? "rgba(34,197,94,0.97)" : "rgba(17,17,17,0.97)";
-  const border = isReconnected ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.3)";
+  const bg = isReconnected ? "rgba(var(--fx-accent-rgb),0.97)" : "rgba(17,17,17,0.97)";
+  const border = isReconnected ? "rgba(var(--fx-accent-rgb),0.4)" : "rgba(239,68,68,0.3)";
   const icon = isReconnected ? "check_circle" : "wifi_off";
   const iconColor = isReconnected ? "#fff" : "#ef4444";
 

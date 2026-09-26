@@ -593,7 +593,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     {/* Saved to Downloads toast — desktop only */}
     {savedToast && mounted && createPortal(
       <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-full text-sm font-semibold pointer-events-none flex items-center gap-2"
-        style={{ background: "rgba(74,222,128,0.15)", backdropFilter: "blur(12px)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>
+        style={{ background: "rgba(var(--fx-accent2-rgb),0.15)", backdropFilter: "blur(12px)", color: "var(--fx-accent-2)", border: "1px solid rgba(var(--fx-accent2-rgb),0.3)" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
         Saved to Downloads
       </div>,
@@ -756,7 +756,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
 
           <button onClick={handleRepost} disabled={reposting || !!post.isRepost}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer transition-all"
-            style={{ background: reposted ? "rgba(74,222,128,0.1)" : "transparent", color: reposted ? "#4ade80" : "#555" }}>
+            style={{ background: reposted ? "rgba(var(--fx-accent2-rgb),0.1)" : "transparent", color: reposted ? "var(--fx-accent-2)" : "#555" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: reposted ? "'FILL' 1" : "'FILL' 0" }}>repeat</span>
             {repostCount > 0 && <span className="text-sm font-semibold">{repostCount}</span>}
           </button>
@@ -866,7 +866,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           </button>
           {/* Repost */}
           <button onClick={handleRepost} disabled={reposting || !!post.isRepost} className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
-            <span className="material-symbols-outlined" style={{ fontSize: 30, color: reposted ? "#4ade80" : "#fff", fontVariationSettings: reposted ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>repeat</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 30, color: reposted ? "var(--fx-accent-2)" : "#fff", fontVariationSettings: reposted ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>repeat</span>
             <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{repostCount > 0 ? repostCount.toLocaleString() : ""}</span>
           </button>
           {/* Share */}
@@ -928,7 +928,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           </div>
           {reportDone ? (
             <div className="px-5 py-6 text-center">
-              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#4ade80", display: "block", marginBottom: 8 }}>check_circle</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "var(--fx-accent-2)", display: "block", marginBottom: 8 }}>check_circle</span>
               <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>Report submitted</p>
               <p className="text-xs mt-1" style={{ color: "#555" }}>We'll review this within 24 hours.</p>
               <button onClick={() => setReportModal(false)}

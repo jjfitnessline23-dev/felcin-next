@@ -10,6 +10,7 @@ import MobileNav from "@/components/MobileNav";
 import OfflineBanner from "@/components/OfflineBanner";
 import EmailVerifyBanner from "@/components/EmailVerifyBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import HalloweenTheme from "@/components/HalloweenTheme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -133,6 +134,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ background: "#090909", minHeight: "100dvh" }}>
+      <HalloweenTheme />
       <UpdateBanner />
       <OfflineBanner />
       <EmailVerifyBanner />

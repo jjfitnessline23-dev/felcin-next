@@ -281,7 +281,7 @@ export default function ReelsPage() {
                 {/* Repost */}
                 <button onClick={() => handleRepost(reel)} disabled={!!repostingId || repostedIds.has(reel.id)}
                   className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
-                  <span className="material-symbols-outlined" style={{ fontSize: 30, color: repostedIds.has(reel.id) ? "#4ade80" : "#fff", fontVariationSettings: repostedIds.has(reel.id) ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>repeat</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 30, color: repostedIds.has(reel.id) ? "var(--fx-accent-2)" : "#fff", fontVariationSettings: repostedIds.has(reel.id) ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>repeat</span>
                   {(reel.repostCount ?? 0) > 0 && <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(reel.repostCount ?? 0).toLocaleString()}</span>}
                 </button>
                 {/* Share */}

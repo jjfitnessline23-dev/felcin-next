@@ -39,7 +39,7 @@ const SPECIALTIES = ["Strength", "Cardio", "HIIT", "Yoga", "Bodybuilding", "Weig
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#f59e0b",
-  accepted: "#22c55e",
+  accepted: "var(--fx-accent)",
   declined: "#ef4444",
   completed: "#6d28d9",
 };
@@ -218,7 +218,7 @@ export default function TrainerDashboardPage() {
       <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
         style={{ background: "linear-gradient(135deg,#080412 0%,#0c0620 50%,#080412 100%)", border: "1px solid rgba(167,139,250,0.22)", minHeight: 160 }}>
         <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.4),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
-        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 420, height: 420, background: "radial-gradient(ellipse at center,rgba(167,139,250,0.28) 0%,rgba(34,197,94,0.08) 45%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 420, height: 420, background: "radial-gradient(ellipse at center,rgba(167,139,250,0.28) 0%,rgba(var(--fx-accent-rgb),0.08) 45%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
         <div className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none select-none">
           <img src="/static/logo-nav.svg" alt="" style={{ width: 160, opacity: 0.05, filter: "grayscale(1) brightness(3)", animation: "floatLogo 8s ease-in-out infinite" }} />
         </div>
@@ -237,9 +237,9 @@ export default function TrainerDashboardPage() {
             {/* Active status pill */}
             {profile && (
               <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                style={{ background: isActive ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)", border: `1px solid ${isActive ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.1)"}` }}>
-                <div className="w-2 h-2 rounded-full" style={{ background: isActive ? "#22c55e" : "#555", animation: isActive ? "onAirPulse 1.5s infinite" : "none" }} />
-                <span className="text-xs font-bold" style={{ color: isActive ? "#22c55e" : "#555" }}>{isActive ? "LISTED" : "HIDDEN"}</span>
+                style={{ background: isActive ? "rgba(var(--fx-accent-rgb),0.15)" : "rgba(255,255,255,0.06)", border: `1px solid ${isActive ? "rgba(var(--fx-accent-rgb),0.35)" : "rgba(255,255,255,0.1)"}` }}>
+                <div className="w-2 h-2 rounded-full" style={{ background: isActive ? "var(--fx-accent)" : "#555", animation: isActive ? "onAirPulse 1.5s infinite" : "none" }} />
+                <span className="text-xs font-bold" style={{ color: isActive ? "var(--fx-accent)" : "#555" }}>{isActive ? "LISTED" : "HIDDEN"}</span>
               </div>
             )}
           </div>
@@ -328,7 +328,7 @@ export default function TrainerDashboardPage() {
           </div>
 
           {profileStatus && (
-            <p className="text-sm text-center" style={{ color: profileStatus.ok ? "#22c55e" : "#ef4444" }}>{profileStatus.msg}</p>
+            <p className="text-sm text-center" style={{ color: profileStatus.ok ? "var(--fx-accent)" : "#ef4444" }}>{profileStatus.msg}</p>
           )}
 
           <button onClick={saveProfile} disabled={savingProfile}
@@ -370,12 +370,12 @@ export default function TrainerDashboardPage() {
                   <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>{s.traineeName || "New client"}</p>
                   <p className="text-xs" style={{ color: "#666" }}>{fmtDate(s.sessionDate)}</p>
                 </div>
-                {s.price ? <p className="text-sm font-bold" style={{ color: "#22c55e" }}>${(s.price / 100).toFixed(0)}</p> : null}
+                {s.price ? <p className="text-sm font-bold" style={{ color: "var(--fx-accent)" }}>${(s.price / 100).toFixed(0)}</p> : null}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => handleAccept(s.id)}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
-                  style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
+                  style={{ background: "rgba(var(--fx-accent-rgb),0.12)", color: "var(--fx-accent)" }}>
                   Accept
                 </button>
                 <button onClick={() => handleDecline(s.id)}
@@ -504,7 +504,7 @@ export default function TrainerDashboardPage() {
 
                 <button onClick={saveLog} disabled={savingLog}
                   className="w-full py-3.5 rounded-xl text-sm font-bold border-none cursor-pointer"
-                  style={{ background: savingLog ? "#2a2a2a" : "#22c55e", color: savingLog ? "#555" : "#000" }}>
+                  style={{ background: savingLog ? "#2a2a2a" : "var(--fx-accent)", color: savingLog ? "#555" : "#000" }}>
                   {savingLog ? "Saving…" : "Save Workout Log"}
                 </button>
               </div>
@@ -585,7 +585,7 @@ function SessionCard({ session, onEdit, onView }: { session: TrainingSession; on
       <div className="flex gap-2">
         <button onClick={onEdit}
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border-none cursor-pointer"
-          style={{ background: "rgba(255,255,255,0.05)", color: hasLog ? "#22c55e" : "#888" }}>
+          style={{ background: "rgba(255,255,255,0.05)", color: hasLog ? "var(--fx-accent)" : "#888" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit_note</span>
           {hasLog ? `${session.exercises.length} exercises` : "Build Log"}
         </button>

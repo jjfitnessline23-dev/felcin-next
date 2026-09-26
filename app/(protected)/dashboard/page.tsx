@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const studioLinks = [
     { href: "/podcasts", label: "Podcast Studio", icon: "mic", color: "#a78bfa", desc: "Episodes & live broadcasts" },
     { href: "/live", label: "Live Studio", icon: "sensors", color: "#ef4444", desc: "Go live to your audience" },
-    { href: "/creator", label: "Create", icon: "add_circle", color: "#22c55e", desc: "Post, reel, story" },
+    { href: "/creator", label: "Create", icon: "add_circle", color: "var(--fx-accent)", desc: "Post, reel, story" },
     { href: "/earnings", label: "Earnings", icon: "payments", color: "#f59e0b", desc: "Revenue & payouts" },
   ];
 

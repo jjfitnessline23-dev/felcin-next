@@ -18,6 +18,77 @@
   --danger: #ef4444;
   --danger-soft: rgba(239,68,68,0.1);
   --grad: #ffffff;
+
+  /* Brand accent tokens — default to Felcin green. Seasonal themes override these
+     so recoloring is centralized (see .theme-halloween). Components reference
+     var(--fx-accent) / rgba(var(--fx-accent-rgb), α) instead of raw hex. */
+  --fx-accent: #22c55e;
+  --fx-accent-2: #4ade80;
+  --fx-accent-dk: #16a34a;
+  --fx-accent-rgb: 34,197,94;
+  --fx-accent2-rgb: 74,222,128;
+}
+
+/* ══════════════════════ 🎃 Halloween theme ══════════════════════
+   Toggled by adding `theme-halloween` to <html> (see components/HalloweenTheme.tsx).
+   Recolors the brand accent green -> pumpkin orange and layers purple/orange
+   decorations. Everything here is scoped, so removing the class fully reverts. */
+html.theme-halloween {
+  --fx-accent: #ff7a1a;      /* pumpkin */
+  --fx-accent-2: #ff9e3d;    /* light pumpkin */
+  --fx-accent-dk: #c2410c;   /* burnt orange */
+  --fx-accent-rgb: 255,122,26;
+  --fx-accent2-rgb: 255,158,61;
+  --accent: #ff7a1a;
+  --accent-soft: rgba(255,122,26,0.1);
+  --primary: #ff7a1a;
+  --primary-light: #ff9e3d;
+  --grad: #ff7a1a;
+}
+/* Recolor shared chrome classes that use the neutral/white accent */
+html.theme-halloween .btn-pill.is-active {
+  background: #ff7a1a; color: #150a02; border-color: #ff7a1a;
+  box-shadow: 0 0 20px rgba(255,122,26,0.35);
+}
+html.theme-halloween .nav-link.active { color: #ff9e3d; }
+html.theme-halloween .spinner { border-top-color: #ff7a1a; }
+html.theme-halloween .skeleton {
+  background: linear-gradient(90deg, #1a1206 25%, #241a0c 50%, #1a1206 75%);
+  background-size: 800px 100%;
+}
+/* Purple glow on the ghost logo mark — leans into the existing ghost identity */
+html.theme-halloween .ghost-eye-glow { filter: drop-shadow(0 0 8px rgba(168,85,247,0.95)); }
+
+/* ── Decorations (rendered by HalloweenTheme, only present when class is on) ── */
+.hw-decor {
+  position: fixed; inset: 0; z-index: 45;
+  pointer-events: none; overflow: hidden;
+}
+.hw-cobweb {
+  position: absolute; width: 128px; height: 128px; opacity: 0.5;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
+.hw-cobweb.tl { top: calc(env(safe-area-inset-top, 0px)); left: 0; }
+.hw-cobweb.tr { top: calc(env(safe-area-inset-top, 0px)); right: 0; transform: scaleX(-1); }
+.hw-bat {
+  position: absolute; will-change: transform;
+  color: #1a1a1a; filter: drop-shadow(0 0 6px rgba(168,85,247,0.5));
+  animation: hwBatFly linear infinite;
+}
+.hw-bat svg { display: block; animation: hwBatFlap 0.32s ease-in-out infinite; transform-origin: center; }
+@keyframes hwBatFly {
+  0%   { transform: translate(-12vw, 78vh) scale(0.8); }
+  25%  { transform: translate(28vw, 40vh) scale(1); }
+  50%  { transform: translate(60vw, 62vh) scale(0.9); }
+  75%  { transform: translate(88vw, 30vh) scale(1.05); }
+  100% { transform: translate(112vw, 55vh) scale(0.85); }
+}
+@keyframes hwBatFlap {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hw-bat { display: none; }
 }
 
 html, body {

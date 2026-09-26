@@ -530,7 +530,7 @@ export default function PageClient() {
           </div>
           {reportDone ? (
             <div className="px-5 py-6 text-center">
-              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "#4ade80", display: "block", marginBottom: 8 }}>check_circle</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "var(--fx-accent-2)", display: "block", marginBottom: 8 }}>check_circle</span>
               <p className="font-semibold text-sm" style={{ color: "#f2f2f2" }}>Report submitted</p>
               <p className="text-xs mt-1" style={{ color: "#555" }}>We'll review this within 24 hours.</p>
               <button onClick={() => setReportModal(false)}

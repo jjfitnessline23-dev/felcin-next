@@ -343,8 +343,8 @@ export default function CreatorPage() {
             {!bgUploading && uploadedUrl && (
               <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full"
                 style={{ background: "rgba(0,0,0,0.6)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14, color: "#4ade80" }}>check_circle</span>
-                <span className="text-xs" style={{ color: "#4ade80" }}>Ready to post</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: "var(--fx-accent-2)" }}>check_circle</span>
+                <span className="text-xs" style={{ color: "var(--fx-accent-2)" }}>Ready to post</span>
               </div>
             )}
             <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer"

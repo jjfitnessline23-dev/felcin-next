@@ -403,27 +403,27 @@ export default function WorkoutsPage() {
 
       {/* Hero */}
       <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
-        style={{ background: "linear-gradient(135deg,#031208 0%,#061a0c 50%,#031208 100%)", border: "1px solid rgba(34,197,94,0.2)", minHeight: 140 }}>
-        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(34,197,94,0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        style={{ background: "linear-gradient(135deg,#031208 0%,#061a0c 50%,#031208 100%)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)", minHeight: 140 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(var(--fx-accent-rgb),0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
         <div className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none select-none">
           <img src="/static/logo-nav.svg" alt="" style={{ width: 120, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(90deg)", animation: "floatLogo 9s ease-in-out infinite" }} />
         </div>
         <div className="relative z-10 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>fitness_center</span>
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(var(--fx-accent-rgb),0.2)", border: "1px solid rgba(var(--fx-accent-rgb),0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "var(--fx-accent)", fontVariationSettings: "'FILL' 1" }}>fitness_center</span>
             </div>
-            <span className="text-xs font-black tracking-widest" style={{ color: "#22c55e", letterSpacing: "0.18em" }}>WORKOUT LOG</span>
+            <span className="text-xs font-black tracking-widest" style={{ color: "var(--fx-accent)", letterSpacing: "0.18em" }}>WORKOUT LOG</span>
           </div>
           <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.4rem,5vw,1.9rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#86efac 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             {session ? "Session Active" : todayLabel && todayLabel !== "Rest" ? `Today: ${todayLabel}` : todayLabel === "Rest" ? "Rest Day 💤" : "Workout Log"}
           </h1>
           {!loading && (
             <div className="flex items-center gap-4 mt-2">
-              <div><span className="text-base font-black" style={{ color: "#22c55e" }}>{logs.length}</span><span className="text-xs ml-1" style={{ color: "#555" }}>workouts</span></div>
+              <div><span className="text-base font-black" style={{ color: "var(--fx-accent)" }}>{logs.length}</span><span className="text-xs ml-1" style={{ color: "#555" }}>workouts</span></div>
               <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} />
               <div><span className="text-base font-black" style={{ color: "#fbbf24" }}>{Object.keys(prs).length}</span><span className="text-xs ml-1" style={{ color: "#555" }}>PRs</span></div>
-              {session && <><div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} /><div><span className="text-base font-black tabular-nums" style={{ color: "#22c55e" }}>{fmtTimer(elapsed)}</span><span className="text-xs ml-1" style={{ color: "#555" }}>elapsed</span></div></>}
+              {session && <><div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.07)" }} /><div><span className="text-base font-black tabular-nums" style={{ color: "var(--fx-accent)" }}>{fmtTimer(elapsed)}</span><span className="text-xs ml-1" style={{ color: "#555" }}>elapsed</span></div></>}
             </div>
           )}
         </div>
@@ -433,14 +433,14 @@ export default function WorkoutsPage() {
       <div className="mx-4 mb-3 rounded-2xl overflow-hidden" style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)" }}>
         {/* Header */}
         <button onClick={() => setShowPlanEditor((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3.5 border-none cursor-pointer bg-transparent">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(var(--fx-accent-rgb),0.15)", border: "1px solid rgba(var(--fx-accent-rgb),0.3)" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: "var(--fx-accent)", fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
           </div>
           <div className="flex-1 text-left">
             <p className="text-sm font-black tracking-wide" style={{ color: "#f2f2f2" }}>WEEKLY WORKOUT PLANNER</p>
             <div className="flex items-center gap-1 mt-0.5">
               {planSyncStatus === "saved"
-                ? <><span className="material-symbols-outlined" style={{ fontSize: 11, color: "#22c55e" }}>check_circle</span><span className="text-xs" style={{ color: "#22c55e" }}>Synced to all devices</span></>
+                ? <><span className="material-symbols-outlined" style={{ fontSize: 11, color: "var(--fx-accent)" }}>check_circle</span><span className="text-xs" style={{ color: "var(--fx-accent)" }}>Synced to all devices</span></>
                 : <span className="text-xs" style={{ color: "#555" }}>{SPLITS[planKey].name}</span>}
             </div>
           </div>
@@ -455,7 +455,7 @@ export default function WorkoutsPage() {
                 {(Object.entries(SPLITS) as [SplitKey, { name: string }][]).map(([key, { name }]) => (
                   <button key={key} onClick={() => applyTemplate(key)}
                     className="px-3 py-1.5 rounded-full text-xs font-semibold border-none cursor-pointer"
-                    style={{ background: planKey === key ? "#22c55e" : "rgba(255,255,255,0.07)", color: planKey === key ? "#000" : "#666" }}>
+                    style={{ background: planKey === key ? "var(--fx-accent)" : "rgba(255,255,255,0.07)", color: planKey === key ? "#000" : "#666" }}>
                     {name}
                   </button>
                 ))}
@@ -463,7 +463,7 @@ export default function WorkoutsPage() {
 
               {/* Today's action card */}
               {todayLabel && (
-                <div className="rounded-2xl mb-3 overflow-hidden" style={{ background: "#1a1a1a", border: "1px solid rgba(34,197,94,0.2)" }}>
+                <div className="rounded-2xl mb-3 overflow-hidden" style={{ background: "#1a1a1a", border: "1px solid rgba(var(--fx-accent-rgb),0.2)" }}>
                   <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                     <span style={{ fontSize: 16 }}>💡</span>
                     <span className="text-sm font-bold" style={{ color: "#f2f2f2" }}>{DAYS[todayIdx].charAt(0).toUpperCase() + DAYS[todayIdx].slice(1)}day: {todayLabel.toUpperCase()}</span>
@@ -481,7 +481,7 @@ export default function WorkoutsPage() {
                       {!session && (
                         <button onClick={() => { startWorkout(dayPlans[todayLabel]); setShowPlanEditor(false); }}
                           className="w-full py-3 rounded-xl text-sm font-bold border-none cursor-pointer"
-                          style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", color: "#fff" }}>
+                          style={{ background: "linear-gradient(135deg,var(--fx-accent-dk),var(--fx-accent))", color: "#fff" }}>
                           ▶ Start {todayLabel} Workout
                         </button>
                       )}
@@ -491,7 +491,7 @@ export default function WorkoutsPage() {
                       <p className="text-sm mb-3" style={{ color: "#555" }}>No exercises planned yet.</p>
                       <button onClick={() => setPlanningDay(todayLabel)}
                         className="w-full py-3 rounded-xl text-sm font-bold border-none cursor-pointer"
-                        style={{ background: "#22c55e", color: "#000" }}>
+                        style={{ background: "var(--fx-accent)", color: "#000" }}>
                         [ + Add Exercises to {todayLabel} ]
                       </button>
                     </div>
@@ -510,7 +510,7 @@ export default function WorkoutsPage() {
                   const isToday = di === todayIdx;
 
                   return (
-                    <div key={di} className="rounded-2xl" style={{ background: "#1a1a1a", border: `1px solid ${isToday ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.07)"}`, overflow: "visible" }}>
+                    <div key={di} className="rounded-2xl" style={{ background: "#1a1a1a", border: `1px solid ${isToday ? "rgba(var(--fx-accent-rgb),0.25)" : "rgba(255,255,255,0.07)"}`, overflow: "visible" }}>
                       <button
                         onClick={() => setExpandedDay(isOpen ? null : label)}
                         className="w-full flex items-center gap-3 px-4 py-3 border-none cursor-pointer bg-transparent text-left">
@@ -524,7 +524,7 @@ export default function WorkoutsPage() {
                               style={{ background: "rgba(255,255,255,0.08)", color: "#888" }}>
                               Edit Plan
                             </button>
-                            {isToday && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>TODAY</span>}
+                            {isToday && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(var(--fx-accent-rgb),0.15)", color: "var(--fx-accent)" }}>TODAY</span>}
                           </div>
                           {exs.length > 0 && <p className="text-xs mt-0.5" style={{ color: "#555" }}>{exs.length} exercise{exs.length !== 1 ? "s" : ""} · {totalSets} set{totalSets !== 1 ? "s" : ""}</p>}
                         </div>
@@ -538,7 +538,7 @@ export default function WorkoutsPage() {
                           </p>
                           <div className="flex items-center gap-2">
                             <div className="flex-1 rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                              <div style={{ width: "0%", height: "100%", background: "#22c55e" }} />
+                              <div style={{ width: "0%", height: "100%", background: "var(--fx-accent)" }} />
                             </div>
                             <span className="text-[10px]" style={{ color: "#444" }}>0/{totalSets}</span>
                           </div>
@@ -560,7 +560,7 @@ export default function WorkoutsPage() {
                               return (
                                 <div key={ei} className="rounded-xl p-3" style={{ background: "#222", border: "1px solid rgba(255,255,255,0.06)" }}>
                                   <div className="flex items-center justify-between mb-1.5">
-                                    <p className="text-sm font-bold" style={{ color: "#22c55e" }}>{ei + 1}. {ex.name}</p>
+                                    <p className="text-sm font-bold" style={{ color: "var(--fx-accent)" }}>{ei + 1}. {ex.name}</p>
                                     <button onClick={() => setExpandedPlanEx(prev => ({ ...prev, [planExKey]: true }))} className="border-none bg-transparent cursor-pointer">
                                       <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#555" }}>chevron_right</span>
                                     </button>
@@ -575,7 +575,7 @@ export default function WorkoutsPage() {
                                       </div>
                                     </div>
                                   )}
-                                  <button className="w-full py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                                  <button className="w-full py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer" style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>
                                     Auto-Fill Set 1 from Last Log
                                   </button>
                                 </div>
@@ -613,14 +613,14 @@ export default function WorkoutsPage() {
                                 {/* Header */}
                                 <div className="flex items-start justify-between gap-2 mb-0.5">
                                   <div>
-                                    <p className="text-sm font-bold" style={{ color: "#22c55e" }}>{ei + 1}. {ex.name}</p>
+                                    <p className="text-sm font-bold" style={{ color: "var(--fx-accent)" }}>{ei + 1}. {ex.name}</p>
                                     <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>Source: {SPLITS[planKey].name} ({label})</p>
                                   </div>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setSwapOpen(isSwapOpen ? null : { day: label, ei }); setInfoOpen(null); }}
                                     className="border-none cursor-pointer flex items-center justify-center rounded-lg shrink-0"
-                                    style={{ width: 28, height: 28, background: isSwapOpen ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.07)", marginTop: -2 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: isSwapOpen ? "#22c55e" : "#666" }}>sync</span>
+                                    style={{ width: 28, height: 28, background: isSwapOpen ? "rgba(var(--fx-accent-rgb),0.15)" : "rgba(255,255,255,0.07)", marginTop: -2 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: isSwapOpen ? "var(--fx-accent)" : "#666" }}>sync</span>
                                   </button>
                                 </div>
 
@@ -651,7 +651,7 @@ export default function WorkoutsPage() {
                                               <button
                                                 onClick={(e) => { e.stopPropagation(); setInfoOpen(isInfoBtnOpen ? null : { day: label, ei, si }); setSwapOpen(null); }}
                                                 className="border-none cursor-pointer flex items-center justify-center rounded-full font-bold"
-                                                style={{ width: 18, height: 18, background: isInfoBtnOpen ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.1)", color: isInfoBtnOpen ? "#22c55e" : "#888", fontSize: 10, flexShrink: 0 }}>
+                                                style={{ width: 18, height: 18, background: isInfoBtnOpen ? "rgba(var(--fx-accent-rgb),0.25)" : "rgba(255,255,255,0.1)", color: isInfoBtnOpen ? "var(--fx-accent)" : "#888", fontSize: 10, flexShrink: 0 }}>
                                                 ℹ
                                               </button>
                                             )}
@@ -665,7 +665,7 @@ export default function WorkoutsPage() {
                                               <button
                                                 onClick={(e) => { e.stopPropagation(); setInfoOpen(isInfoBtnOpen ? null : { day: label, ei, si }); setSwapOpen(null); }}
                                                 className="border-none cursor-pointer flex items-center justify-center rounded-full font-bold"
-                                                style={{ width: 18, height: 18, background: isInfoBtnOpen ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.1)", color: isInfoBtnOpen ? "#22c55e" : "#888", fontSize: 10, flexShrink: 0 }}>
+                                                style={{ width: 18, height: 18, background: isInfoBtnOpen ? "rgba(var(--fx-accent-rgb),0.25)" : "rgba(255,255,255,0.1)", color: isInfoBtnOpen ? "var(--fx-accent)" : "#888", fontSize: 10, flexShrink: 0 }}>
                                                 ℹ
                                               </button>
                                             )}
@@ -674,7 +674,7 @@ export default function WorkoutsPage() {
                                           <div className="flex items-center gap-1.5">
                                             <span className="text-xs px-2 py-1 rounded-lg font-semibold" style={{ background: "#2a2a2a", color: "#f2f2f2" }}>{set.reps} reps</span>
                                             <span className="text-xs" style={{ color: "#555" }}>@</span>
-                                            <span className="text-[11px] px-2 py-1 rounded-full font-semibold flex items-center gap-0.5" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)" }}>⚙ Match last</span>
+                                            <span className="text-[11px] px-2 py-1 rounded-full font-semibold flex items-center gap-0.5" style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)" }}>⚙ Match last</span>
                                           </div>
                                         ) : (
                                           <div className="flex items-center gap-1.5">
@@ -703,7 +703,7 @@ export default function WorkoutsPage() {
                                               <p className="text-[11px] mt-0.5 mb-2.5" style={{ color: "#888" }}>+{suggestion} {unitLabel} suggested.</p>
                                               <div className="flex items-end gap-0.5" style={{ height: 34 }}>
                                                 {vols.map((v, idx) => (
-                                                  <div key={idx} style={{ flex: 1, background: idx === vols.length - 1 ? "#22c55e" : "#2a2a2a", height: `${Math.max(6, (v / maxVol) * 100)}%`, borderRadius: "2px 2px 0 0" }} />
+                                                  <div key={idx} style={{ flex: 1, background: idx === vols.length - 1 ? "var(--fx-accent)" : "#2a2a2a", height: `${Math.max(6, (v / maxVol) * 100)}%`, borderRadius: "2px 2px 0 0" }} />
                                                 ))}
                                               </div>
                                               <p className="text-[9px] mt-1" style={{ color: "#555" }}>Recent volume for this lift</p>
@@ -717,7 +717,7 @@ export default function WorkoutsPage() {
 
                                 {/* Auto-fill button (no prev log) */}
                                 {!lastPrev && (
-                                  <button className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                                  <button className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer" style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>
                                     Auto-Fill Set 1 from Last Log
                                   </button>
                                 )}
@@ -727,7 +727,7 @@ export default function WorkoutsPage() {
                           {/* Save & Commit */}
                           <button onClick={() => setExpandedDay(null)}
                             className="w-full py-3 rounded-xl text-sm font-bold border-none cursor-pointer"
-                            style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", color: "#fff" }}>
+                            style={{ background: "linear-gradient(135deg,var(--fx-accent-dk),var(--fx-accent))", color: "#fff" }}>
                             Save &amp; Commit Changes to Template
                           </button>
                         </div>
@@ -751,7 +751,7 @@ export default function WorkoutsPage() {
                       {exs.map((ex, ei) => (
                         <div key={ei} className="p-3 rounded-xl" style={{ background: "#222", border: "1px solid rgba(255,255,255,0.06)" }}>
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-bold shrink-0" style={{ color: "#22c55e", width: 20 }}>{ei + 1}.</span>
+                            <span className="text-xs font-bold shrink-0" style={{ color: "var(--fx-accent)", width: 20 }}>{ei + 1}.</span>
                             <input type="text" placeholder={`Exercise ${ei + 1}`} value={ex.name}
                               onChange={(e) => mutatePlan(day, (xs) => xs.map((x, i) => i !== ei ? x : { ...x, name: e.target.value }))}
                               className="flex-1 px-3 py-2 rounded-lg outline-none text-sm"
@@ -791,7 +791,7 @@ export default function WorkoutsPage() {
                       </button>
                       <button onClick={() => setPlanningDay(null)}
                         className="w-full py-3 rounded-xl text-sm font-bold border-none cursor-pointer"
-                        style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", color: "#fff" }}>
+                        style={{ background: "linear-gradient(135deg,var(--fx-accent-dk),var(--fx-accent))", color: "#fff" }}>
                         Save &amp; Commit Changes to Template
                       </button>
                     </div>
@@ -822,7 +822,7 @@ export default function WorkoutsPage() {
           <div className="rounded-2xl mb-4" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.1)" }}>
             <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#22c55e" }}>timer</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--fx-accent)" }}>timer</span>
                 <span className="text-xl font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{fmtTimer(elapsed)}</span>
               </div>
               <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.07)" }}>
@@ -860,7 +860,7 @@ export default function WorkoutsPage() {
                           border: ex.name ? "none" : "1px dashed rgba(255,255,255,0.15)",
                           color: "#f2f2f2",
                           minWidth: 0,
-                          caretColor: "#22c55e",
+                          caretColor: "var(--fx-accent)",
                         }} />
                       {/* Weight visualizer — shows as soon as name is typed, adapts to equipment */}
                       {ex.type !== "cardio" && ex.name.trim().length > 0 && (
@@ -977,7 +977,7 @@ export default function WorkoutsPage() {
                         const active = (ex.type ?? "strength") === t;
                         return (
                           <button key={t} onClick={() => setExType(ei, t)} className="flex-1 py-2 rounded-xl text-xs font-bold border-none cursor-pointer flex items-center justify-center gap-1"
-                            style={{ background: active ? (t === "cardio" ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.03)", color: active ? (t === "cardio" ? "#22c55e" : "#f2f2f2") : "#444", border: `1px solid ${active ? (t === "cardio" ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.06)"}` }}>
+                            style={{ background: active ? (t === "cardio" ? "rgba(var(--fx-accent-rgb),0.15)" : "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.03)", color: active ? (t === "cardio" ? "var(--fx-accent)" : "#f2f2f2") : "#444", border: `1px solid ${active ? (t === "cardio" ? "rgba(var(--fx-accent-rgb),0.4)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.06)"}` }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}>{t === "strength" ? "fitness_center" : "directions_run"}</span>
                             {t === "strength" ? "Strength" : "Cardio"}
                           </button>
@@ -990,7 +990,7 @@ export default function WorkoutsPage() {
                         <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3" style={{ scrollbarWidth: "none" }}>
                           {CARDIO_PRESETS.map((p) => (
                             <button key={p.name} onClick={() => setExName(ei, p.name)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border-none cursor-pointer shrink-0"
-                              style={{ background: ex.name === p.name ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.05)", color: ex.name === p.name ? "#22c55e" : "#555", border: `1px solid ${ex.name === p.name ? "rgba(34,197,94,0.4)" : "transparent"}` }}>
+                              style={{ background: ex.name === p.name ? "rgba(var(--fx-accent-rgb),0.2)" : "rgba(255,255,255,0.05)", color: ex.name === p.name ? "var(--fx-accent)" : "#555", border: `1px solid ${ex.name === p.name ? "rgba(var(--fx-accent-rgb),0.4)" : "transparent"}` }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{p.icon}</span>{p.name}
                             </button>
                           ))}
@@ -1052,8 +1052,8 @@ export default function WorkoutsPage() {
                           const prevSet = prevSets[si];
                           const isFocused = focusedSi === si;
                           const sType = set.setType ?? "S";
-                          const inputBg = set.done ? "rgba(34,197,94,0.08)" : isFocused ? "rgba(255,255,255,0.08)" : "#222";
-                          const inputBorder = set.done ? "rgba(34,197,94,0.35)" : isFocused ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.1)";
+                          const inputBg = set.done ? "rgba(var(--fx-accent-rgb),0.08)" : isFocused ? "rgba(255,255,255,0.08)" : "#222";
+                          const inputBorder = set.done ? "rgba(var(--fx-accent-rgb),0.35)" : isFocused ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.1)";
                           return (
                             <div key={si} className="flex items-start gap-2 mx-3 mb-1" onClick={() => setFocusedSet({ ei, si })}>
                               {/* Set type badge */}
@@ -1069,7 +1069,7 @@ export default function WorkoutsPage() {
                                   onChange={(e) => setField(ei, si, "reps", Number(e.target.value))}
                                   onFocus={() => setFocusedSet({ ei, si })}
                                   className="w-full px-2 py-2 rounded-lg outline-none text-sm font-semibold text-center"
-                                  style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: set.done ? "#22c55e" : "#f2f2f2" }} />
+                                  style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: set.done ? "var(--fx-accent)" : "#f2f2f2" }} />
                                 {prevSet && <span className="text-[9px] text-center" style={{ color: "#404040" }}>Prev: {prevSet.reps}</span>}
                               </div>
                               {/* Weight */}
@@ -1078,13 +1078,13 @@ export default function WorkoutsPage() {
                                   onChange={(e) => setField(ei, si, "weight", Number(e.target.value))}
                                   onFocus={() => setFocusedSet({ ei, si })}
                                   className="w-full px-2 py-2 rounded-lg outline-none text-sm font-semibold text-center"
-                                  style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: set.done ? "#22c55e" : "#f2f2f2" }} />
+                                  style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: set.done ? "var(--fx-accent)" : "#f2f2f2" }} />
                                 {prevSet && <span className="text-[9px] text-center" style={{ color: "#404040" }}>Prev: {toDisplay(prevSet.weight, useKg)}</span>}
                               </div>
                               {/* Checkmark */}
                               <button onClick={(e) => { e.stopPropagation(); toggleDone(ei, si); }}
                                 className="shrink-0 mt-0.5 flex items-center justify-center rounded-lg border-none cursor-pointer"
-                                style={{ width: 36, height: 36, border: `2px solid ${set.done ? "#22c55e" : "#3a3a3a"}`, background: set.done ? "#22c55e" : "transparent" }}>
+                                style={{ width: 36, height: 36, border: `2px solid ${set.done ? "var(--fx-accent)" : "#3a3a3a"}`, background: set.done ? "var(--fx-accent)" : "transparent" }}>
                                 {set.done
                                   ? <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#000", fontVariationSettings: "'FILL' 1,'wght' 700" }}>check</span>
                                   : <span style={{ width: 10, height: 10, borderRadius: 3, border: "1.5px solid #4a4a4a", display: "block" }} />}
@@ -1143,10 +1143,10 @@ export default function WorkoutsPage() {
 
                         {/* Rest timer — solid green bar like spec */}
                         <div className="flex items-center justify-between mx-3 mb-2 px-4 py-3 rounded-xl"
-                          style={{ background: restActive ? "rgba(20,83,45,0.6)" : "#1e1e1e", border: `1px solid ${restActive ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.06)"}` }}>
+                          style={{ background: restActive ? "rgba(20,83,45,0.6)" : "#1e1e1e", border: `1px solid ${restActive ? "rgba(var(--fx-accent-rgb),0.4)" : "rgba(255,255,255,0.06)"}` }}>
                           <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: restActive ? "#22c55e" : "#444" }}>self_improvement</span>
-                            <span className="text-sm font-bold tabular-nums" style={{ color: restActive ? "#22c55e" : "#555" }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: restActive ? "var(--fx-accent)" : "#444" }}>self_improvement</span>
+                            <span className="text-sm font-bold tabular-nums" style={{ color: restActive ? "var(--fx-accent)" : "#555" }}>
                               {restActive ? `Rest — ${fmtTimer(restSecs)}` : "Rest timer"}
                             </span>
                           </div>
@@ -1157,7 +1157,7 @@ export default function WorkoutsPage() {
                           ) : (
                             <button onClick={() => { setRestSecs(0); setRestActive(true); }}
                               className="text-sm font-bold px-4 py-1.5 rounded-lg border-none cursor-pointer"
-                              style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>Start</button>
+                              style={{ background: "rgba(var(--fx-accent-rgb),0.15)", color: "var(--fx-accent)" }}>Start</button>
                           )}
                         </div>
 
@@ -1176,7 +1176,7 @@ export default function WorkoutsPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span> Add Exercise
                 </button>
                 <button onClick={addCardio} className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer flex items-center justify-center gap-1.5"
-                  style={{ background: "rgba(34,197,94,0.08)", color: "#22c55e", border: "1px dashed rgba(34,197,94,0.3)" }}>
+                  style={{ background: "rgba(var(--fx-accent-rgb),0.08)", color: "var(--fx-accent)", border: "1px dashed rgba(var(--fx-accent-rgb),0.3)" }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 15 }}>directions_run</span> Add Cardio
                 </button>
               </div>
@@ -1215,7 +1215,7 @@ export default function WorkoutsPage() {
                 </div>
               </div>
               <button onClick={() => startWorkout()} className="flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm border-none cursor-pointer"
-                style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", color: "#fff", boxShadow: "0 0 20px rgba(34,197,94,0.35)" }}>
+                style={{ background: "linear-gradient(135deg,var(--fx-accent-dk),var(--fx-accent))", color: "#fff", boxShadow: "0 0 20px rgba(var(--fx-accent-rgb),0.35)" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                 Start Workout
               </button>
@@ -1287,7 +1287,7 @@ export default function WorkoutsPage() {
                             {ex.equipment && (
                               <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>{ex.equipment}</span>
                             )}
-                            {isCardio && <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>Cardio</span>}
+                            {isCardio && <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>Cardio</span>}
                             {exIs1Rm && !ex.equipment && <p className="text-[10px] font-bold mt-0.5" style={{ color: "#fbbf24" }}>PR</p>}
                             {exIs1Rm && ex.equipment && <p className="text-[10px] font-bold mt-0.5" style={{ color: "#fbbf24" }}>PR</p>}
                           </div>
@@ -1355,7 +1355,7 @@ export default function WorkoutsPage() {
         const plateColor: Record<number, { bg: string; text: string; label: string }> = {
           45: { bg: "#dc2626", text: "#fff", label: "red" },
           35: { bg: "#2563eb", text: "#fff", label: "blue" },
-          25: { bg: "#16a34a", text: "#fff", label: "green" },
+          25: { bg: "var(--fx-accent-dk)", text: "#fff", label: "green" },
           10: { bg: "#ca8a04", text: "#fff", label: "yellow" },
           5:  { bg: "#9333ea", text: "#fff", label: "purple" },
           2.5:{ bg: "#0891b2", text: "#fff", label: "cyan" },
@@ -1560,8 +1560,8 @@ export default function WorkoutsPage() {
                 {/* ── BODYWEIGHT ── */}
                 {isBodyweight && (
                   <div className="flex flex-col items-center gap-4 py-2">
-                    <div className="flex items-center justify-center rounded-2xl" style={{ width: 80, height: 80, background: "rgba(34,197,94,0.1)", border: "2px solid rgba(34,197,94,0.2)" }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>accessibility_new</span>
+                    <div className="flex items-center justify-center rounded-2xl" style={{ width: 80, height: 80, background: "rgba(var(--fx-accent-rgb),0.1)", border: "2px solid rgba(var(--fx-accent-rgb),0.2)" }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--fx-accent)", fontVariationSettings: "'FILL' 1" }}>accessibility_new</span>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-black" style={{ color: "#f2f2f2" }}>Bodyweight</p>
@@ -1638,7 +1638,7 @@ export default function WorkoutsPage() {
         <div className="fixed left-0 right-0 flex items-center justify-between px-4 py-3 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom,0px) + 64px)", background: "rgba(9,9,9,0.92)", backdropFilter: "blur(16px)", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#22c55e" }}>timer</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--fx-accent)" }}>timer</span>
             <span className="text-sm font-bold tabular-nums" style={{ color: "#f2f2f2" }}>{fmtTimer(elapsed)}</span>
             <span className="text-xs" style={{ color: "#444" }}>· {session.exercises.filter((e) => (e.name||"").trim()).length} exercises</span>
           </div>

@@ -90,7 +90,7 @@ function ReelDiagnostic({ reels }: { reels: { id: string; mediaUrl?: string; cap
             <div key={r.id} style={{ background: "#111", borderRadius: 8, padding: "8px 10px", fontSize: 11 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                 <span style={{ color: "#888" }}>{r.caption.slice(0, 25) || r.id.slice(0, 8)} · {r.date}</span>
-                <span style={{ fontWeight: 700, color: r.status.includes("✅") ? "#22c55e" : r.status.includes("NO") ? "#f59e0b" : "#ef4444" }}>{r.status}</span>
+                <span style={{ fontWeight: 700, color: r.status.includes("✅") ? "var(--fx-accent)" : r.status.includes("NO") ? "#f59e0b" : "#ef4444" }}>{r.status}</span>
               </div>
               <span style={{ color: "#444" }}>bucket: {r.bucket}</span>
             </div>
@@ -143,7 +143,7 @@ function DiagnosticsTab({ diagResult, diagRunning, onRun }: {
         {/* Status banner */}
         {diagResult && (
           <div className="mb-4 p-3 rounded-xl flex items-center gap-2"
-            style={{ background: allOk ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)", border: `1px solid ${allOk ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}` }}>
+            style={{ background: allOk ? "rgba(var(--fx-accent-rgb),0.08)" : "rgba(239,68,68,0.08)", border: `1px solid ${allOk ? "rgba(var(--fx-accent-rgb),0.2)" : "rgba(239,68,68,0.2)"}` }}>
             <span style={{ fontSize: 16 }}>{allOk ? "✅" : "⚠️"}</span>
             <span className="text-sm font-bold" style={{ color: allOk ? "#34d399" : "#f87171" }}>
               {allOk ? "All Systems OK" : `${failed} Issue${failed > 1 ? "s" : ""} Found`}
@@ -761,7 +761,7 @@ export default function AdminPortalPage() {
               { label: "Total Users", value: users.length, icon: "group", color: "#34d399" },
               { label: "Ghost Workouts", value: ghosts.length, icon: "sprint", color: "#fb923c" },
               { label: "Workout Logs", value: workoutsLoaded ? workoutLogs.length : "—", icon: "fitness_center", color: "#34d399" },
-              { label: "Total Runs", value: runsLoaded ? runRoutes.length : "—", icon: "directions_run", color: "#22c55e" },
+              { label: "Total Runs", value: runsLoaded ? runRoutes.length : "—", icon: "directions_run", color: "var(--fx-accent)" },
               { label: "Pending Reports", value: pendingReports.length, icon: "flag", color: "#f87171" },
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-4 p-4 rounded-xl"
@@ -1265,7 +1265,7 @@ export default function AdminPortalPage() {
               return (
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: "Total runs", value: runRoutes.length, color: "#22c55e" },
+                    { label: "Total runs", value: runRoutes.length, color: "var(--fx-accent)" },
                     { label: "Total km", value: totalKm.toFixed(1), color: "#60a5fa" },
                     { label: "Runners", value: uniqueRunners, color: "#a78bfa" },
                     { label: "PRs set", value: prs, color: "#fbbf24" },
@@ -1699,7 +1699,7 @@ export default function AdminPortalPage() {
                   </div>
                   <p className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Moderation Bot</p>
                 </div>
-                <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(34,197,94,0.1)", color: "#34d399" }}>
+                <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "#34d399" }}>
                   Every 30 min
                 </span>
               </div>

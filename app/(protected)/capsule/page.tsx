@@ -264,10 +264,10 @@ export default function CapsulePage() {
                       const prog = getProgress(cap);
                       const pct = Math.min(100, Math.round((prog.current / prog.target) * 100));
                       return (
-                        <div key={cap.id} className="p-4 rounded-2xl" style={{ background: "#131313", border: `1px solid ${cap.unlocked ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.07)"}` }}>
+                        <div key={cap.id} className="p-4 rounded-2xl" style={{ background: "#131313", border: `1px solid ${cap.unlocked ? "rgba(var(--fx-accent-rgb),0.2)" : "rgba(255,255,255,0.07)"}` }}>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-lg">{cap.unlocked ? "🎉" : "🔒"}</span>
-                            <span className="text-sm font-bold" style={{ color: cap.unlocked ? "#22c55e" : "#f2f2f2" }}>
+                            <span className="text-sm font-bold" style={{ color: cap.unlocked ? "var(--fx-accent)" : "#f2f2f2" }}>
                               {cap.unlocked ? "Unlocked!" : "Locked"}
                             </span>
                             <span className="ml-auto text-xs" style={{ color: "#444" }}>{goalLabel(cap)}</span>
@@ -310,11 +310,11 @@ export default function CapsulePage() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     {community.map((cap) => (
-                      <div key={cap.id} className="p-4 rounded-2xl" style={{ background: "#131313", border: "1px solid rgba(34,197,94,0.15)" }}>
+                      <div key={cap.id} className="p-4 rounded-2xl" style={{ background: "#131313", border: "1px solid rgba(var(--fx-accent-rgb),0.15)" }}>
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-sm">🎉</span>
                           <span className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>{cap.authorName}</span>
-                          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>
                             {goalLabel(cap)}
                           </span>
                         </div>

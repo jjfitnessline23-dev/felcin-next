@@ -96,7 +96,7 @@ export default function TrainerProfileClient() {
             <p className="text-lg font-bold" style={{ color: "#f2f2f2" }}>{trainer.displayName}</p>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>
                 Certified Trainer
               </span>
               {trainer.sessionCount ? (

@@ -541,7 +541,7 @@ export default function StreamViewerPage() {
             {GIFTS.filter(g => g.ghost).map((gift) => {
               const styles: Record<string, { bg: string; border: string; label: string; price: string; filter: string; shadow: string }> = {
                 fire:     { bg: "linear-gradient(135deg,#1a0500,#2a0a00)", border: "1px solid rgba(249,115,22,0.35)", label: "#f97316", price: "#ea580c", filter: "sepia(1) saturate(8) hue-rotate(-30deg) brightness(1.3)", shadow: "0 0 16px rgba(249,115,22,0.15)" },
-                champion: { bg: "linear-gradient(135deg,#001a0a,#002a10)", border: "1px solid rgba(74,222,128,0.35)", label: "#4ade80", price: "#16a34a", filter: "hue-rotate(100deg) saturate(5) brightness(1.4)", shadow: "0 0 16px rgba(74,222,128,0.15)" },
+                champion: { bg: "linear-gradient(135deg,#001a0a,#002a10)", border: "1px solid rgba(var(--fx-accent2-rgb),0.35)", label: "var(--fx-accent-2)", price: "var(--fx-accent-dk)", filter: "hue-rotate(100deg) saturate(5) brightness(1.4)", shadow: "0 0 16px rgba(var(--fx-accent2-rgb),0.15)" },
                 gold:     { bg: "linear-gradient(135deg,#1a1200,#2a1e00)", border: "1px solid rgba(251,191,36,0.35)", label: "#fbbf24", price: "#d97706", filter: "sepia(1) saturate(6) hue-rotate(5deg) brightness(1.3)", shadow: "0 0 16px rgba(251,191,36,0.1)" },
                 diamond:  { bg: "linear-gradient(135deg,#0a0d1a,#0d1428)", border: "1px solid rgba(99,179,237,0.35)", label: "#93c5fd", price: "#3b82f6", filter: "hue-rotate(200deg) saturate(4) brightness(1.5) contrast(1.1)", shadow: "0 0 16px rgba(99,179,237,0.1)" },
               };

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import StripeCheckoutModal from "@/components/StripeCheckoutModal";
+import { isHalloweenActive, setHalloweenPref } from "@/components/HalloweenTheme";
 
 interface BlockedUser { uid: string; displayName?: string; photoURL?: string; }
 
@@ -124,6 +125,10 @@ export default function SettingsPage() {
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [blockedLoading, setBlockedLoading] = useState(true);
   const [unblocking, setUnblocking] = useState<string | null>(null);
+
+  // Appearance — Halloween theme (reflects the current effective state on mount)
+  const [halloween, setHalloween] = useState(false);
+  useEffect(() => { setHalloween(isHalloweenActive()); }, []);
 
   // Load settings
   useEffect(() => {
@@ -332,6 +337,10 @@ export default function SettingsPage() {
         </Section>
 
         {/* Support & Legal */}
+        <Section title="Appearance">
+          <Row icon="dark_mode" label="Halloween theme" sub="🎃 Pumpkin colors, bats & cobwebs (auto in late October)" right={<Toggle on={halloween} onChange={(v) => { setHalloween(v); setHalloweenPref(v ? "on" : "off"); }} />} />
+        </Section>
+
         <Section title="Support & Legal">
           <Row icon="help" label="Help & Support" href="/support" />
           <Row icon="privacy_tip" label="Privacy Policy" href="/privacy" />

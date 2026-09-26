@@ -110,16 +110,16 @@ export default function LiveRunPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {/* Avatar */}
           {session.photoURL ? (
-            <img src={session.photoURL} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(34,197,94,0.5)", flexShrink: 0 }} />
+            <img src={session.photoURL} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(var(--fx-accent-rgb),0.5)", flexShrink: 0 }} />
           ) : (
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1a1a1a", border: "2px solid rgba(34,197,94,0.5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16, fontWeight: 800, color: "#f2f2f2" }}>{initial}</div>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1a1a1a", border: "2px solid rgba(var(--fx-accent-rgb),0.5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16, fontWeight: 800, color: "#f2f2f2" }}>{initial}</div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: "#f2f2f2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.displayName}</span>
               {session.active ? (
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, color: "#22c55e", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)", padding: "2px 8px", borderRadius: 12 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", animation: "onAirPulse 1.4s ease-in-out infinite" }} />
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, color: "var(--fx-accent)", background: "rgba(var(--fx-accent-rgb),0.12)", border: "1px solid rgba(var(--fx-accent-rgb),0.25)", padding: "2px 8px", borderRadius: 12 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--fx-accent)", display: "inline-block", animation: "onAirPulse 1.4s ease-in-out infinite" }} />
                   LIVE
                 </span>
               ) : (
@@ -153,7 +153,7 @@ export default function LiveRunPage() {
 
         <div style={{ textAlign: "center", marginTop: 12 }}>
           <a href="https://felcin.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#333", textDecoration: "none", fontWeight: 600 }}>
-            Track your own runs on <span style={{ color: "#22c55e" }}>Felcin</span>
+            Track your own runs on <span style={{ color: "var(--fx-accent)" }}>Felcin</span>
           </a>
         </div>
       </div>

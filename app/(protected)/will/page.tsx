@@ -149,7 +149,7 @@ export default function WillPage() {
     const gap = Math.max(0, will.milestoneValue - current);
 
     return (
-      <div className="p-4 rounded-2xl" style={{ background: "#131313", border: `1px solid ${unlocked ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.07)"}` }}>
+      <div className="p-4 rounded-2xl" style={{ background: "#131313", border: `1px solid ${unlocked ? "rgba(var(--fx-accent-rgb),0.2)" : "rgba(255,255,255,0.07)"}` }}>
         <div className="flex items-center gap-2.5 mb-3">
           {will.authorPhoto ? (
             <img src={will.authorPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
@@ -176,11 +176,11 @@ export default function WillPage() {
               <button
                 onClick={() => handleReveal(will)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full border-none cursor-pointer"
-                style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                style={{ background: "rgba(var(--fx-accent-rgb),0.1)", color: "var(--fx-accent)" }}>
                 🎉 Mark as read
               </button>
             )}
-            {alreadyRevealed && <span className="text-xs" style={{ color: "#22c55e" }}>🎉 You unlocked this message</span>}
+            {alreadyRevealed && <span className="text-xs" style={{ color: "var(--fx-accent)" }}>🎉 You unlocked this message</span>}
           </div>
         ) : (
           <div>

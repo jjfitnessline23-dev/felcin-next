@@ -322,7 +322,7 @@ export default function AdvertisePage() {
                           <p style={{ fontSize: 14, fontWeight: 700, color: "#f2f2f2", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.title}</p>
                           <p style={{ fontSize: 12, color: "#555", margin: "0 0 8px", textTransform: "capitalize" }}>{ad.tier} · expires {new Date(ad.expiresAt.seconds * 1000).toLocaleDateString()}</p>
                         </div>
-                        <div style={{ padding: "4px 10px", borderRadius: 50, fontSize: 11, fontWeight: 700, background: ad.status === "active" ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.05)", color: ad.status === "active" ? "#22c55e" : "#555", border: `1px solid ${ad.status === "active" ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.08)"}` }}>
+                        <div style={{ padding: "4px 10px", borderRadius: 50, fontSize: 11, fontWeight: 700, background: ad.status === "active" ? "rgba(var(--fx-accent-rgb),0.1)" : "rgba(255,255,255,0.05)", color: ad.status === "active" ? "var(--fx-accent)" : "#555", border: `1px solid ${ad.status === "active" ? "rgba(var(--fx-accent-rgb),0.2)" : "rgba(255,255,255,0.08)"}` }}>
                           {ad.status === "active" ? "● Live" : "Ended"}
                         </div>
                       </div>

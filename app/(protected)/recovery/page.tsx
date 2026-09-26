@@ -50,7 +50,7 @@ function computeScore(logs: WorkoutLog[], nowMs: number) {
 }
 
 const LABELS = [
-  { min: 85, label: "Peak Ready 🚀", color: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.3)",  glow: "rgba(34,197,94,0.4)" },
+  { min: 85, label: "Peak Ready 🚀", color: "var(--fx-accent)", bg: "rgba(var(--fx-accent-rgb),0.12)",  border: "rgba(var(--fx-accent-rgb),0.3)",  glow: "rgba(var(--fx-accent-rgb),0.4)" },
   { min: 70, label: "Ready 💪",      color: "#84cc16", bg: "rgba(132,204,22,0.12)", border: "rgba(132,204,22,0.3)", glow: "rgba(132,204,22,0.4)" },
   { min: 55, label: "Moderate 👍",   color: "#eab308", bg: "rgba(234,179,8,0.12)",  border: "rgba(234,179,8,0.3)",  glow: "rgba(234,179,8,0.4)" },
   { min: 40, label: "Recover 😴",    color: "#f97316", bg: "rgba(249,115,22,0.12)", border: "rgba(249,115,22,0.3)", glow: "rgba(249,115,22,0.4)" },
@@ -65,7 +65,7 @@ const TIPS: Record<string, string> = {
   "Rest Day ⚠️":   "Full rest. Sleep and nutrition are your recovery tools.",
 };
 
-const ZONE_COLORS = ["#ef4444","#f97316","#eab308","#84cc16","#22c55e"];
+const ZONE_COLORS = ["#ef4444","#f97316","#eab308","#84cc16","var(--fx-accent)"];
 
 export default function RecoveryPage() {
   const { user } = useAuth();
@@ -248,11 +248,11 @@ export default function RecoveryPage() {
                 {result.factors.map((f, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: f.delta > 0 ? "#22c55e" : f.delta < 0 ? "#ef4444" : "#333" }} />
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: f.delta > 0 ? "var(--fx-accent)" : f.delta < 0 ? "#ef4444" : "#333" }} />
                       <span className="text-xs" style={{ color: f.applied ? "#d0d0d0" : "#444" }}>{f.label}</span>
                     </div>
                     <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full"
-                      style={{ color: f.delta > 0 ? "#22c55e" : f.delta < 0 ? "#ef4444" : "#444", background: f.delta > 0 ? "rgba(34,197,94,0.1)" : f.delta < 0 ? "rgba(239,68,68,0.1)" : "transparent" }}>
+                      style={{ color: f.delta > 0 ? "var(--fx-accent)" : f.delta < 0 ? "#ef4444" : "#444", background: f.delta > 0 ? "rgba(var(--fx-accent-rgb),0.1)" : f.delta < 0 ? "rgba(239,68,68,0.1)" : "transparent" }}>
                       {f.delta > 0 ? `+${f.delta}` : f.delta === 0 ? "—" : f.delta}
                     </span>
                   </div>
@@ -285,14 +285,14 @@ export default function RecoveryPage() {
             {/* ── Steps ── */}
             {(hkGranted || stepsLoading) && (
               <div className="rounded-3xl p-5 relative overflow-hidden"
-                style={{ background: "linear-gradient(135deg,#050f0a,#0a1a12)", border: "1px solid rgba(34,197,94,0.2)" }}>
-                <div className="absolute pointer-events-none" style={{ top: "-40%", right: "-10%", width: 200, height: 200, background: "radial-gradient(circle,rgba(34,197,94,0.12) 0%,transparent 70%)" }} />
+                style={{ background: "linear-gradient(135deg,#050f0a,#0a1a12)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)" }}>
+                <div className="absolute pointer-events-none" style={{ top: "-40%", right: "-10%", width: 200, height: 200, background: "radial-gradient(circle,rgba(var(--fx-accent-rgb),0.12) 0%,transparent 70%)" }} />
                 <div className="relative">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)" }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>directions_walk</span>
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--fx-accent-rgb),0.15)", border: "1px solid rgba(var(--fx-accent-rgb),0.3)" }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: "var(--fx-accent)", fontVariationSettings: "'FILL' 1" }}>directions_walk</span>
                     </div>
-                    <span className="text-xs font-black tracking-widest" style={{ color: "#22c55e", letterSpacing: "0.15em" }}>DAILY STEPS</span>
+                    <span className="text-xs font-black tracking-widest" style={{ color: "var(--fx-accent)", letterSpacing: "0.15em" }}>DAILY STEPS</span>
                   </div>
 
                   {stepsLoading ? (
@@ -313,9 +313,9 @@ export default function RecoveryPage() {
                       <div className="flex items-center gap-3 mb-5">
                         <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                           <div className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${stepPct}%`, background: stepPct >= 100 ? "#22c55e" : "linear-gradient(90deg,#16a34a,#22c55e)" }} />
+                            style={{ width: `${stepPct}%`, background: stepPct >= 100 ? "var(--fx-accent)" : "linear-gradient(90deg,var(--fx-accent-dk),var(--fx-accent))" }} />
                         </div>
-                        <span className="text-xs font-bold shrink-0" style={{ color: stepPct >= 100 ? "#22c55e" : "#555" }}>
+                        <span className="text-xs font-bold shrink-0" style={{ color: stepPct >= 100 ? "var(--fx-accent)" : "#555" }}>
                           {stepPct >= 100 ? "Goal ✓" : `${STEP_GOAL.toLocaleString()} goal`}
                         </span>
                       </div>
@@ -332,14 +332,14 @@ export default function RecoveryPage() {
                               return (
                                 <div key={d.date} className="flex flex-col items-center gap-1 flex-1">
                                   <div className="w-full rounded-t-md transition-all duration-500 relative"
-                                    style={{ height: `${Math.max(4, pct)}%`, background: isToday ? "#22c55e" : "rgba(34,197,94,0.25)", minHeight: 4 }}>
+                                    style={{ height: `${Math.max(4, pct)}%`, background: isToday ? "var(--fx-accent)" : "rgba(var(--fx-accent-rgb),0.25)", minHeight: 4 }}>
                                     {isToday && d.steps > 0 && (
-                                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap" style={{ color: "#22c55e" }}>
+                                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap" style={{ color: "var(--fx-accent)" }}>
                                         {d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps}
                                       </div>
                                     )}
                                   </div>
-                                  <span className="text-[9px]" style={{ color: isToday ? "#22c55e" : "#444" }}>{dayLabel}</span>
+                                  <span className="text-[9px]" style={{ color: isToday ? "var(--fx-accent)" : "#444" }}>{dayLabel}</span>
                                 </div>
                               );
                             })}
@@ -350,7 +350,7 @@ export default function RecoveryPage() {
                       {/* Step stats row */}
                       <div className="flex gap-3 mt-4">
                         {[
-                          { label: "Today", value: steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : String(steps), color: "#22c55e" },
+                          { label: "Today", value: steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : String(steps), color: "var(--fx-accent)" },
                           { label: "Weekly avg", value: weekly.length > 0 ? `${Math.round(weekly.reduce((s, d) => s + d.steps, 0) / weekly.length).toLocaleString()}` : "—", color: "#f2f2f2" },
                           { label: "Best day", value: maxWeekly >= 1000 ? `${(maxWeekly / 1000).toFixed(1)}k` : String(maxWeekly), color: "#f2f2f2" },
                         ].map((s) => (

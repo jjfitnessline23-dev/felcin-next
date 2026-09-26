@@ -53,7 +53,7 @@ export default function WatchLinkPage() {
         ) : status === "success" ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-            <p style={{ color: "#22c55e", fontSize: 16, fontWeight: 700, margin: 0 }}>{message}</p>
+            <p style={{ color: "var(--fx-accent)", fontSize: 16, fontWeight: 700, margin: 0 }}>{message}</p>
           </div>
         ) : (
           <>

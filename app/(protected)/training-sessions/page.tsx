@@ -25,7 +25,7 @@ interface TrainingSession {
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#f59e0b",
-  accepted: "#22c55e",
+  accepted: "var(--fx-accent)",
   declined: "#ef4444",
   completed: "#6d28d9",
 };
@@ -121,25 +121,25 @@ export default function TrainingSessionsPage() {
 
       {/* Cinematic Hero */}
       <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"
-        style={{ background: "linear-gradient(135deg,#011208 0%,#031a0c 50%,#011208 100%)", border: "1px solid rgba(34,197,94,0.2)", minHeight: 160 }}>
-        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(34,197,94,0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
-        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(34,197,94,0.25) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
+        style={{ background: "linear-gradient(135deg,#011208 0%,#031a0c 50%,#011208 100%)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)", minHeight: 160 }}>
+        <div className="absolute left-0 w-full pointer-events-none" style={{ height: 1.5, background: "linear-gradient(90deg,transparent,rgba(var(--fx-accent-rgb),0.35),transparent)", animation: "scanLine 5s linear infinite", zIndex: 1 }} />
+        <div className="absolute pointer-events-none" style={{ top: "-30%", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse at center,rgba(var(--fx-accent-rgb),0.25) 0%,transparent 65%)", animation: "heroGlow 4s ease-in-out infinite" }} />
         <div className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none select-none">
           <img src="/static/logo-nav.svg" alt="" style={{ width: 160, opacity: 0.05, filter: "grayscale(1) brightness(3) sepia(1) hue-rotate(90deg)", animation: "floatLogo 8s ease-in-out infinite" }} />
         </div>
         <div className="relative z-10 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "#22c55e", fontVariationSettings: "'FILL' 1" }}>event_available</span>
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: "rgba(var(--fx-accent-rgb),0.2)", border: "1px solid rgba(var(--fx-accent-rgb),0.4)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13, color: "var(--fx-accent)", fontVariationSettings: "'FILL' 1" }}>event_available</span>
             </div>
-            <span className="text-xs font-black tracking-widest" style={{ color: "#22c55e", letterSpacing: "0.18em" }}>MY SESSIONS</span>
+            <span className="text-xs font-black tracking-widest" style={{ color: "var(--fx-accent)", letterSpacing: "0.18em" }}>MY SESSIONS</span>
           </div>
           <h1 className="font-black mb-1" style={{ fontSize: "clamp(1.6rem,6vw,2.2rem)", letterSpacing: -1, background: "linear-gradient(135deg,#fff 0%,#86efac 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Training Sessions</h1>
           <p className="text-sm" style={{ color: "#555" }}>Your bookings with personal trainers</p>
           <div className="flex items-center gap-4 mt-3">
-            <div><span className="text-base font-black" style={{ color: "#22c55e" }}>{upcoming.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>upcoming</span></div>
+            <div><span className="text-base font-black" style={{ color: "var(--fx-accent)" }}>{upcoming.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>upcoming</span></div>
             <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.07)" }} />
-            <div><span className="text-base font-black" style={{ color: "#22c55e" }}>{past.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>completed</span></div>
+            <div><span className="text-base font-black" style={{ color: "var(--fx-accent)" }}>{past.length}</span><span className="text-xs ml-1.5" style={{ color: "#555" }}>completed</span></div>
           </div>
         </div>
       </div>
@@ -151,8 +151,8 @@ export default function TrainingSessionsPage() {
         </div>
       )}
       {verifyMsg && !verifying && (
-        <div className="mx-4 mt-3 p-3 rounded-xl" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
-          <span className="text-sm" style={{ color: "#22c55e" }}>{verifyMsg}</span>
+        <div className="mx-4 mt-3 p-3 rounded-xl" style={{ background: "rgba(var(--fx-accent-rgb),0.08)", border: "1px solid rgba(var(--fx-accent-rgb),0.2)" }}>
+          <span className="text-sm" style={{ color: "var(--fx-accent)" }}>{verifyMsg}</span>
         </div>
       )}
 
@@ -223,8 +223,8 @@ export default function TrainingSessionsPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined" style={{ fontSize: 14, color: hasLog ? "#22c55e" : "#444" }}>fitness_center</span>
-                <span className="text-xs" style={{ color: hasLog ? "#22c55e" : "#555" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: hasLog ? "var(--fx-accent)" : "#444" }}>fitness_center</span>
+                <span className="text-xs" style={{ color: hasLog ? "var(--fx-accent)" : "#555" }}>
                   {hasLog ? `${(s.exercises || []).length} exercises planned` : "Workout log not built yet"}
                 </span>
               </div>
