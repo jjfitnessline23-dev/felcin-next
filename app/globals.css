@@ -91,6 +91,49 @@ html.theme-halloween .ghost-eye-glow { filter: drop-shadow(0 0 8px rgba(168,85,2
   .hw-bat { display: none; }
 }
 
+/* ══════════════════════ 🎄 Christmas theme ══════════════════════
+   Toggled by `theme-christmas` on <html> (components/ChristmasTheme.tsx).
+   Recolors the brand accent to holly red, keeps a festive green secondary,
+   and layers falling snow. Defined after the Halloween block so it wins if
+   both are ever active at once. */
+html.theme-christmas {
+  --fx-accent: #e23b3b;      /* holly red */
+  --fx-accent-2: #34d17a;    /* christmas green */
+  --fx-accent-dk: #b01e1e;   /* deep red */
+  --fx-accent-rgb: 226,59,59;
+  --fx-accent2-rgb: 52,209,122;
+  --accent: #e23b3b;
+  --accent-soft: rgba(226,59,59,0.1);
+  --primary: #e23b3b;
+  --primary-light: #ff6b6b;
+  --grad: #e23b3b;
+}
+html.theme-christmas .btn-pill.is-active {
+  background: #e23b3b; color: #fff; border-color: #e23b3b;
+  box-shadow: 0 0 20px rgba(226,59,59,0.35);
+}
+html.theme-christmas .nav-link.active { color: #ff6b6b; }
+html.theme-christmas .spinner { border-top-color: #e23b3b; }
+html.theme-christmas .ghost-eye-glow { filter: drop-shadow(0 0 8px rgba(52,209,122,0.9)); }
+/* If both seasonal classes are somehow active, hide the Halloween decorations */
+html.theme-christmas .hw-decor { display: none; }
+
+/* ── Snow (rendered by ChristmasTheme, only present when class is on) ── */
+.xmas-decor { position: fixed; inset: 0; z-index: 45; pointer-events: none; overflow: hidden; }
+.xmas-snow {
+  position: absolute; top: -6vh; color: #fff; opacity: 0.85;
+  will-change: transform; animation: xmasFall linear infinite;
+  text-shadow: 0 0 5px rgba(255,255,255,0.6);
+}
+@keyframes xmasFall {
+  0%   { transform: translateY(-6vh) translateX(0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 0.9; }
+  100% { transform: translateY(108vh) translateX(5vw) rotate(360deg); opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xmas-snow { display: none; }
+}
+
 html, body {
   background: var(--bg) !important;
   color: var(--text) !important;

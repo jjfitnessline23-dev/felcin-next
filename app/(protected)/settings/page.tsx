@@ -9,6 +9,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import StripeCheckoutModal from "@/components/StripeCheckoutModal";
 import { isHalloweenActive, setHalloweenPref } from "@/components/HalloweenTheme";
+import { isChristmasActive, setChristmasPref } from "@/components/ChristmasTheme";
 
 interface BlockedUser { uid: string; displayName?: string; photoURL?: string; }
 
@@ -126,9 +127,10 @@ export default function SettingsPage() {
   const [blockedLoading, setBlockedLoading] = useState(true);
   const [unblocking, setUnblocking] = useState<string | null>(null);
 
-  // Appearance — Halloween theme (reflects the current effective state on mount)
+  // Appearance — seasonal themes (reflect the current effective state on mount)
   const [halloween, setHalloween] = useState(false);
-  useEffect(() => { setHalloween(isHalloweenActive()); }, []);
+  const [christmas, setChristmas] = useState(false);
+  useEffect(() => { setHalloween(isHalloweenActive()); setChristmas(isChristmasActive()); }, []);
 
   // Load settings
   useEffect(() => {
@@ -338,7 +340,8 @@ export default function SettingsPage() {
 
         {/* Support & Legal */}
         <Section title="Appearance">
-          <Row icon="dark_mode" label="Halloween theme" sub="🎃 Pumpkin colors, bats & cobwebs (auto in late October)" right={<Toggle on={halloween} onChange={(v) => { setHalloween(v); setHalloweenPref(v ? "on" : "off"); }} />} />
+          <Row icon="dark_mode" label="Halloween theme" sub="🎃 Pumpkin colors, bats & cobwebs (auto in late October)" right={<Toggle on={halloween} onChange={(v) => { setHalloween(v); setHalloweenPref(v ? "on" : "off"); if (v) { setChristmas(false); setChristmasPref("off"); } }} />} />
+          <Row icon="ac_unit" label="Christmas theme" sub="🎄 Holly-red colors & falling snow (auto in December)" right={<Toggle on={christmas} onChange={(v) => { setChristmas(v); setChristmasPref(v ? "on" : "off"); if (v) { setHalloween(false); setHalloweenPref("off"); } }} />} />
         </Section>
 
         <Section title="Support & Legal">
