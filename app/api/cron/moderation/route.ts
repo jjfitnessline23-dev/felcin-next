@@ -16,13 +16,14 @@ function getAdmin() {
 const POLICY_PROMPT = `You are a strict content moderation AI for Felcin, a fitness social media platform.
 Analyze the content for policy violations. Violation categories:
 - hate_speech: attacks based on race, religion, gender, sexuality, disability, etc.
-- explicit_content: nudity, sexual content, pornography
+- explicit_content: nudity or sexual content. BLOCK: exposed genitals/anus, exposed female nipples/areola, fully bare buttocks, sexual acts, pornographic or sexually explicit imagery, or content that is primarily sexual. This is a FITNESS app — do NOT flag gym wear, sports bras, shirtless training/bodybuilding, swimwear/bikinis in an athletic or beach context, or physique/progress photos in normal athletic attire.
 - violence: threats of harm, graphic violence, content glorifying violence
 - harassment: bullying, targeted abuse, doxxing, intimidation of individuals
 - spam: scam links, fake giveaways, unsolicited commercial content, bot behavior
 - illegal_content: drug dealing, weapons sales, illegal services
 
 Only flag clear, high-confidence violations. Do not flag fitness content, workout discussion, or mild language.
+Nudity and sexual content are ZERO-TOLERANCE: if you are confident an image contains real nudity or sexual content, flag it as explicit_content (use medium or high severity — never low for real nudity).
 
 Respond ONLY with valid JSON, no other text:
 {"violation":boolean,"category":"hate_speech"|"explicit_content"|"violence"|"harassment"|"spam"|"illegal_content"|"none","severity":"low"|"medium"|"high","reason":"brief explanation or empty string if no violation"}`;
@@ -174,7 +175,10 @@ export async function POST(req: NextRequest) {
           await db.collection(item.collection).doc(item.id).update({ aiModerated: true, aiModeratedAt: admin.firestore.FieldValue.serverTimestamp() });
           results.scanned++;
 
-          if (result.violation && result.severity !== "low") {
+          // Nudity/sexual content is zero-tolerance: act on it at ANY severity.
+          // Everything else keeps the higher (medium+) bar to avoid false bans.
+          const isExplicit = result.category === "explicit_content";
+          if (result.violation && (result.severity !== "low" || isExplicit)) {
             // Create report entry (shows up in admin Reports tab)
             await db.collection("reports").add({
               [item.collection === "posts" ? "postId" : "reelId"]: item.id,
@@ -187,6 +191,13 @@ export async function POST(req: NextRequest) {
               status: "pending",
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+
+            // Immediately take the offending media DOWN. For nudity/sexual content
+            // and any high-severity violation, remove it from feeds right away
+            // (evidence is preserved in the report above + the user's violation log).
+            if (isExplicit || result.severity === "high") {
+              await db.collection(item.collection).doc(item.id).delete().catch(() => {});
+            }
 
             const banApplied = await applyViolation(db, item.authorId, {
               contentId: item.id,
@@ -225,7 +236,7 @@ export async function POST(req: NextRequest) {
             await db.collection("users").doc(userDoc.id).update({ bioModerated: true });
             results.scanned++;
 
-            if (result.violation && result.severity !== "low") {
+            if (result.violation && (result.severity !== "low" || result.category === "explicit_content")) {
               await db.collection("reports").add({
                 authorId: userDoc.id,
                 reporterId: "ai-bot",

@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
 import PageHeader from "@/components/PageHeader";
+import { PostCardSkeleton } from "@/components/SkeletonCard";
 
 interface Post { id: string; authorId: string; authorName?: string; authorPhoto?: string; caption?: string; text?: string; mediaUrl?: string; contentType?: string; mimeType?: string; likes?: number; comments?: number; likedBy?: string[]; createdAt?: { seconds: number } | null; }
 
@@ -61,7 +62,7 @@ export default function BookmarksPage() {
 
       <div className="px-4">
         {loading ? (
-          <div className="ghost-bg flex justify-center py-24 rounded-3xl"><div className="spinner" /></div>
+          <div className="flex flex-col gap-4">{[1, 2, 3].map((i) => <PostCardSkeleton key={i} />)}</div>
         ) : posts.length === 0 ? (
           <div className="ghost-bg text-center py-20 rounded-3xl">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"

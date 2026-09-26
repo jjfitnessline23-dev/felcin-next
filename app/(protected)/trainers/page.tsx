@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, orderBy, limit } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 interface TrainerProfile {
   uid: string;
@@ -81,7 +82,7 @@ export default function TrainersPage() {
 
       <div className="px-4 pt-3">
         {loading ? (
-          <div className="flex justify-center py-16"><div className="spinner" /></div>
+          <ListSkeleton count={5} />
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3">
             <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#333" }}>fitness_center</span>

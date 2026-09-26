@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, addDoc, orderBy, serverTimestamp } from "@/lib/db";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, addDoc, orderBy, serverTimestamp } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 interface TrainerProfile {
   displayName: string;
@@ -85,19 +86,17 @@ export default function TrainerDashboardPage() {
   useEffect(() => {
     if (!user) return;
     const ref = doc(db, "trainerProfiles", user.uid);
-    import("firebase/firestore").then(({ getDoc }) => {
-      getDoc(ref).then((snap) => {
-        if (snap.exists()) {
-          const d = snap.data() as TrainerProfile;
-          setProfile(d);
-          setBio(d.bio || "");
-          setRate(d.ratePerSession ? String(d.ratePerSession / 100) : "");
-          setSelectedSpecs(d.specialty || []);
-          setIsActive(d.isActive ?? false);
-        }
-        setProfileLoaded(true);
-      }).catch(() => setProfileLoaded(true));
-    });
+    getDoc(ref).then((snap) => {
+      if (snap.exists()) {
+        const d = snap.data() as TrainerProfile;
+        setProfile(d);
+        setBio(d.bio || "");
+        setRate(d.ratePerSession ? String(d.ratePerSession / 100) : "");
+        setSelectedSpecs(d.specialty || []);
+        setIsActive(d.isActive ?? false);
+      }
+      setProfileLoaded(true);
+    }).catch(() => setProfileLoaded(true));
   }, [user]);
 
   useEffect(() => {
@@ -350,7 +349,7 @@ export default function TrainerDashboardPage() {
       {tab === "requests" && (
         <div className="px-4 flex flex-col gap-3">
           {sessionsLoading ? (
-            <div className="flex justify-center py-12"><div className="spinner" /></div>
+            <ListSkeleton count={4} />
           ) : pending.length === 0 ? (
             <div className="flex flex-col items-center py-16 gap-3">
               <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#333" }}>inbox</span>
@@ -402,7 +401,7 @@ export default function TrainerDashboardPage() {
           </button>
 
           {sessionsLoading ? (
-            <div className="flex justify-center py-12"><div className="spinner" /></div>
+            <ListSkeleton count={4} />
           ) : (
             <>
               {upcoming.length > 0 && (

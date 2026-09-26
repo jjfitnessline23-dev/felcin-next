@@ -82,9 +82,28 @@ export default function MobileNav() {
   const initial = displayName.charAt(0).toUpperCase();
 
   useEffect(() => { setOpen(false); }, [pathname]);
+  // Lock page scroll while the drawer is open. `overflow: hidden` on <body>
+  // is ignored by iOS/Android WebViews (Capacitor), so we pin the body with
+  // position:fixed and restore the scroll offset on close.
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (!open) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.width = "";
+      body.style.overflow = "";
+      window.scrollTo(0, scrollY);
+    };
   }, [open]);
 
   // Re-open drawer when user navigates back to the "menu open" history state
@@ -168,8 +187,10 @@ export default function MobileNav() {
 
       {/* Backdrop */}
       {open && (
-        <div className="mobile-nav-drawer fixed inset-0 z-[60]" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-          onClick={() => setOpen(false)} />
+        <div className="mobile-nav-drawer fixed inset-0 z-[60]"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", touchAction: "none", overscrollBehavior: "contain" }}
+          onClick={() => setOpen(false)}
+          onTouchMove={(e) => e.preventDefault()} />
       )}
 
       {/* Slide-up drawer */}
@@ -179,6 +200,7 @@ export default function MobileNav() {
           borderTop: "1px solid rgba(255,255,255,0.08)",
           maxHeight: "85dvh",
           transform: open ? "translateY(0)" : "translateY(100%)",
+          visibility: open ? "visible" : "hidden",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}>
 
@@ -210,7 +232,7 @@ export default function MobileNav() {
         </div>
 
         {/* Scrollable menu */}
-        <div className="overflow-y-auto flex-1 px-3 py-2">
+        <div className="overflow-y-auto flex-1 px-3 py-2" style={{ overscrollBehavior: "contain" }}>
 
           {/* DASHBOARD — featured entry */}
           <Link href="/dashboard" onClick={() => setOpen(false)}

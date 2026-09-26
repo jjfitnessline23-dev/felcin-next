@@ -113,7 +113,7 @@ export default function ReelsPage() {
     const bm = bookmarkedIds.has(reel.id);
     setBookmarkedIds((prev) => { const n = new Set(prev); bm ? n.delete(reel.id) : n.add(reel.id); return n; });
     const ref = doc(db, "users", user.uid, "bookmarks", reel.id);
-    if (bm) { await ref && import("firebase/firestore").then(({ deleteDoc }) => deleteDoc(ref)).catch(() => {}); }
+    if (bm) { await deleteDoc(ref).catch(() => {}); }
     else { await setDoc(ref, { reelId: reel.id, savedAt: serverTimestamp() }).catch(() => {}); }
   }
 
@@ -285,7 +285,7 @@ export default function ReelsPage() {
                   {(reel.repostCount ?? 0) > 0 && <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(reel.repostCount ?? 0).toLocaleString()}</span>}
                 </button>
                 {/* Share */}
-                <button onClick={() => { if (navigator.share) navigator.share({ url: `${window.location.origin}/reels` }).catch(() => {}); }}
+                <button onClick={() => { const url = `${window.location.origin}/reels/${reel.id}`; if (navigator.share) navigator.share({ url }).catch(() => {}); else navigator.clipboard?.writeText(url).catch(() => {}); }}
                   className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
                   <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#fff", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>ios_share</span>
                 </button>

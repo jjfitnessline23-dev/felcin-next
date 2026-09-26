@@ -37,6 +37,7 @@ interface Post {
   repostOriginalAuthorName?: string | null;
   ppvPrice?: number | null;
   mediaUrlDownload?: string | null;
+  thumbnailUrl?: string;
 }
 
 function resolveMediaType(contentType?: string, mimeType?: string, url?: string): "video" | "image" {
@@ -108,6 +109,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const [liked, setLiked] = useState(Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || ""));
   const [likeCount, setLikeCount] = useState(typeof post.likes === "number" ? post.likes : 0);
   const [imgBroken, setImgBroken] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const [videoMuted, setVideoMuted] = useState(true);
   const [liking, setLiking] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -445,47 +447,12 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           return;
         } catch { /* fall through to URL share */ }
       } else {
-        // Videos — same smart blob flow as download (reuses cached blob)
-        if (vidBlob) {
-          setVidReady(false);
-          const file = new File([vidBlob], `felcin-${post.id}.mp4`, { type: "video/mp4" });
-          const isMobileShare = navigator.maxTouchPoints > 0;
-          if (isMobileShare && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-            try { await navigator.share({ files: [file], title: "Felcin", text: shareTitle }); } catch {}
-          } else {
-            const a = document.createElement("a");
-            const blobUrl = URL.createObjectURL(vidBlob);
-            a.href = blobUrl;
-            a.download = `felcin-${post.id}.mp4`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-            setSavedToast(true);
-            setTimeout(() => setSavedToast(false), 3000);
-          }
-          return;
+        // Videos — always share the post URL. Sharing the raw video file behaves
+        // like a download on some devices and blows past the iOS share-gesture
+        // window; the URL opens the post (which plays the video) reliably.
+        try { await navigator.share({ title: shareTitle, url: postUrl }); return; } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return;
         }
-        setDownloading(true);
-        setVidReady(false);
-        const videoSrc = post.mediaUrlDownload || post.mediaUrl;
-        const videoProxy = `/api/proxy-media?url=${encodeURIComponent(videoSrc)}`;
-        try {
-          const res = await fetch(videoProxy);
-          if (!res.ok) throw new Error();
-          const blob = await res.blob();
-          setVidBlob(blob);
-          const file = new File([blob], `felcin-${post.id}.mp4`, { type: "video/mp4" });
-          try {
-            await navigator.share({ files: [file], title: "Felcin", text: shareTitle });
-            return;
-          } catch (err) {
-            if (err instanceof Error && err.name === "AbortError") return;
-            setVidReady(true); // gesture expired — show tap button
-          }
-        } catch {}
-        finally { setDownloading(false); }
-        return;
       }
     }
 
@@ -493,7 +460,18 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     try {
       if (navigator.share) { await navigator.share({ title: shareTitle, url: postUrl }); return; }
     } catch {}
-    try { await navigator.clipboard.writeText(postUrl); } catch {}
+    let clipOk = false;
+    try { await navigator.clipboard.writeText(postUrl); clipOk = true; } catch {}
+    if (!clipOk) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = postUrl; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        clipOk = true;
+      } catch {}
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -647,7 +625,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           {/* Primary author */}
           <Link href={`/user-profile?uid=${post.authorId}`} className="flex items-center gap-2 min-w-0">
             {post.authorPhoto ? (
-              <img src={post.authorPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 36, height: 36 }} />
+              <img src={post.authorPhoto} alt="" width={36} height={36} loading="eager" className="rounded-full object-cover shrink-0" style={{ width: 36, height: 36 }} />
             ) : (
               <div className="rounded-full flex items-center justify-center font-bold text-sm shrink-0"
                 style={{ width: 36, height: 36, background: "#222", color: "#aaa" }}>
@@ -677,7 +655,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
             <div className="font-semibold text-sm truncate" style={{ color: "#f2f2f2" }}>
               {post.collabUid
                 ? <><Link href={`/user-profile?uid=${post.authorId}`}>{displayName}</Link><span style={{ color: "#555" }}> × </span><Link href={`/user-profile?uid=${post.collabUid}`}>{post.collabName || "Collaborator"}</Link></>
-                : displayName
+                : <Link href={`/user-profile?uid=${post.authorId}`}>{displayName}</Link>
               }
             </div>
             {timeStr && <div className="text-xs" style={{ color: "#444" }}>{timeStr}</div>}
@@ -693,7 +671,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         <div className="relative" style={{ background: "#111", overflow: "hidden" }}>
           {isLocked ? (
             <div className="relative w-full flex flex-col items-center justify-center gap-3" style={{ aspectRatio: "1/1", background: "#111" }}>
-              {post.mediaUrl && <img src={post.mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: "blur(20px) brightness(0.3)" }} />}
+              {post.mediaUrl && <img src={post.mediaUrl} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" style={{ filter: "blur(20px) brightness(0.3)" }} />}
               <div className="relative flex flex-col items-center gap-3 px-6 text-center">
                 <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)" }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>lock</span>
@@ -716,6 +694,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
               <video
                 ref={videoRef}
                 src={post.mediaUrl}
+                poster={post.thumbnailUrl || undefined}
                 muted loop playsInline preload="none"
                 className="w-full h-full object-cover cursor-pointer"
                 onClick={() => openLightbox(true)}
@@ -737,8 +716,15 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
               </button>
             </div>
           ) : (
-            <div className="w-full cursor-pointer" onClick={() => openLightbox(false)}>
-              <img src={post.mediaUrl} alt="Post" className="w-full h-auto block" loading="lazy" onError={() => setImgBroken(true)} />
+            <div className="w-full cursor-pointer relative" onClick={() => openLightbox(false)}
+              style={{ background: imgLoaded ? "transparent" : "linear-gradient(110deg,#141414 30%,#1c1c1c 50%,#141414 70%)", backgroundSize: "200% 100%", animation: imgLoaded ? "none" : "shimmer 1.4s linear infinite", minHeight: imgLoaded ? undefined : 220 }}>
+              <img src={post.mediaUrl} alt={post.caption || `Post by ${displayName}`}
+                className="w-full h-auto block"
+                loading="lazy" decoding="async"
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgBroken(true)}
+                style={{ opacity: imgLoaded ? 1 : 0, transition: "opacity 0.35s ease" }}
+              />
             </div>
           )}
           {viewsLeft !== null && (
@@ -856,7 +842,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         {isVideo
           ? <video ref={lbVideoRef} src={post.mediaUrl} autoPlay loop playsInline
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-          : <img src={post.mediaUrl} alt=""
+          : <img src={post.mediaUrl} alt={post.caption || `Post by ${displayName}`}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         }
 

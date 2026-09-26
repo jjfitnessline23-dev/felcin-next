@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { sendLiveNotification } from "@/lib/notify";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 type Privacy = "public" | "followers";
 interface Stream {
@@ -341,7 +342,7 @@ export default function LivePage() {
             STREAM CARDS
         ════════════════════════════════ */}
         {streamsLoading ? (
-          <div className="flex justify-center py-16"><div className="spinner" /></div>
+          <ListSkeleton count={4} />
 
         ) : streams.length === 0 ? (
           /* Empty state */

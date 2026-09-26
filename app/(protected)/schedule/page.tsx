@@ -6,6 +6,7 @@ import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 interface ScheduledClass {
   id: string; hostId: string; hostName: string; hostPhoto?: string;
@@ -132,7 +133,7 @@ export default function SchedulePage() {
       <div className="px-4 pt-2">
 
       {loading ? (
-        <div className="flex justify-center py-16"><div className="spinner" /></div>
+        <ListSkeleton count={5} />
       ) : classes.length === 0 ? (
         <div className="ghost-bg text-center py-20 rounded-3xl">
           <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"

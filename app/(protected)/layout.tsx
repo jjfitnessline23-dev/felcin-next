@@ -14,6 +14,17 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
+// Pages that must never be the first thing painted on a cold app open
+const COLD_START_RESET = ["/creator", "/stories", "/live/", "/run"];
+
+// Synchronous cold-start check — runs during render, before any paint
+function useColdStartGuard(pathname: string) {
+  if (typeof window === "undefined") return false;
+  const isWarm = sessionStorage.getItem("felcin_warm") === "1";
+  if (!isWarm) sessionStorage.setItem("felcin_warm", "1");
+  return !isWarm && COLD_START_RESET.some((p) => pathname.startsWith(p));
+}
+
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, banned, signOut } = useAuth();
   const router = useRouter();
@@ -21,7 +32,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const onboardingChecked = useRef(false);
   const userCountedToday = useRef(false);
   const profileEnsured = useRef(false);
+  const shouldResetToHome = useColdStartGuard(pathname);
   usePushNotifications();
+
+  // Fire the redirect after mount (router needs to be ready)
+  useEffect(() => {
+    if (shouldResetToHome) router.replace("/");
+  }, [shouldResetToHome, router]);
 
   useEffect(() => {
     if (loading) return;
@@ -93,6 +110,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       }).catch(() => {});
     }
   }, [user, pathname]);
+
+  // Cold start on a transient page — paint nothing until redirect fires
+  if (shouldResetToHome) {
+    return <div className="fixed inset-0" style={{ background: "#090909" }} />;
+  }
 
   if (loading) {
     return (

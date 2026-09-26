@@ -6,12 +6,15 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 interface FollowUser { uid: string; displayName?: string; photoURL?: string; bio?: string; }
 
 export default function FollowingPage() {
   const { user } = useAuth();
+  const [uids, setUids] = useState<string[]>([]);
   const [list, setList] = useState<FollowUser[]>([]);
+  const [visibleCount, setVisibleCount] = useState(30);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"following" | "followers">("following");
   const [followingCount, setFollowingCount] = useState(0);
@@ -24,29 +27,40 @@ export default function FollowingPage() {
     return () => { unsub1(); unsub2(); };
   }, [user]);
 
+  // Live listener just collects the IDs (cheap) — profiles are fetched separately,
+  // paginated, so we never fire hundreds of profile reads at once.
   useEffect(() => {
     if (!user) return;
     setLoading(true);
+    setVisibleCount(30);
     const colPath = tab === "following"
       ? collection(db, "users", user.uid, "following")
       : collection(db, "users", user.uid, "followers");
-    return onSnapshot(colPath, async (snap) => {
-      try {
-        const uids = snap.docs.map((d) => tab === "following" ? d.data().followingId || d.id : d.data().followerId || d.id);
-        const users = await Promise.all(uids.map(async (uid) => {
-          try {
-            const pub = await getDoc(doc(db, "users", uid, "public", "profile"));
-            if (pub.exists()) { const d = pub.data(); return { uid, displayName: d.displayName || d.username || "User", photoURL: d.photoURL || "", bio: d.bio || "" }; }
-            const root = await getDoc(doc(db, "users", uid));
-            if (root.exists()) { const d = root.data(); return { uid, displayName: d.displayName || d.username || "User", photoURL: d.photoURL || "", bio: d.bio || "" }; }
-          } catch {}
-          return { uid };
-        }));
-        setList(users);
-      } catch {}
-      setLoading(false);
+    return onSnapshot(colPath, (snap) => {
+      setUids(snap.docs.map((d) => tab === "following" ? d.data().followingId || d.id : d.data().followerId || d.id));
     }, () => setLoading(false));
   }, [user, tab]);
+
+  // Fetch profiles only for the currently-visible slice.
+  useEffect(() => {
+    if (!user) return;
+    const slice = uids.slice(0, visibleCount);
+    if (slice.length === 0) { setList([]); setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      const users = await Promise.all(slice.map(async (uid) => {
+        try {
+          const pub = await getDoc(doc(db, "users", uid, "public", "profile"));
+          if (pub.exists()) { const d = pub.data(); return { uid, displayName: d.displayName || d.username || "User", photoURL: d.photoURL || "", bio: d.bio || "" }; }
+          const root = await getDoc(doc(db, "users", uid));
+          if (root.exists()) { const d = root.data(); return { uid, displayName: d.displayName || d.username || "User", photoURL: d.photoURL || "", bio: d.bio || "" }; }
+        } catch {}
+        return { uid };
+      }));
+      if (!cancelled) { setList(users); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [uids, visibleCount, user]);
 
   return (
     <div className="max-w-xl mx-auto pb-10 overflow-x-hidden">
@@ -96,7 +110,7 @@ export default function FollowingPage() {
 
       <div className="px-4">
         {loading ? (
-          <div className="ghost-bg flex justify-center py-24 rounded-3xl"><div className="spinner" /></div>
+          <ListSkeleton count={6} />
         ) : list.length === 0 ? (
           <div className="ghost-bg text-center py-20 rounded-3xl">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
@@ -146,6 +160,13 @@ export default function FollowingPage() {
                 </Link>
               );
             })}
+            {uids.length > list.length && (
+              <button onClick={() => setVisibleCount((v) => v + 30)}
+                className="mt-1 mx-auto px-6 py-2.5 rounded-full text-sm font-bold border-none cursor-pointer"
+                style={{ background: "rgba(6,182,212,0.1)", color: "#06b6d4", border: "1px solid rgba(6,182,212,0.2)" }}>
+                Load more
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -116,7 +116,7 @@ export default function LiveRunPage() {
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "#f2f2f2", truncate: "true" }}>{session.displayName}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#f2f2f2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.displayName}</span>
               {session.active ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, color: "#22c55e", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)", padding: "2px 8px", borderRadius: 12 }}>
                   <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", animation: "onAirPulse 1.4s ease-in-out infinite" }} />

@@ -266,6 +266,14 @@ main { animation: pageFadeIn 0.18s ease-out; }
   .mobile-nav-bar, .mobile-nav-drawer { display: none !important; }
 }
 
+/* Podcast mini-player: sit ABOVE the mobile nav bar (nav height + iPhone safe area) */
+.podcast-miniplayer {
+  bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .podcast-miniplayer { bottom: 0; left: 15rem; }
+}
+
 /* Private chats: break out of the 430px layout container and go full-screen */
 .private-chats-root {
   position: fixed;

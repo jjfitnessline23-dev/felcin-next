@@ -7,6 +7,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
 
 interface Chat { id: string; participants: string[]; lastMessage?: string; lastAt?: { seconds: number }; otherName?: string; otherPhoto?: string; }
 interface Msg { id: string; senderId: string; text?: string; type?: "text" | "image" | "audio"; imageUrl?: string; audioUrl?: string; createdAt?: { seconds: number }; }
@@ -168,6 +169,11 @@ export default function PrivateChatsPage() {
     if (!file || !user || !activeChat) return;
     setUploading(true);
     try {
+      try {
+        await assertMediaClean(file, () => user.getIdToken());
+      } catch (e) {
+        if (e instanceof NudityBlockedError) { setUploading(false); alert(e.message); return; }
+      }
       const sRef = storageRef(storage, `chat-media/${activeChat}/${Date.now()}-${user.uid}`);
       const snapshot = await uploadBytes(sRef, file);
       const url = await getDownloadURL(snapshot.ref);

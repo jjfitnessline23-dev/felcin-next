@@ -22,6 +22,58 @@ export function PostCardSkeleton() {
   );
 }
 
+export function ListRowSkeleton() {
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-12 h-12 rounded-full shrink-0 skeleton" />
+      <div className="flex-1">
+        <div className="h-3 rounded-full w-36 mb-2 skeleton" />
+        <div className="h-2.5 rounded-full w-24 skeleton" />
+      </div>
+      <div className="w-16 h-7 rounded-full skeleton shrink-0" />
+    </div>
+  );
+}
+
+export function ListSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {Array.from({ length: count }).map((_, i) => <ListRowSkeleton key={i} />)}
+    </div>
+  );
+}
+
+export function GridSkeleton({ count = 9 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="skeleton" style={{ aspectRatio: "1/1", borderRadius: 10 }} />
+      ))}
+    </div>
+  );
+}
+
+export function ProfileSkeleton() {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-5">
+        <div className="rounded-full skeleton shrink-0" style={{ width: 88, height: 88 }} />
+        <div className="flex-1">
+          <div className="h-4 rounded-full w-40 mb-3 skeleton" />
+          <div className="flex gap-5">
+            <div className="h-3 rounded-full w-12 skeleton" />
+            <div className="h-3 rounded-full w-12 skeleton" />
+            <div className="h-3 rounded-full w-12 skeleton" />
+          </div>
+        </div>
+      </div>
+      <div className="h-3 rounded-full w-3/4 mb-2 skeleton" />
+      <div className="h-3 rounded-full w-1/2 mb-6 skeleton" />
+      <GridSkeleton count={9} />
+    </div>
+  );
+}
+
 export function GhostCardSkeleton() {
   return (
     <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>

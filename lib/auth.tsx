@@ -121,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       import("@capacitor-firebase/authentication")
         .then(({ FirebaseAuthentication }) => {
-          FirebaseAuthentication.addAuthStateChangeListener(({ user }) => {
+          // Plugin's TS types omit addAuthStateChangeListener in this version; cast to reach it.
+          (FirebaseAuthentication as any).addAuthStateChangeListener(({ user }: { user: any }) => {
             clearTimeout(capTimeout);
             handleUser(user);
           });

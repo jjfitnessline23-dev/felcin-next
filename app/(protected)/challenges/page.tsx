@@ -5,6 +5,7 @@ import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "@/
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 type ChallengeType = "general" | "run" | "cycle";
 
@@ -210,7 +211,7 @@ export default function ChallengesPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><div className="spinner" /></div>
+        <ListSkeleton count={5} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 rounded-3xl" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.05)" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 40, display: "block", color: "#1e1e1e", marginBottom: 12 }}>

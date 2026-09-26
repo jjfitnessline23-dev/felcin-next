@@ -268,7 +268,7 @@ export default function ExplorePage() {
                   <Link key={p.id} href={`/comments?postId=${p.id}`}
                     className="relative block" style={{ aspectRatio: "1", background: "#131313", overflow: "hidden", borderRadius: 4 }}>
                     {p.mediaUrl
-                      ? <img src={p.mediaUrl} alt="" className="w-full h-full object-cover" />
+                      ? <img src={p.mediaUrl} alt={p.caption || "Post"} className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center p-2 text-xs text-center" style={{ color: "#888" }}>{p.caption?.slice(0, 60)}</div>}
                   </Link>
                 ))}

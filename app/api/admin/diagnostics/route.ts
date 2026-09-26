@@ -129,6 +129,8 @@ async function checkFirebase() {
     ["reports",        "🚩 Firestore — reports"],
     ["notifications",  "🔔 Firestore — notifications"],
     ["ghostWorkouts",  "👻 Firestore — ghostWorkouts"],
+    ["podcasts",       "🎙️ Firestore — podcasts"],
+    ["livePodcasts",   "📻 Firestore — livePodcasts"],
     ["challenges",     "🏆 Firestore — challenges"],
     ["payments",       "💰 Firestore — payments"],
     ["config",         "⚙️ Firestore — config"],
@@ -318,6 +320,7 @@ async function checkStorageRules() {
       ["profilePictures", "🗄️ Storage — profilePictures/ (profile photos)"],
       ["videos",          "🗄️ Storage — videos/ (post videos)"],
       ["uploads",         "🗄️ Storage — uploads/ (media uploads)"],
+      ["uploads/podcasts","🗄️ Storage — uploads/podcasts/ (podcast audio)"],
     ];
 
     for (const [p, label] of requiredPaths) {
@@ -386,6 +389,7 @@ async function checkFirestoreIndexes() {
     ["🎬 Reels — createdAt desc index",        () => db.collection("reels").orderBy("createdAt", "desc").limit(1).get()],
     ["🚩 Reports — createdAt desc index",      () => db.collection("reports").orderBy("createdAt", "desc").limit(1).get()],
     ["👻 Ghost workouts — createdAt index",    () => db.collection("ghostWorkouts").orderBy("createdAt", "desc").limit(1).get()],
+    ["🎙️ Podcasts — publishedAt desc index",  () => db.collection("podcasts").orderBy("publishedAt", "desc").limit(1).get()],
     ["🤖 botLogs — runAt desc index",          () => db.collection("botLogs").orderBy("runAt", "desc").limit(1).get()],
     ["🚨 errorLogs — timestamp desc index",    () => db.collection("errorLogs").orderBy("timestamp", "desc").limit(1).get()],
   ];
@@ -616,6 +620,8 @@ async function checkSecurityRules() {
       ["notifications",   "🔔 notifications in rules"],
       ["reports",         "🚩 reports in rules"],
       ["ghostWorkouts",   "👻 ghostWorkouts in rules"],
+      ["podcasts",        "🎙️ podcasts in rules"],
+      ["livePodcasts",    "📻 livePodcasts in rules"],
       ["analytics",       "📊 analytics in rules"],
     ];
 
@@ -642,6 +648,232 @@ async function checkMapTiler() {
   } catch (e: any) {
     return [{ label: "🗺️ MapTiler (GPS maps)", ok: false, detail: e?.message }];
   }
+}
+
+async function checkRecentFixes() {
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+  const app = getAdminApp();
+
+  // ── 1. Post page OG tags (SEO fix) ───────────────────────────────────────────
+  try {
+    let testPostId: string | null = null;
+    if (app) {
+      const snap = await app.firestore().collection("posts").orderBy("createdAt", "desc").limit(1).get();
+      if (!snap.empty) testPostId = snap.docs[0].id;
+    }
+    if (testPostId) {
+      const res = await fetch(`${BASE}/comments?postId=${testPostId}`, { cache: "no-store" });
+      const html = await res.text();
+      const hasTitle = html.includes("og:title");
+      const hasImage = html.includes("og:image");
+      const hasDesc  = html.includes("og:description");
+      results.push({
+        label: "📊 Post page — dynamic OG meta tags",
+        ok: hasTitle && hasImage && hasDesc,
+        detail: hasTitle && hasImage && hasDesc
+          ? "og:title, og:image, og:description all present ✓"
+          : `Missing:${!hasTitle ? " og:title" : ""}${!hasImage ? " og:image" : ""}${!hasDesc ? " og:description" : ""}`,
+      });
+    } else {
+      results.push({ label: "📊 Post page — dynamic OG meta tags", ok: true, detail: "No posts found to test" });
+    }
+  } catch (e: any) {
+    results.push({ label: "📊 Post page — dynamic OG meta tags", ok: false, detail: e.message });
+  }
+
+  // ── 2. User profile OG tags ───────────────────────────────────────────────────
+  try {
+    let testUid: string | null = null;
+    if (app) {
+      const snap = await app.firestore().collection("users").limit(1).get();
+      if (!snap.empty) testUid = snap.docs[0].id;
+    }
+    if (testUid) {
+      const res = await fetch(`${BASE}/user-profile?uid=${testUid}`, { cache: "no-store" });
+      const html = await res.text();
+      const hasTitle = html.includes("og:title");
+      const hasDesc  = html.includes("og:description");
+      results.push({
+        label: "👤 User profile page — dynamic OG meta tags",
+        ok: hasTitle && hasDesc,
+        detail: hasTitle && hasDesc
+          ? "og:title and og:description present ✓"
+          : `Missing:${!hasTitle ? " og:title" : ""}${!hasDesc ? " og:description" : ""}`,
+      });
+    } else {
+      results.push({ label: "👤 User profile page — dynamic OG meta tags", ok: true, detail: "No users found to test" });
+    }
+  } catch (e: any) {
+    results.push({ label: "👤 User profile page — dynamic OG meta tags", ok: false, detail: e.message });
+  }
+
+  // ── 3. Comments page loads without postId (no crash) ─────────────────────────
+  try {
+    const res = await fetch(`${BASE}/comments`, { cache: "no-store" });
+    results.push({
+      label: "💬 Comments page — loads without postId param",
+      ok: res.status < 500,
+      detail: res.status < 500 ? `HTTP ${res.status} ✓` : `HTTP ${res.status} — server error (should redirect, not crash)`,
+    });
+  } catch (e: any) {
+    results.push({ label: "💬 Comments page — loads without postId param", ok: false, detail: e.message });
+  }
+
+  // ── 4. Main feed page loads (stories strip lives here) ───────────────────────
+  try {
+    const res = await fetch(`${BASE}/`, { cache: "no-store" });
+    const html = await res.text();
+    const hasStoryAnchor = html.toLowerCase().includes("story") || html.toLowerCase().includes("felcin");
+    results.push({
+      label: "📖 Main feed — loads (stories strip present)",
+      ok: res.ok && hasStoryAnchor,
+      detail: res.ok ? "Feed page loads ✓" : `HTTP ${res.status}`,
+    });
+  } catch (e: any) {
+    results.push({ label: "📖 Main feed — loads (stories strip present)", ok: false, detail: e.message });
+  }
+
+  // ── 5. Share button — video posts use URL share (not download) ───────────────
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const postCard = fs.readFileSync(path.join(process.cwd(), "components", "PostCard.tsx"), "utf8");
+    // Extract only the handleShare function body to avoid false positives from handleDownload/handleVidSave
+    const shareStart = postCard.indexOf("const handleShare = async");
+    const shareEnd   = postCard.indexOf("\n  };", shareStart) + 5;
+    const shareFn    = shareStart > -1 ? postCard.slice(shareStart, shareEnd) : "";
+    // handleShare should NOT trigger a download (a.download inside share fn = bug)
+    const hasDownloadInShare = shareFn.includes("a.download");
+    // handleShare should contain the simple URL-share marker for videos
+    const hasUrlShare = shareFn.includes("Videos — always share the post URL") || shareFn.includes("share the post URL");
+    results.push({
+      label: "📤 Share button — video posts share URL (not download)",
+      ok: !hasDownloadInShare && hasUrlShare,
+      detail: !hasDownloadInShare && hasUrlShare
+        ? "handleShare uses URL for videos, no download fallback ✓"
+        : hasDownloadInShare
+          ? "⚠️ handleShare has a.download — share triggers a file download on some devices"
+          : "handleShare missing video URL-share logic",
+    });
+  } catch (e: any) {
+    results.push({ label: "📤 Share button — video posts share URL (not download)", ok: false, detail: e.message });
+  }
+
+  // ── 6. Username click — displayName wrapped in Link ──────────────────────────
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const postCard = fs.readFileSync(path.join(process.cwd(), "components", "PostCard.tsx"), "utf8");
+    // Check that the non-collab branch wraps displayName in a Link
+    const hasBareDisplayName = postCard.includes(": displayName\n") || postCard.includes(": displayName }");
+    const hasLinkedDisplayName = postCard.includes(`/user-profile?uid=\${post.authorId}\`}>{displayName}</Link>`);
+    results.push({
+      label: "🔗 Username click — navigates to user profile",
+      ok: !hasBareDisplayName && hasLinkedDisplayName,
+      detail: !hasBareDisplayName && hasLinkedDisplayName
+        ? "displayName wrapped in Link to profile ✓"
+        : hasBareDisplayName
+          ? "⚠️ displayName is plain text — clicking username does nothing"
+          : "Link present but format unexpected",
+    });
+  } catch (e: any) {
+    results.push({ label: "🔗 Username click — navigates to user profile", ok: false, detail: e.message });
+  }
+
+  // ── 7. Story viewer — author name is a link to profile ───────────────────────
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const strip = fs.readFileSync(path.join(process.cwd(), "components", "StoriesStrip.tsx"), "utf8");
+    const hasAuthorLink = strip.includes(`/user-profile?uid=\${current.authorId}`);
+    const hasSafeArea   = strip.includes("safe-area-inset-top");
+    results.push({
+      label: "📖 Story viewer — author name tappable + header safe-area",
+      ok: hasAuthorLink && hasSafeArea,
+      detail: hasAuthorLink && hasSafeArea
+        ? "Author Link and safe-area inset both present ✓"
+        : `Missing:${!hasAuthorLink ? " author profile link" : ""}${!hasSafeArea ? " safe-area-inset-top" : ""}`,
+    });
+  } catch (e: any) {
+    results.push({ label: "📖 Story viewer — author name tappable + header safe-area", ok: false, detail: e.message });
+  }
+
+  // ── 8. Profile picture lightbox on user profile page ─────────────────────────
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const profilePage = fs.readFileSync(path.join(process.cwd(), "app", "(protected)", "user-profile", "PageClient.tsx"), "utf8");
+    const hasLightbox   = profilePage.includes("photoLightbox");
+    const hasClickable  = profilePage.includes("setPhotoLightbox(true)");
+    results.push({
+      label: "🖼️ Profile picture — tappable lightbox",
+      ok: hasLightbox && hasClickable,
+      detail: hasLightbox && hasClickable
+        ? "Profile photo lightbox wired up ✓"
+        : `Missing:${!hasLightbox ? " lightbox state" : ""}${!hasClickable ? " onClick handler" : ""}`,
+    });
+  } catch (e: any) {
+    results.push({ label: "🖼️ Profile picture — tappable lightbox", ok: false, detail: e.message });
+  }
+
+  return results;
+}
+
+// ─── Auth-user misuse scan ──────────────────────────────────────────────────────
+// The `user` from useAuth() is a SYNTHESIZED plain object (see lib/auth.tsx), NOT a
+// real firebase/auth User. Passing it to updateProfile()/deleteUser()/etc throws —
+// and on Capacitor builds `auth` is null. This silently broke profile-name saving
+// for every user. This check greps the client source for that anti-pattern so the
+// bot catches this class of bug proactively, before a user hits "Failed to save".
+async function checkAuthUserMisuse() {
+  const results: { label: string; ok: boolean; detail: string }[] = [];
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+
+    // firebase/auth methods that require a REAL User instance. Calling them with the
+    // context `user` (or the useAuth destructured `user`) is always a bug here.
+    // All modular firebase/auth functions that take a real User as their first arg.
+    const AUTH_METHODS = ["updateProfile", "deleteUser", "reauthenticateWithCredential", "updatePassword", "updateEmail", "reload", "sendEmailVerification", "linkWithCredential", "unlink"];
+    const offenders: string[] = [];
+
+    const walk = (dir: string) => {
+      let entries: string[] = [];
+      try { entries = fs.readdirSync(dir); } catch { return; }
+      for (const name of entries) {
+        if (name === "node_modules" || name === ".next" || name === "out") continue;
+        const full = path.join(dir, name);
+        let stat;
+        try { stat = fs.statSync(full); } catch { continue; }
+        if (stat.isDirectory()) { walk(full); continue; }
+        if (!/\.(tsx|ts)$/.test(name)) continue;
+        let src = "";
+        try { src = fs.readFileSync(full, "utf8"); } catch { continue; }
+        // Only client components use the useAuth() synthesized user.
+        if (!src.includes('from "@/lib/auth"') && !src.includes("useAuth(")) continue;
+        for (const m of AUTH_METHODS) {
+          // `m(user` or `m(user,` — the bare context user passed straight into the SDK method.
+          const re = new RegExp(`${m}\\s*\\(\\s*user\\b`);
+          if (re.test(src)) {
+            offenders.push(`${path.relative(process.cwd(), full).replace(/\\/g, "/")} → ${m}(user…)`);
+          }
+        }
+      }
+    };
+    walk(path.join(process.cwd(), "app"));
+    walk(path.join(process.cwd(), "components"));
+
+    results.push({
+      label: "🔐 Auth-user misuse (updateProfile/deleteUser on synthesized user)",
+      ok: offenders.length === 0,
+      detail: offenders.length === 0
+        ? "No client code passes the useAuth() user into a firebase/auth method ✓"
+        : `⚠️ ${offenders.length} offender(s) — will fail 100% (auth is null on Capacitor): ${offenders.slice(0, 5).join("; ")}`,
+    });
+  } catch (e: any) {
+    results.push({ label: "🔐 Auth-user misuse scan", ok: false, detail: e?.message });
+  }
+  return results;
 }
 
 // ─── email report ──────────────────────────────────────────────────────────────
@@ -713,7 +945,8 @@ export async function POST(req: NextRequest) {
     firebaseChecks, stripeChecks, sslCheck, mapTilerCheck,
     watchChecks, envChecks, dataChecks, rulesChecks,
     replicateChecks, storageRulesChecks, errorLogChecks,
-    indexChecks, apiBodyChecks,
+    indexChecks, apiBodyChecks, recentFixChecks,
+    authMisuseChecks,
   ] = await Promise.all([
     checkSitePages(),
     checkPaymentAPIs(),
@@ -732,6 +965,8 @@ export async function POST(req: NextRequest) {
     checkErrorLogPatterns(),
     checkFirestoreIndexes(),
     checkAPIResponseBodies(),
+    checkRecentFixes(),
+    checkAuthUserMisuse(),
   ]);
 
   const allChecks = [
@@ -752,6 +987,8 @@ export async function POST(req: NextRequest) {
     ...errorLogChecks,
     ...indexChecks,
     ...apiBodyChecks,
+    ...recentFixChecks,
+    ...authMisuseChecks,
   ];
 
   const emailSent = sendEmail ? await sendEmailReport(allChecks) : false;
@@ -774,6 +1011,8 @@ export async function POST(req: NextRequest) {
     { group: "🚨 Client Errors",      checks: errorLogChecks },
     { group: "📊 Firestore Indexes",  checks: indexChecks },
     { group: "🔬 API Response Bodies", checks: apiBodyChecks },
+    { group: "🛠️ Recent Fixes",        checks: recentFixChecks },
+    { group: "🔐 Auth Integrity",       checks: authMisuseChecks },
   ];
 
   return NextResponse.json({

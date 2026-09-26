@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/auth";
 import { logError } from "@/lib/logError";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
 import PageHeader from "@/components/PageHeader";
 
 const STYLES = [
@@ -63,6 +64,15 @@ export default function AIStudioPage() {
 
     try {
       const token = await auth.currentUser?.getIdToken();
+
+      if (file && !uploadedUrl) {
+        try {
+          await assertMediaClean(file, async () => (await auth.currentUser?.getIdToken()) || "");
+        } catch (e) {
+          if (e instanceof NudityBlockedError) { setError(e.message); setLoading(false); return; }
+        }
+      }
+
       let mediaUrl = uploadedUrl;
 
       if (file && !uploadedUrl) {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { ListSkeleton } from "@/components/SkeletonCard";
 import {
-  collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc,
+  collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, increment,
   serverTimestamp, query, orderBy, where, onSnapshot,
 } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -120,7 +121,37 @@ export default function PodcastsPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Inline mini-player (play episodes right here instead of opening a page) ──
+  const [nowPlaying, setNowPlaying] = useState<Episode | null>(null);
+  const [inlinePlaying, setInlinePlaying] = useState(false);
+  const [inlineProgress, setInlineProgress] = useState(0);
+  const inlineAudioRef = useRef<HTMLAudioElement>(null);
+  const countedPlays = useRef<Set<string>>(new Set());
+
+  function togglePlay(e: React.MouseEvent, ep: Episode) {
+    e.preventDefault();
+    e.stopPropagation();
+    const a = inlineAudioRef.current;
+    if (nowPlaying?.id === ep.id) {
+      if (a) { if (a.paused) a.play().catch(() => {}); else a.pause(); }
+    } else {
+      setNowPlaying(ep);
+      setInlineProgress(0);
+      if (!countedPlays.current.has(ep.id)) {
+        countedPlays.current.add(ep.id);
+        updateDoc(doc(db, "podcasts", ep.id), { plays: increment(1) }).catch(() => {});
+      }
+    }
+  }
+
+  // Auto-play when the current episode changes
+  useEffect(() => {
+    const a = inlineAudioRef.current;
+    if (a && nowPlaying) a.play().catch(() => {});
+  }, [nowPlaying]);
 
   const [showGoLive, setShowGoLive] = useState(false);
   const [liveTitle, setLiveTitle] = useState("");
@@ -128,6 +159,8 @@ export default function PodcastsPage() {
   const [kbOffset, setKbOffset] = useState(0);
 
   const isOwner = !authLoading && !!user && OWNER_UIDS.includes(user.uid);
+  // Who can broadcast (Go Live / Upload): owner, or any creator with 300+ followers.
+  const canBroadcast = isOwner || (typeof followers === "number" && followers >= 300);
   const isLive = liveShows.some((s) => s.hostId === user?.uid);
 
   useEffect(() => {
@@ -199,6 +232,7 @@ export default function PodcastsPage() {
     if (!user || !uploadFile || !uploadTitle.trim() || uploading) return;
     setUploading(true);
     setUploadProgress(0);
+    setUploadError(null);
     try {
       const ext = uploadFile.name.split(".").pop();
       const storageRef = ref(storage, `uploads/podcasts/${Date.now()}.${ext}`);
@@ -239,60 +273,19 @@ export default function PodcastsPage() {
       }, ...prev]);
       setShowUpload(false);
       setUploadTitle(""); setUploadDesc(""); setUploadFile(null);
-    } catch {}
+    } catch (e: unknown) {
+      const msg = (e as { code?: string; message?: string })?.code === "storage/unauthorized"
+        ? "Upload blocked by permissions. Please try again shortly."
+        : (e as Error)?.message || "Upload failed. Please try again.";
+      setUploadError(msg);
+    }
     setUploading(false);
   }
 
   if (authLoading) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
 
-  if (!isOwner) {
-    if (followers === null) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
-    if (followers < 300) {
-      return (
-        <div className="max-w-xl mx-auto px-4 py-6 flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
-          <style>{`
-            @keyframes lockGlow { 0%,100%{opacity:.55} 50%{opacity:.9} }
-            @keyframes onAirPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-          `}</style>
-          <div className="relative w-full rounded-3xl overflow-hidden mb-8 flex flex-col items-center justify-center py-14 px-6"
-            style={{ background: "linear-gradient(135deg, #0d0618 0%, #130a24 100%)", border: "1px solid rgba(124,58,237,0.2)" }}>
-            {/* Ghost logo watermark */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-              <img src="/static/logo-nav.svg" alt="" style={{ width: 200, opacity: 0.05, filter: "grayscale(1) brightness(3)" }} />
-            </div>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle, rgba(124,58,237,0.15) 0%, transparent 70%)", filter: "blur(20px)", animation: "lockGlow 4s ease-in-out infinite" }} />
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#7C3AED", fontVariationSettings: "'FILL' 1" }}>lock</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-4"
-                style={{ background: "rgba(124,58,237,0.12)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>group</span>
-                300 FOLLOWERS TO UNLOCK STUDIO
-              </div>
-              <h1 className="text-2xl font-bold text-center mb-2" style={{ color: "#f2f2f2" }}>Podcast Studio</h1>
-              <p className="text-sm text-center leading-relaxed mb-6" style={{ color: "#666", maxWidth: 260 }}>
-                You have {followers} follower{followers !== 1 ? "s" : ""}. Reach 300 to start broadcasting.
-              </p>
-              <div className="w-full max-w-xs">
-                <div className="flex justify-between text-xs mb-2" style={{ color: "#555" }}>
-                  <span>{followers}</span><span>300</span>
-                </div>
-                <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
-                  <div className="h-full rounded-full" style={{
-                    width: `${Math.min(100, (followers / 300) * 100)}%`,
-                    background: "linear-gradient(90deg, #7C3AED, #a78bfa)",
-                  }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }
+  // Option A: the Podcast Studio is browsable/listenable by everyone.
+  // Only broadcasting (Go Live / Upload) is gated at 300 followers (canBroadcast, below).
 
   const featuredEp = episodes[0] ?? null;
   const restEpisodes = episodes.slice(1);
@@ -408,6 +401,9 @@ export default function PodcastsPage() {
               }}>
               {uploading ? "Publishing…" : "Publish Episode"}
             </button>
+            {uploadError && (
+              <p className="text-xs text-center mt-2" style={{ color: "#f87171" }}>{uploadError}</p>
+            )}
           </div>
         </div>
       )}
@@ -513,7 +509,7 @@ export default function PodcastsPage() {
             )}
 
             {/* Owner controls */}
-            {isOwner && (
+            {canBroadcast && (
               <div className="flex items-center gap-2">
                 {isLive ? (
                   <button onClick={endLive}
@@ -536,6 +532,21 @@ export default function PodcastsPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>upload</span>
                   Upload
                 </button>
+              </div>
+            )}
+
+            {/* Under 300 followers: browse/listen freely, but broadcasting is locked —
+                show the unlock progress so listeners have a reason to grow. */}
+            {!canBroadcast && typeof followers === "number" && (
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold"
+                  style={{ background: "rgba(124,58,237,0.12)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
+                  {followers}/300 followers to broadcast
+                </div>
+                <div className="rounded-full overflow-hidden" style={{ height: 5, background: "rgba(255,255,255,0.06)", width: 110 }}>
+                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, (followers / 300) * 100)}%`, background: "linear-gradient(90deg,#7C3AED,#a78bfa)" }} />
+                </div>
               </div>
             )}
           </div>
@@ -637,11 +648,15 @@ export default function PodcastsPage() {
                     <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>mic</span>
                   </div>
                 )}
-                {/* Play button overlay */}
-                <div className="absolute right-4 bottom-4 z-10 w-11 h-11 rounded-full flex items-center justify-center"
+                {/* Play button overlay — plays inline instead of opening the page */}
+                <button onClick={(e) => togglePlay(e, featuredEp)}
+                  aria-label="Play episode"
+                  className="absolute right-4 bottom-4 z-20 w-11 h-11 rounded-full flex items-center justify-center border-none cursor-pointer"
                   style={{ background: "linear-gradient(135deg,#7C3AED,#a78bfa)", boxShadow: "0 0 20px rgba(124,58,237,0.5)" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#fff", fontVariationSettings: "'FILL' 1", marginLeft: 2 }}>play_arrow</span>
-                </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#fff", fontVariationSettings: "'FILL' 1", marginLeft: (nowPlaying?.id === featuredEp.id && inlinePlaying) ? 0 : 2 }}>
+                    {nowPlaying?.id === featuredEp.id && inlinePlaying ? "pause" : "play_arrow"}
+                  </span>
+                </button>
               </div>
 
               {/* Info panel */}
@@ -694,7 +709,7 @@ export default function PodcastsPage() {
           </div>
 
           {episodesLoading ? (
-            <div className="flex justify-center py-16"><div className="spinner" /></div>
+            <ListSkeleton count={5} />
           ) : episodes.length === 0 ? (
             <div className="text-center py-16 rounded-3xl relative overflow-hidden"
               style={{ background: "linear-gradient(135deg, #0d0618, #130a24)", border: "1px solid rgba(124,58,237,0.15)" }}>
@@ -708,7 +723,7 @@ export default function PodcastsPage() {
                 </div>
                 <p className="text-lg font-bold mb-1" style={{ color: "#f2f2f2" }}>The studio is quiet</p>
                 <p className="text-sm mb-5" style={{ color: "#555" }}>No episodes yet. Be the first to broadcast.</p>
-                {isOwner && (
+                {canBroadcast && (
                   <button onClick={() => setShowUpload(true)}
                     className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm border-none cursor-pointer"
                     style={{ background: "linear-gradient(135deg, #7C3AED, #a78bfa)", color: "#fff", boxShadow: "0 0 24px rgba(124,58,237,0.35)" }}>
@@ -775,10 +790,14 @@ export default function PodcastsPage() {
                     {/* Right — EQ + play */}
                     <div className="relative flex-shrink-0 flex flex-col items-center gap-2">
                       <EQBars count={5} color={isHovered ? "#a78bfa" : "rgba(124,58,237,0.35)"} height={18} active={isHovered} />
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center"
-                        style={{ background: isHovered ? "linear-gradient(135deg,#7C3AED,#a78bfa)" : "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.25)", transition: "background .2s" }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: isHovered ? "#fff" : "#a78bfa", fontVariationSettings: "'FILL' 1", marginLeft: 1, transition: "color .2s" }}>play_arrow</span>
-                      </div>
+                      <button onClick={(e) => togglePlay(e, ep)}
+                        aria-label="Play episode"
+                        className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+                        style={{ background: (isHovered || nowPlaying?.id === ep.id) ? "linear-gradient(135deg,#7C3AED,#a78bfa)" : "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.25)", transition: "background .2s" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: (isHovered || nowPlaying?.id === ep.id) ? "#fff" : "#a78bfa", fontVariationSettings: "'FILL' 1", marginLeft: (nowPlaying?.id === ep.id && inlinePlaying) ? 0 : 1, transition: "color .2s" }}>
+                          {nowPlaying?.id === ep.id && inlinePlaying ? "pause" : "play_arrow"}
+                        </span>
+                      </button>
                     </div>
                   </Link>
                 );
@@ -787,6 +806,48 @@ export default function PodcastsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Sticky inline mini-player ── */}
+      {nowPlaying && (
+        <>
+          <audio ref={inlineAudioRef} src={nowPlaying.audioUrl}
+            onPlay={() => setInlinePlaying(true)}
+            onPause={() => setInlinePlaying(false)}
+            onEnded={() => setInlinePlaying(false)}
+            onTimeUpdate={(e) => { const a = e.currentTarget; setInlineProgress(a.duration ? (a.currentTime / a.duration) * 100 : 0); }}
+          />
+          <div className="podcast-miniplayer fixed z-50 left-0 right-0"
+            style={{ background: "rgba(13,6,24,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(124,58,237,0.25)" }}>
+            <div style={{ height: 3, background: "rgba(124,58,237,0.15)" }}>
+              <div style={{ height: "100%", width: `${inlineProgress}%`, background: "linear-gradient(90deg,#7C3AED,#a78bfa)", transition: "width .2s linear" }} />
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+                style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.3)" }}>
+                {nowPlaying.coverUrl
+                  ? <img src={nowPlaying.coverUrl} alt="" className="w-full h-full object-cover" />
+                  : <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>mic</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{nowPlaying.title}</p>
+                <Link href={`/podcasts/${nowPlaying.id}`} className="text-xs no-underline" style={{ color: "#a78bfa" }}>Open full page →</Link>
+              </div>
+              <button onClick={() => { const a = inlineAudioRef.current; if (a) { if (a.paused) a.play().catch(() => {}); else a.pause(); } }}
+                aria-label={inlinePlaying ? "Pause" : "Play"}
+                className="w-10 h-10 rounded-full flex items-center justify-center border-none cursor-pointer flex-shrink-0"
+                style={{ background: "linear-gradient(135deg,#7C3AED,#a78bfa)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#fff", fontVariationSettings: "'FILL' 1" }}>{inlinePlaying ? "pause" : "play_arrow"}</span>
+              </button>
+              <button onClick={() => { inlineAudioRef.current?.pause(); setNowPlaying(null); setInlinePlaying(false); }}
+                aria-label="Close player"
+                className="w-8 h-8 rounded-full flex items-center justify-center border-none cursor-pointer flex-shrink-0 bg-transparent"
+                style={{ color: "#666" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

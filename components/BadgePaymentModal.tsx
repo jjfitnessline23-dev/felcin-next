@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
@@ -19,15 +19,20 @@ function PaymentForm({ badgeLabel, amountCents, onClose, onSuccess }: Omit<Props
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
+    // Synchronous guard: prevents a rapid double-click / Enter-key from firing
+    // confirmPayment twice before React re-renders the disabled button.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
 
     const { error: submitError } = await elements.submit();
-    if (submitError) { setError(submitError.message ?? "Invalid details"); setLoading(false); return; }
+    if (submitError) { setError(submitError.message ?? "Invalid details"); setLoading(false); submittingRef.current = false; return; }
 
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
@@ -37,11 +42,13 @@ function PaymentForm({ badgeLabel, amountCents, onClose, onSuccess }: Omit<Props
     if (confirmError) {
       setError(confirmError.message ?? "Payment failed");
       setLoading(false);
+      submittingRef.current = false;
     } else if (paymentIntent?.status === "succeeded") {
       onSuccess(paymentIntent.id);
     } else {
       setError("Payment could not be completed. Please try again.");
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 

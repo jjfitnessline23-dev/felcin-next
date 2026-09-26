@@ -6,6 +6,8 @@ import { collection, addDoc, getDocs, query, where, orderBy, Timestamp } from "@
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 const AD_TIERS = [
   { id: "starter", label: "Starter",  price: "$29",  impressions: "10,000",  days: 7,  color: "#635bff", features: ["10,000 impressions", "7-day campaign", "Image or video", "Click tracking"] },
@@ -39,8 +41,37 @@ export default function AdvertisePage() {
   const [myAds, setMyAds] = useState<MyAd[]>([]);
   const [loadingAds, setLoadingAds] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiAudience, setAiAudience] = useState("");
+  const [aiGoal, setAiGoal] = useState("");
+  const [generatingCopy, setGeneratingCopy] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+
+  const generateAdCopy = async () => {
+    if (!aiDesc.trim() || generatingCopy) return;
+    setGeneratingCopy(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/ai-ad-copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ description: aiDesc.trim(), audience: aiAudience.trim(), goal: aiGoal.trim() }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast(data.error); return; }
+      setTitle(data.headline);
+      setAdBody(data.body);
+      setShowAiPanel(false);
+      setAiDesc(""); setAiAudience(""); setAiGoal("");
+      showToast("✨ Ad copy generated!");
+    } catch {
+      showToast("Generation failed — try again");
+    } finally {
+      setGeneratingCopy(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -76,6 +107,11 @@ export default function AdvertisePage() {
   const handleFile = async (file: File) => {
     if (!user) return;
     setUploading(true);
+    try {
+      await assertMediaClean(file, () => user.getIdToken());
+    } catch (e) {
+      if (e instanceof NudityBlockedError) { setUploading(false); showToast(e.message); return; }
+    }
     const isVid = file.type.startsWith("video/");
     setMediaType(isVid ? "video" : "image");
     const ext = file.name.split(".").pop() || "bin";
@@ -208,6 +244,29 @@ export default function AdvertisePage() {
           )}
           <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
 
+          {/* AI Copy Generator */}
+          <button onClick={() => setShowAiPanel(!showAiPanel)}
+            style={{ width: "100%", padding: "10px 14px", borderRadius: 12, marginBottom: 10, cursor: "pointer", border: "1px solid rgba(124,58,237,0.35)", background: showAiPanel ? "rgba(124,58,237,0.12)" : "rgba(124,58,237,0.06)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxSizing: "border-box" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>Write ad copy with AI</span>
+          </button>
+
+          {showAiPanel && (
+            <div style={{ borderRadius: 14, padding: 14, background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", marginBottom: 10 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#7c3aed", letterSpacing: "0.08em", margin: "0 0 10px" }}>✨ AI AD COPY</p>
+              <input type="text" placeholder="What are you promoting? (e.g. gym supplements, personal training)" value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} maxLength={200}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: "#111", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 13, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+              <input type="text" placeholder="Target audience (optional — e.g. gym-goers, runners)" value={aiAudience} onChange={(e) => setAiAudience(e.target.value)} maxLength={100}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: "#111", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 13, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+              <input type="text" placeholder="Campaign goal (optional — e.g. get sign-ups, boost sales)" value={aiGoal} onChange={(e) => setAiGoal(e.target.value)} maxLength={100}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: "#111", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 13, outline: "none", marginBottom: 10, boxSizing: "border-box" }} />
+              <button onClick={generateAdCopy} disabled={!aiDesc.trim() || generatingCopy}
+                style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none", cursor: aiDesc.trim() && !generatingCopy ? "pointer" : "default", background: aiDesc.trim() && !generatingCopy ? "linear-gradient(135deg,#7c3aed,#a855f7)" : "rgba(255,255,255,0.06)", color: aiDesc.trim() && !generatingCopy ? "#fff" : "#555", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {generatingCopy ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Generating…</> : <><span className="material-symbols-outlined" style={{ fontSize: 15, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span> Generate headline &amp; description</>}
+              </button>
+            </div>
+          )}
+
           <input type="text" placeholder="Ad headline (required)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80}
             style={{ width: "100%", padding: "11px 14px", borderRadius: 12, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 14, outline: "none", marginBottom: 10, boxSizing: "border-box" }} />
 
@@ -244,7 +303,7 @@ export default function AdvertisePage() {
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#444", marginBottom: 12 }}>YOUR CAMPAIGNS</p>
             {loadingAds ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "24px 0" }}><div className="spinner" /></div>
+              <ListSkeleton count={2} />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {myAds.map((ad) => {

@@ -22,15 +22,60 @@ const IS_CAP = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 export const db = _db;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export type DocumentData = Record<string, unknown>;
+// Field values are `any` to match Firebase's own DocumentData — Firestore data is
+// untyped at the boundary. Use docData<T>(snap) below when you want a real type.
+export type DocumentData = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export type QueryDocumentSnapshot = {
   id: string;
   exists(): boolean;
-  data(): DocumentData | undefined;
-  ref: CapRef;
+  // Typed non-undefined to match Firebase's QueryDocumentSnapshot (a doc in a
+  // query result always has data). For getDoc(), guard with .exists() first.
+  // options mirrors Firebase's SnapshotOptions (e.g. { serverTimestamps: "estimate" }).
+  data(options?: any): DocumentData; // eslint-disable-line @typescript-eslint/no-explicit-any
+  ref: DocRef;
   metadata: { fromCache: boolean; hasPendingWrites: boolean };
 };
+
+// Typed accessor: docData<Post>(snap) returns the data cast to your interface,
+// with the doc id merged in. Prefer this over `{ id: snap.id, ...snap.data() }`.
+export function docData<T = DocumentData>(snap: { id: string; data(): DocumentData }): T & { id: string } {
+  return { id: snap.id, ...(snap.data() || {}) } as T & { id: string };
+}
+
+// Shape returned by getDocs()/onSnapshot() — a clean, non-generic query result so
+// call sites see QueryDocumentSnapshot (data(): DocumentData) instead of Firebase's
+// generic Query<unknown> whose .data() resolves to `unknown`.
+export type QuerySnap = {
+  docs: QueryDocumentSnapshot[];
+  empty: boolean;
+  size: number;
+  forEach: (fn: (d: QueryDocumentSnapshot) => void) => void;
+};
+
+// Union shape handed to an onSnapshot callback — a listener may be on a single doc
+// (id/data/exists) or a collection query (docs/forEach/docChanges). All members are
+// present so call sites can use whichever applies without casting.
+export type Snapshot = {
+  // collection-query shape
+  docs: QueryDocumentSnapshot[];
+  empty: boolean;
+  size: number;
+  forEach: (fn: (d: QueryDocumentSnapshot) => void) => void;
+  docChanges: () => { type: "added" | "modified" | "removed"; doc: QueryDocumentSnapshot }[];
+  // single-doc shape
+  id: string;
+  exists: () => boolean;
+  data: (options?: any) => DocumentData; // eslint-disable-line @typescript-eslint/no-explicit-any
+  ref: DocRef;
+};
+
+// Structural ref types — call sites only ever read .id/.path/.parent or pass refs
+// back into these wrappers (which accept unknown), so a minimal shape is all that's
+// needed. parent is `any` so admin collectionGroup path-walking (ref.parent.parent)
+// type-checks; on the native branch it's undefined (guarded with ?.) at runtime.
+export type DocRef = { id: string; path?: string; parent?: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+export type CollRef = { id?: string; path?: string; parent?: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 type CapRef = { __capPath: string; id: string };
 type CapColl = { __capPath: string; __capColl: true; __capIsGroup?: boolean };
@@ -115,7 +160,7 @@ function makeSnap(snapshot: Record<string, unknown> | null | undefined, refPath:
     id,
     ref: capRef,
     exists: () => data !== undefined && snapshot !== null && snapshot !== undefined,
-    data: () => data,
+    data: () => data as DocumentData,
     metadata: { fromCache: false, hasPendingWrites: false },
   };
 }
@@ -163,20 +208,20 @@ function buildNativeQuery(constraints: CapConstraint[]) {
 }
 
 // ─── Reference helpers ────────────────────────────────────────────────────────
-export function doc(dbOrRef: unknown, ...pathSegments: string[]): CapRef | ReturnType<typeof fs.doc> {
-  if (!IS_CAP) return fs.doc(dbOrRef as Parameters<typeof fs.doc>[0], ...pathSegments);
+export function doc(dbOrRef: unknown, ...pathSegments: string[]): DocRef {
+  if (!IS_CAP) return (fs.doc as any)(dbOrRef, ...pathSegments) as DocRef;
   const path = pathSegments.join("/");
-  return { __capPath: path, id: pathSegments[pathSegments.length - 1] };
+  return { __capPath: path, id: pathSegments[pathSegments.length - 1] } as unknown as DocRef;
 }
 
-export function collection(dbOrRef: unknown, ...pathSegments: string[]): CapColl | ReturnType<typeof fs.collection> {
-  if (!IS_CAP) return fs.collection(dbOrRef as Parameters<typeof fs.collection>[0], ...pathSegments);
-  return { __capPath: pathSegments.join("/"), __capColl: true };
+export function collection(dbOrRef: unknown, ...pathSegments: string[]): CollRef {
+  if (!IS_CAP) return (fs.collection as any)(dbOrRef, ...pathSegments) as CollRef;
+  return { __capPath: pathSegments.join("/"), __capColl: true } as unknown as CollRef;
 }
 
-export function collectionGroup(dbInst: unknown, collectionId: string): CapColl | ReturnType<typeof fs.collectionGroup> {
-  if (!IS_CAP) return fs.collectionGroup(dbInst as Parameters<typeof fs.collectionGroup>[0], collectionId);
-  return { __capPath: collectionId, __capColl: true, __capIsGroup: true };
+export function collectionGroup(dbInst: unknown, collectionId: string): CollRef {
+  if (!IS_CAP) return (fs.collectionGroup as any)(dbInst, collectionId) as CollRef;
+  return { __capPath: collectionId, __capColl: true, __capIsGroup: true } as unknown as CollRef;
 }
 
 // ─── Query builders ───────────────────────────────────────────────────────────
@@ -238,26 +283,26 @@ export function arrayRemove(...elements: unknown[]) {
 }
 
 // ─── Document reads ───────────────────────────────────────────────────────────
-export async function getDoc(ref: unknown) {
-  if (!IS_CAP) return fs.getDoc(ref as Parameters<typeof fs.getDoc>[0]);
+export async function getDoc(ref: unknown): Promise<QueryDocumentSnapshot> {
+  if (!IS_CAP) return (await fs.getDoc(ref as Parameters<typeof fs.getDoc>[0])) as unknown as QueryDocumentSnapshot;
   const { __capPath } = ref as CapRef;
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   const result = await FirebaseFirestore.getDocument({ reference: __capPath });
-  return makeSnap(result.snapshot as Record<string, unknown>, __capPath);
+  return makeSnap(result.snapshot as unknown as Record<string, unknown>, __capPath);
 }
 
-export async function getDocs(queryOrRef: unknown) {
-  if (!IS_CAP) return fs.getDocs(queryOrRef as Parameters<typeof fs.getDocs>[0]);
+export async function getDocs(queryOrRef: unknown): Promise<QuerySnap> {
+  if (!IS_CAP) return (await fs.getDocs(queryOrRef as Parameters<typeof fs.getDocs>[0])) as unknown as QuerySnap;
   const q = queryOrRef as CapQuery;
   const { compositeFilter, queryConstraints } = buildNativeQuery(q.__capConstraints || []);
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   let snapshots: Record<string, unknown>[];
   if (q.__capIsGroup) {
-    const r = await FirebaseFirestore.getCollectionGroup({ reference: q.__capPath, compositeFilter, queryConstraints } as Parameters<typeof FirebaseFirestore.getCollectionGroup>[0]);
-    snapshots = (r.snapshots || []) as Record<string, unknown>[];
+    const r = await FirebaseFirestore.getCollectionGroup({ reference: q.__capPath, compositeFilter, queryConstraints } as unknown as Parameters<typeof FirebaseFirestore.getCollectionGroup>[0]);
+    snapshots = (r.snapshots || []) as unknown as Record<string, unknown>[];
   } else {
-    const r = await FirebaseFirestore.getCollection({ reference: q.__capPath, compositeFilter, queryConstraints } as Parameters<typeof FirebaseFirestore.getCollection>[0]);
-    snapshots = (r.snapshots || []) as Record<string, unknown>[];
+    const r = await FirebaseFirestore.getCollection({ reference: q.__capPath, compositeFilter, queryConstraints } as unknown as Parameters<typeof FirebaseFirestore.getCollection>[0]);
+    snapshots = (r.snapshots || []) as unknown as Record<string, unknown>[];
   }
   const docs = snapshots.map(s => makeSnap(s, `${q.__capPath}/${s.id}`));
   return { docs, empty: docs.length === 0, size: docs.length, forEach: (fn: (d: QueryDocumentSnapshot) => void) => docs.forEach(fn) };
@@ -277,16 +322,16 @@ export async function updateDoc(ref: unknown, data: DocumentData) {
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   // Native plugin updateDocument uses fields array format
   const fields = Object.entries(data).map(([fieldPath, value]) => ({ fieldPath, value: serialize(value) }));
-  await FirebaseFirestore.updateDocument({ reference: __capPath, fields } as Parameters<typeof FirebaseFirestore.updateDocument>[0]);
+  await FirebaseFirestore.updateDocument({ reference: __capPath, fields } as unknown as Parameters<typeof FirebaseFirestore.updateDocument>[0]);
 }
 
-export async function addDoc(collRef: unknown, data: DocumentData) {
-  if (!IS_CAP) return fs.addDoc(collRef as Parameters<typeof fs.addDoc>[0], sanitizeForWeb(data) as DocumentData);
+export async function addDoc(collRef: unknown, data: DocumentData): Promise<DocRef> {
+  if (!IS_CAP) return (await fs.addDoc(collRef as Parameters<typeof fs.addDoc>[0], sanitizeForWeb(data) as DocumentData)) as unknown as DocRef;
   const { __capPath } = collRef as CapColl;
   const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
   const result = await FirebaseFirestore.addDocument({ reference: __capPath, data: serialize(data) as DocumentData });
   const id = result.reference?.id || "";
-  return { id, __capPath: `${__capPath}/${id}` } as CapRef;
+  return { id, __capPath: `${__capPath}/${id}` } as unknown as DocRef;
 }
 
 export async function deleteDoc(ref: unknown) {
@@ -297,17 +342,32 @@ export async function deleteDoc(ref: unknown) {
 }
 
 // ─── Real-time listeners ──────────────────────────────────────────────────────
+// A snapshot passed to onSnapshot is either a single-doc snapshot (data()/exists())
+// or a query snapshot (docs/forEach). Callbacks get `any` so both shapes are usable
+// without casts — matching how the app already consumes them.
+export function onSnapshot(refOrQuery: unknown, onNext: (snap: Snapshot) => void, onError?: (e: any) => void): () => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+export function onSnapshot(refOrQuery: unknown, options: unknown, onNext: (snap: Snapshot) => void, onError?: (e: any) => void): () => void; // eslint-disable-line @typescript-eslint/no-explicit-any
 export function onSnapshot(refOrQuery: unknown, callbackOrOptions: unknown, maybeCallback?: unknown): () => void {
+  // Normalize the two call shapes: (ref, onNext[, onError]) and (ref, options, onNext[, onError]).
+  const optionsFirst = typeof callbackOrOptions !== "function";
+  const onNext = (optionsFirst ? maybeCallback : callbackOrOptions) as (snap: unknown) => void;
+  const providedError = (optionsFirst ? undefined : maybeCallback) as ((e: unknown) => void) | undefined;
+  // Default handler so a listener error (permission denied, missing index, network)
+  // is never swallowed silently — the historical cause of "stuck forever" spinners.
+  const onError = (e: unknown) => {
+    const path = (() => { try { const r = refOrQuery as any; return r?.__capPath || r?.path || "(unknown)"; } catch { return "(unknown)"; } })();
+    console.error(`[Firestore onSnapshot] listener error on ${path}:`, e);
+    providedError?.(e);
+  };
+
   if (!IS_CAP) {
-    return fs.onSnapshot(
-      refOrQuery as Parameters<typeof fs.onSnapshot>[0],
-      callbackOrOptions as Parameters<typeof fs.onSnapshot>[1],
-      maybeCallback as Parameters<typeof fs.onSnapshot>[2]
+    return (optionsFirst
+      ? fs.onSnapshot(refOrQuery as any, callbackOrOptions as any, onNext as any, onError as any)
+      : fs.onSnapshot(refOrQuery as any, onNext as any, onError as any)
     ) as unknown as () => void;
   }
 
-  const cb = typeof callbackOrOptions === "function" ? callbackOrOptions : maybeCallback;
-  const callback = cb as (snap: unknown) => void;
+  const callback = onNext;
   const rq = refOrQuery as (CapRef | CapQuery);
   const isCollection = "__capColl" in rq || "__capConstraints" in rq;
 
@@ -322,21 +382,23 @@ export function onSnapshot(refOrQuery: unknown, callbackOrOptions: unknown, mayb
       const q = rq as CapQuery;
       const { compositeFilter, queryConstraints } = buildNativeQuery(q.__capConstraints || []);
       callbackId = await FirebaseFirestore.addCollectionSnapshotListener(
-        { reference: q.__capPath, compositeFilter, queryConstraints } as Parameters<typeof FirebaseFirestore.addCollectionSnapshotListener>[0],
-        (event: Record<string, unknown> | null, _error: unknown) => {
+        { reference: q.__capPath, compositeFilter, queryConstraints } as unknown as Parameters<typeof FirebaseFirestore.addCollectionSnapshotListener>[0],
+        ((event: Record<string, unknown> | null, error: unknown) => {
           if (unsubscribed) return;
+          if (error) { onError(error); return; }
           const snaps = ((event?.snapshots || []) as Record<string, unknown>[]).map(s => makeSnap(s, `${q.__capPath}/${s.id}`));
           callback({ docs: snaps, empty: snaps.length === 0, size: snaps.length, forEach: (fn: (d: QueryDocumentSnapshot) => void) => snaps.forEach(fn) });
-        }
+        }) as any
       ) as unknown as string;
     } else {
       const r = rq as CapRef;
       callbackId = await FirebaseFirestore.addDocumentSnapshotListener(
         { reference: r.__capPath },
-        (event: Record<string, unknown> | null, _error: unknown) => {
+        ((event: Record<string, unknown> | null, error: unknown) => {
           if (unsubscribed) return;
-          callback(makeSnap(event?.snapshot as Record<string, unknown>, r.__capPath));
-        }
+          if (error) { onError(error); return; }
+          callback(makeSnap(event?.snapshot as unknown as Record<string, unknown>, r.__capPath));
+        }) as any
       ) as unknown as string;
     }
   })();
@@ -368,7 +430,7 @@ export function writeBatch(dbInst: unknown) {
     },
     async commit() {
       const { FirebaseFirestore } = await import("@capacitor-firebase/firestore");
-      await FirebaseFirestore.writeBatch({ operations } as Parameters<typeof FirebaseFirestore.writeBatch>[0]);
+      await FirebaseFirestore.writeBatch({ operations } as unknown as Parameters<typeof FirebaseFirestore.writeBatch>[0]);
     },
   };
 }

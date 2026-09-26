@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  collection, query, where, getDocs, limit,
+  collection, query, where, getDocs, limit, orderBy,
   doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, updateDoc, increment,
 } from "@/lib/db";
 import { db, auth } from "@/lib/firebase";
@@ -27,6 +27,7 @@ interface Post {
   mediaUrl?: string;
   contentType?: string;
   mimeType?: string;
+  caption?: string;
   thumbnailUrl?: string;
   collabUid?: string | null;
   isStory?: boolean;
@@ -46,6 +47,8 @@ export default function UserProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [visiblePosts, setVisiblePosts] = useState(12);
+  const [podcasts, setPodcasts] = useState<{ id: string; title: string; coverUrl?: string; duration?: number; plays?: number; publishedAt?: { seconds: number } }[]>([]);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [prStats, setPrStats] = useState<{ distPR: number | null; pacePR: number | null }>({ distPR: null, pacePR: null });
@@ -55,6 +58,7 @@ export default function UserProfilePage() {
   const [tipping, setTipping] = useState(false);
   const [tipAmount, setTipAmount] = useState(500);
   const [appStoreCountdown, setAppStoreCountdown] = useState<number | null>(null);
+  const [photoLightbox, setPhotoLightbox] = useState(false);
 
   /* iOS smart redirect — if page still visible after 1.5s, user doesn't have the app → send to App Store */
   useEffect(() => {
@@ -105,6 +109,7 @@ export default function UserProfilePage() {
     setProfile(null);
     setLoading(true);
     setPosts([]);
+    setVisiblePosts(12);
     setFollowing(false);
     setBlocked(false);
     setBlockedByThem(false);
@@ -130,14 +135,22 @@ export default function UserProfilePage() {
       })
       .catch(() => setLoading(false));
 
-    // Load PR stats from runningRoutes — calculate dynamically from all runs
-    getDocs(query(collection(db, "users", uid, "runningRoutes"), limit(500)))
-      .then((snap) => {
-        const routes = snap.docs.map(d => d.data()).filter(r => r.distance > 100);
-        const distPR = routes.sort((a, b) => b.distance - a.distance)[0];
-        const pacePR = routes.filter(r => r.avgPace > 0 && r.distance >= 500).sort((a, b) => a.avgPace - b.avgPace)[0];
-        setPrStats({ distPR: distPR?.distance ?? null, pacePR: pacePR?.avgPace ?? null });
-      }).catch(() => {});
+    // Load PR stats with two tiny targeted queries instead of pulling up to 500 full
+    // route docs (each may carry a GPS polyline) on every profile visit.
+    Promise.all([
+      // Distance PR = the single longest run
+      getDocs(query(collection(db, "users", uid, "runningRoutes"), orderBy("distance", "desc"), limit(1))),
+      // Pace PR = fastest pace among runs ≥500m — fetch the fastest few, filter client-side
+      getDocs(query(collection(db, "users", uid, "runningRoutes"), orderBy("avgPace", "asc"), limit(20))),
+    ]).then(([distSnap, paceSnap]) => {
+      const distPR = distSnap.docs[0]?.data();
+      const pacePR = paceSnap.docs.map((d) => d.data())
+        .find((r) => (r.avgPace ?? 0) > 0 && (r.distance ?? 0) >= 500);
+      setPrStats({
+        distPR: distPR && distPR.distance > 100 ? distPR.distance : null,
+        pacePR: pacePR?.avgPace ?? null,
+      });
+    }).catch(() => {});
 
     // Fetch authored posts + collab posts, merge and dedupe — limit 100 each to prevent
     // loading thousands of posts for popular accounts
@@ -152,6 +165,14 @@ export default function UserProfilePage() {
       });
       setPosts(all.filter((p) => p.mediaUrl && !p.isStory).sort((a, b) => ((b as any).createdAt?.seconds ?? 0) - ((a as any).createdAt?.seconds ?? 0)));
     }).catch(() => {});
+
+    // Fetch this creator's podcast episodes (sorted client-side to avoid a composite index)
+    getDocs(query(collection(db, "podcasts"), where("hostId", "==", uid), limit(50)))
+      .then((snap) => {
+        const eps = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<typeof podcasts[number], "id">) }));
+        eps.sort((a, b) => (b.publishedAt?.seconds ?? 0) - (a.publishedAt?.seconds ?? 0));
+        setPodcasts(eps);
+      }).catch(() => {});
 
     if (user && user.uid !== uid) {
       getDoc(doc(db, "users", user.uid, "blocked", uid)).then((s) => setBlocked(s.exists()));
@@ -270,6 +291,19 @@ export default function UserProfilePage() {
     <div className="max-w-2xl mx-auto pb-10">
       {appStoreBanner}
 
+      {/* Profile picture lightbox */}
+      {photoLightbox && profile?.photoURL && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.92)" }}
+          onClick={() => setPhotoLightbox(false)}>
+          <img src={profile.photoURL} alt="" className="rounded-full object-cover"
+            style={{ width: "80vw", height: "80vw", maxWidth: 400, maxHeight: 400, border: "3px solid rgba(167,139,250,0.5)" }} />
+          <button className="absolute top-6 right-6" style={{ background: "none", border: "none", cursor: "pointer" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#fff" }}>close</span>
+          </button>
+        </div>
+      )}
+
       {/* ── Top bar ── */}
       <div className="sticky z-20" style={{ top: "env(safe-area-inset-top,0px)", background: "rgba(9,9,9,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="flex items-center gap-3 px-4 py-3">
@@ -298,8 +332,9 @@ export default function UserProfilePage() {
           <div className="relative inline-block">
             <div className="rounded-full" style={{ padding: 4, background: "linear-gradient(135deg,#e9d5ff,#a78bfa,#7C3AED)", boxShadow: "0 0 40px rgba(124,58,237,0.7), 0 0 80px rgba(124,58,237,0.3)" }}>
               {profile.photoURL ? (
-                <img src={profile.photoURL} alt="" className="rounded-full object-cover block"
-                  style={{ width: 88, height: 88, border: "3px solid #090909" }} />
+                <img src={profile.photoURL} alt="" className="rounded-full object-cover block cursor-pointer"
+                  style={{ width: 88, height: 88, border: "3px solid #090909" }}
+                  onClick={() => setPhotoLightbox(true)} />
               ) : (
                 <div className="rounded-full flex items-center justify-center text-3xl font-bold"
                   style={{ width: 88, height: 88, background: "linear-gradient(135deg,#3b2065,#1e1050)", color: "#e9d5ff", border: "3px solid #090909" }}>
@@ -597,6 +632,42 @@ export default function UserProfilePage() {
       {/* Divider */}
       <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
+      {/* ── Podcasts ── */}
+      {podcasts.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>podcasts</span>
+            <span className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Podcasts</span>
+            <span className="text-xs" style={{ color: "#555" }}>{podcasts.length}</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {podcasts.map((ep) => (
+              <Link key={ep.id} href={`/podcasts/${ep.id}`}
+                className="flex items-center gap-3 p-3 rounded-2xl no-underline"
+                style={{ background: "#0d0618", border: "1px solid rgba(124,58,237,0.15)" }}>
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                  style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.25)" }}>
+                  {ep.coverUrl
+                    ? <img src={ep.coverUrl} alt={ep.title || "Podcast episode"} className="w-full h-full object-cover" />
+                    : <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>mic</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{ep.title}</p>
+                  <p className="text-xs" style={{ color: "#555" }}>
+                    {ep.plays ?? 0} plays{ep.duration ? ` · ${Math.floor(ep.duration / 60)}:${String(Math.floor(ep.duration % 60)).padStart(2, "0")}` : ""}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: "linear-gradient(135deg,#7C3AED,#a78bfa)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#fff", fontVariationSettings: "'FILL' 1", marginLeft: 2 }}>play_arrow</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginTop: 16 }} />
+        </div>
+      )}
+
       {/* ── Posts grid ── */}
       {posts.length === 0 ? (
         <div className="ghost-bg text-center py-20 mx-4 rounded-3xl mt-4" style={{ color: "#555" }}>
@@ -612,14 +683,14 @@ export default function UserProfilePage() {
         </div>
       ) : (
         <div className="grid grid-cols-3" style={{ gap: 2 }}>
-          {posts.map((p) => {
+          {posts.slice(0, visiblePosts).map((p) => {
             const type = resolveMediaType(p.contentType, p.mimeType, p.mediaUrl);
             return (
               <Link key={p.id} href={`/comments?postId=${p.id}`}
                 className="relative block" style={{ aspectRatio: "1", overflow: "hidden", background: "#0f0f0f" }}>
                 {type === "video" ? (
                   p.thumbnailUrl
-                    ? <img src={p.thumbnailUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ? <img src={p.thumbnailUrl} alt={p.caption || "Post"} className="w-full h-full object-cover" loading="lazy" />
                     : <video
                         src={p.mediaUrl ? `${p.mediaUrl}#t=0.5` : undefined}
                         preload="metadata"
@@ -629,7 +700,7 @@ export default function UserProfilePage() {
                         style={{ pointerEvents: "none" }}
                       />
                 ) : (
-                  <img src={p.mediaUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img src={p.mediaUrl} alt={p.caption || "Post"} className="w-full h-full object-cover" loading="lazy" />
                 )}
                 {type === "video" && (
                   <span className="material-symbols-outlined absolute top-2 right-2 text-white"
@@ -638,6 +709,15 @@ export default function UserProfilePage() {
               </Link>
             );
           })}
+        </div>
+      )}
+      {posts.length > visiblePosts && (
+        <div className="flex justify-center mt-4">
+          <button onClick={() => setVisiblePosts((v) => v + 12)}
+            className="px-6 py-2.5 rounded-full text-sm font-bold border-none cursor-pointer"
+            style={{ background: "rgba(255,255,255,0.08)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.12)" }}>
+            Load more
+          </button>
         </div>
       )}
 

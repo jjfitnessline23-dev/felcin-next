@@ -10,6 +10,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
+import { logError } from "@/lib/logError";
+
+const IS_CAP = process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
 export default function ProfileSettingsPage() {
   const { user, signOut } = useAuth();
@@ -47,6 +51,11 @@ export default function ProfileSettingsPage() {
     if (!user || uploading) return;
     setUploading(true); setStatus(null);
     try {
+      try {
+        await assertMediaClean(f, () => user.getIdToken());
+      } catch (e) {
+        if (e instanceof NudityBlockedError) { setStatus({ msg: e.message, ok: false }); setUploading(false); return; }
+      }
       const ext = f.name.split(".").pop() || "jpg";
       const storageRef = ref(storage, `uploads/avatars/${user.uid}/avatar_${Date.now()}.${ext}`);
       const task = uploadBytesResumable(storageRef, f, { contentType: f.type });
@@ -63,14 +72,35 @@ export default function ProfileSettingsPage() {
   const save = async () => {
     if (!user) return;
     setSaving(true); setStatus(null);
+    const cleanUsername = username.toLowerCase().replace(/[^a-z0-9._]/g, "");
     try {
-      await updateProfile(user, { displayName, photoURL });
-      // Write to both paths so all parts of the app can find profile data
-      const cleanUsername = username.toLowerCase().replace(/[^a-z0-9._]/g, "");
+      // Firestore is the source of truth the app reads profiles from, so write it
+      // FIRST — a name change always persists even if the auth-profile mirror below
+      // fails. Write to both paths so every part of the app can find the data.
       await setDoc(doc(db, "users", user.uid, "public", "profile"), { displayName, username: cleanUsername, bio, photoURL, badge, updatedAt: new Date() }, { merge: true });
       await setDoc(doc(db, "users", user.uid), { displayName, username: cleanUsername, photoURL, badge, updatedAt: new Date() }, { merge: true });
+
+      // Best-effort mirror onto the Firebase Auth profile. The `user` from
+      // useAuth() is a synthesized plain object (see lib/auth), NOT a real
+      // web-SDK User, so passing it to updateProfile() throws. Use the real
+      // currentUser on web and the native plugin on Capacitor — and never let
+      // this step fail the whole save.
+      try {
+        if (IS_CAP) {
+          const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+          await FirebaseAuthentication.updateProfile({ displayName, photoUrl: photoURL });
+        } else if (auth?.currentUser) {
+          await updateProfile(auth.currentUser, { displayName, photoURL });
+        }
+      } catch (e) {
+        logError("profile-settings.updateAuthProfile", e, { uid: user.uid, email: user.email });
+      }
+
       setStatus({ msg: "Profile saved!", ok: true });
-    } catch { setStatus({ msg: "Failed to save. Try again.", ok: false }); }
+    } catch (e) {
+      logError("profile-settings.save", e, { uid: user.uid, email: user.email });
+      setStatus({ msg: "Failed to save. Try again.", ok: false });
+    }
     setSaving(false);
   };
 
@@ -81,15 +111,35 @@ export default function ProfileSettingsPage() {
     setDeleting(true);
     setDeleteError("");
     try {
-      const token = await auth.currentUser?.getIdToken();
+      // Token must come from the native plugin on Capacitor (web `auth` is null there).
+      let token: string | undefined;
+      if (IS_CAP) {
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        token = (await FirebaseAuthentication.getIdToken()).token;
+      } else {
+        token = await auth?.currentUser?.getIdToken();
+      }
+      // Server deletion (admin SDK) is authoritative — this is what actually removes the account.
       await fetch("/api/delete-account", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      await deleteUser(user);
+      // Best-effort client-side auth removal. The context `user` is a synthesized
+      // object (see lib/auth), so use the native plugin / real currentUser instead.
+      try {
+        if (IS_CAP) {
+          const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+          await FirebaseAuthentication.deleteUser();
+        } else if (auth?.currentUser) {
+          await deleteUser(auth.currentUser);
+        }
+      } catch (e) {
+        logError("profile-settings.deleteAuthUser", e, { uid: user.uid, email: user.email });
+      }
       router.replace("/login");
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "";
+      logError("profile-settings.deleteAccount", err, { uid: user.uid, email: user.email });
       setDeleteError(
         code === "auth/requires-recent-login"
           ? "For security, please sign out and sign back in, then try again."

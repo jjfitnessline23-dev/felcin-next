@@ -284,6 +284,56 @@ service cloud.firestore {
       }
     }
 
+    // ── Podcasts (FIX: was missing, defaulted to deny — uploads/plays/reads all failed) ──
+    match /podcasts/{episodeId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.hostId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.hostId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plays', 'likes', 'likedBy']) ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.hostId || isAdmin());
+
+      match /comments/{commentId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+        allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
+        allow update: if false;
+      }
+    }
+
+    // ── Live Podcasts (doc id = host uid) ──
+    match /livePodcasts/{hostId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth() && request.auth.uid == hostId;
+      allow delete: if isAuth() && (request.auth.uid == hostId || isAdmin());
+    }
+
+    // ── Time Capsules (FIX: was missing, defaulted to deny) ──
+    match /capsules/{capsuleId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.authorId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unlocked', 'unlockedAt']) ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
+    }
+
+    // ── Wills (FIX: was missing, defaulted to deny) ──
+    match /wills/{willId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.authorId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['recipientCount']) ||
+        isAdmin()
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
+    }
+
     // ── Reports ──
     match /reports/{reportId} {
       allow create: if isAuth()

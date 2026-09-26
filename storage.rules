@@ -73,6 +73,14 @@ service firebase.storage {
                    && request.resource.contentType.matches('video/.*');
     }
 
+    // Podcast episode audio — any authenticated user can upload, 200 MB max, audio only
+    match /uploads/podcasts/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 200 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+    }
+
     // Watermarked videos + thumbnails — written by Cloud Functions, read by anyone
     match /watermarked/{userId}/{fileName} {
       allow read: if true;

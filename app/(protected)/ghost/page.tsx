@@ -5,6 +5,7 @@ import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "@/
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
 import { GhostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 
@@ -58,6 +59,11 @@ export default function GhostPage() {
     if (!user || uploading) return;
     setUploading(true); setUploadProgress(0);
     try {
+      try {
+        await assertMediaClean(file, () => user.getIdToken());
+      } catch (e) {
+        if (e instanceof NudityBlockedError) { setUploading(false); setSaveError(e.message); return; }
+      }
       const ext = file.name.split(".").pop() || "mp4";
       const sRef = storageRef(storage, `uploads/media/${user.uid}/ghost_${Date.now()}.${ext}`);
       const task = uploadBytesResumable(sRef, file, { contentType: file.type });

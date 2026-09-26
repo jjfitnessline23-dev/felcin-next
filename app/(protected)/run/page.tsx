@@ -166,14 +166,15 @@ export default function RunPage() {
         const perm = await Geolocation.requestPermissions();
         if (perm.location === "denied") { setLocState("denied"); enablingRef.current = false; return; }
 
-        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000 });
+        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 });
         setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocState("granted");
 
         if (idleWatchRef.current === null) {
           idleWatchRef.current = await Geolocation.watchPosition(
-            { enableHighAccuracy: false },
-            (p, err) => { if (!err && p) setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }); }
+            { enableHighAccuracy: true },
+            // Ignore coarse idle fixes so the standing dot doesn't jump a block away
+            (p, err) => { if (!err && p && (p.coords.accuracy == null || p.coords.accuracy <= 50)) setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }); }
           );
         }
       } else {
@@ -184,15 +185,16 @@ export default function RunPage() {
             setLocState("granted");
             if (idleWatchRef.current === null) {
               idleWatchRef.current = navigator.geolocation.watchPosition(
-                (p) => setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                // Ignore coarse idle fixes so the standing dot doesn't jump a block away
+                (p) => { if (p.coords.accuracy == null || p.coords.accuracy <= 50) setCurrentPos({ lat: p.coords.latitude, lng: p.coords.longitude }); },
                 () => {},
-                { enableHighAccuracy: false, maximumAge: 5000, timeout: 30000 }
+                { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 }
               );
             }
             enablingRef.current = false;
           },
           (err) => { setLocState(err.code === 1 ? "denied" : "prompt"); enablingRef.current = false; },
-          { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 }
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
         );
         return; // web path resolves via callbacks
       }
@@ -260,9 +262,14 @@ export default function RunPage() {
     }
 
     const onPos = (lat: number, lng: number, accuracy?: number) => {
-      // Single threshold: 65m for both dot and route
-      if (accuracy !== undefined && accuracy > 65) return;
+      const acc = accuracy ?? 999;
+      // Show the live dot for reasonable fixes (≤50m)
+      if (acc > 50) return;
       setCurrentPos({ lat, lng });
+
+      // Only extend the route + distance with high-quality fixes (≤30m).
+      // Weak GPS (30–50m) still moves the dot but can't drag the line across buildings.
+      if (acc > 30) return;
 
       const now = Date.now();
       const last = lastCoordRef.current;

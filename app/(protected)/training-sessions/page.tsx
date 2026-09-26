@@ -6,6 +6,7 @@ import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 interface TrainingSession {
   id: string;
@@ -168,7 +169,7 @@ export default function TrainingSessionsPage() {
 
       <div className="px-4 flex flex-col gap-3">
         {loading ? (
-          <div className="flex justify-center py-16"><div className="spinner" /></div>
+          <ListSkeleton count={5} />
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3">
             <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#333" }}>fitness_center</span>

@@ -8,6 +8,8 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebas
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
+import { GridSkeleton } from "@/components/SkeletonCard";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
 
 interface ProgressPhoto {
   id: string;
@@ -96,6 +98,11 @@ export default function ProgressPage() {
     setUploading(true);
     setUploadProgress(0);
     try {
+      try {
+        await assertMediaClean(uploadFile, () => user.getIdToken());
+      } catch (e) {
+        if (e instanceof NudityBlockedError) { setUploading(false); alert(e.message); return; }
+      }
       const ext = uploadFile.name.split(".").pop() || "jpg";
       const path = `uploads/progress/${user.uid}/${Date.now()}.${ext}`;
       const storageRef = ref(storage, path);
@@ -323,7 +330,7 @@ export default function ProgressPage() {
         ════════════════════════ */}
         {tab === "timeline" && (
           loading ? (
-            <div className="ghost-bg flex justify-center py-24 rounded-3xl"><div className="spinner" /></div>
+            <GridSkeleton count={6} />
           ) : photos.length === 0 ? (
             <div className="ghost-bg text-center py-20 rounded-3xl">
               <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#2a2a2a", display: "block", marginBottom: 12 }}>photo_library</span>

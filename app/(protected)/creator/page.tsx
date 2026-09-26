@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, addDoc, serverTimestamp, Timestamp, getDocs, limit, query } from "@/lib/db";
+import { collection, addDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
 
 interface CollabUser { uid: string; displayName: string; photoURL: string; }
 
@@ -90,11 +91,12 @@ export default function CreatorPage() {
   const [showCollabSearch, setShowCollabSearch] = useState(false);
   const [allUsers, setAllUsers] = useState<CollabUser[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [ready, setReady] = useState(false);
 
-  // Open photo picker immediately on page load
-  useEffect(() => {
-    const t = setTimeout(() => fileRef.current?.click(), 80);
-    return () => clearTimeout(t);
+  // useLayoutEffect fires before the browser paints — file picker opens with zero visible flash
+  useLayoutEffect(() => {
+    fileRef.current?.click();
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -175,6 +177,20 @@ export default function CreatorPage() {
     if (!user) return;
     setPublishing(true); setStatus(null);
     try {
+      // Nudity gate — block disallowed media before it ever becomes a post/reel/story.
+      if (file) {
+        setStatus({ msg: "Checking media…", type: "info" });
+        try {
+          await assertMediaClean(file, () => user.getIdToken());
+        } catch (e) {
+          if (e instanceof NudityBlockedError) {
+            setStatus({ msg: e.message, type: "error" });
+            setPublishing(false);
+            return;
+          }
+          // Non-block errors fall through — cron backstop will catch anything missed.
+        }
+      }
       let mediaUrl = ""; let contentType = "text"; let mimeType = "";
       if (file) {
         mimeType = file.type || "";
@@ -194,8 +210,21 @@ export default function CreatorPage() {
       const col = mode === "reel" ? "reels" : "posts";
       const scheduledAt = scheduled && schedTime ? new Date(schedTime) : null;
       const tags = [...new Set((caption.match(/#([a-zA-Z0-9_]+)/g) || []).map((t) => t.slice(1).toLowerCase()))];
+      // Denormalize author name+photo onto the post so the feed never has to do
+      // a second lookup per author (kills the N+1 read). Prefer the public profile
+      // (source of truth for the feed), fall back to the auth user object.
+      let authorName = user.displayName || "";
+      let authorPhoto = user.photoURL || "";
+      try {
+        const prof = await getDoc(doc(db, "users", user.uid, "public", "profile"));
+        if (prof.exists()) {
+          const d = prof.data();
+          authorName = d.displayName || d.username || authorName;
+          authorPhoto = d.photoURL || authorPhoto;
+        }
+      } catch {}
       await addDoc(collection(db, col), {
-        authorId: user.uid, caption, text: caption, mediaUrl,
+        authorId: user.uid, authorName, authorPhoto, caption, text: caption, mediaUrl,
         contentType: mode === "story" ? "story" : mode === "reel" ? "reel" : contentType,
         mimeType, likes: 0, comments: 0,
         status: scheduledAt ? "scheduled" : "published",
@@ -221,6 +250,14 @@ export default function CreatorPage() {
   };
 
   const canPublish = !publishing && (!!file || !!caption.trim());
+
+  // Don't flash the creator UI — show dark screen until file picker has opened
+  if (!ready) return (
+    <div className="fixed inset-0" style={{ background: "#090909" }}>
+      <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
+        onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+    </div>
+  );
 
   return (
     <div className="max-w-lg mx-auto min-h-screen" style={{ background: "#090909" }}>

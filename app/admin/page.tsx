@@ -282,6 +282,11 @@ export default function AdminPortalPage() {
   const [workoutsLoaded, setWorkoutsLoaded] = useState(false);
   const [diagResult, setDiagResult] = useState<DiagResult | null>(null);
   const [diagRunning, setDiagRunning] = useState(false);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
+  const [displayNameInput, setDisplayNameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [nameMsg, setNameMsg] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
@@ -425,6 +430,56 @@ export default function AdminPortalPage() {
       if (res.ok) setStripeStats(await res.json());
     } catch { /* silent */ } finally {
       setLoadingStats(false);
+    }
+  };
+
+  const runBackfill = async () => {
+    if (backfillRunning) return;
+    setBackfillRunning(true);
+    setBackfillMsg(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/backfill-authors", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ scanLimit: 3000 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        const p = data.posts ?? {}; const r = data.reels ?? {};
+        setBackfillMsg(`✅ Done — updated ${p.updated ?? 0} posts and ${r.updated ?? 0} reels (${data.uniqueAuthorsResolved ?? 0} creators). Already-fast: ${(p.skipped ?? 0) + (r.skipped ?? 0)}. Safe to run again anytime.`);
+      } else {
+        setBackfillMsg(`⚠️ ${data.error || `Failed (HTTP ${res.status})`}`);
+      }
+    } catch (e: any) {
+      setBackfillMsg(`⚠️ ${e?.message || "Backfill failed"}`);
+    } finally {
+      setBackfillRunning(false);
+    }
+  };
+
+  const saveDisplayName = async () => {
+    const name = displayNameInput.trim();
+    if (!name || savingName) return;
+    setSavingName(true);
+    setNameMsg(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/set-display-name", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setNameMsg(`✅ Your display name is now "${data.name}" everywhere (posts, comments, podcasts). Refresh to see it.`);
+      } else {
+        setNameMsg(`⚠️ ${data.error || `Failed (HTTP ${res.status})`}`);
+      }
+    } catch (e: any) {
+      setNameMsg(`⚠️ ${e?.message || "Failed to set name"}`);
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -732,17 +787,17 @@ export default function AdminPortalPage() {
               <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl"
                 style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
                 {p.mediaUrl ? (
-                  p.contentType?.startsWith("video") ? (
-                    <div className="rounded-lg shrink-0 flex items-center justify-center"
-                      style={{ width: 48, height: 48, background: "#1a1a1a" }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#555" }}>play_circle</span>
+                  (p.contentType?.startsWith("video") || /\.(mp4|webm|mov|m4v|avi|3gp|mkv)(\?|%3F|$)/i.test(p.mediaUrl)) ? (
+                    <div className="rounded-lg shrink-0 overflow-hidden" style={{ width: 80, height: 112, background: "#000" }}>
+                      <video src={p.mediaUrl} controls muted playsInline preload="metadata"
+                        style={{ width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />
                     </div>
                   ) : (
-                    <img src={p.mediaUrl} alt="" className="rounded-lg object-cover shrink-0" style={{ width: 48, height: 48 }} />
+                    <img src={p.mediaUrl} alt="" className="rounded-lg object-cover shrink-0" style={{ width: 80, height: 112 }} />
                   )
                 ) : (
                   <div className="rounded-lg flex items-center justify-center shrink-0"
-                    style={{ width: 48, height: 48, background: "#1a1a1a" }}>
+                    style={{ width: 80, height: 112, background: "#1a1a1a" }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#333" }}>image</span>
                   </div>
                 )}
@@ -774,9 +829,16 @@ export default function AdminPortalPage() {
             ) : reels.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl"
                 style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div className="rounded-lg shrink-0 flex items-center justify-center"
-                  style={{ width: 48, height: 48, background: "#1a1a1a" }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#555" }}>play_circle</span>
+                <div className="rounded-lg shrink-0 overflow-hidden flex items-center justify-center"
+                  style={{ width: 80, height: 112, background: "#000" }}>
+                  {!r.mediaUrl ? (
+                    <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#555" }}>play_circle</span>
+                  ) : /\.(jpg|jpeg|png|gif|webp|heic|heif)(\?|%3F|$)/i.test(r.mediaUrl) ? (
+                    <img src={r.mediaUrl} alt={r.caption || "reel"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <video src={r.mediaUrl} controls muted playsInline preload="metadata"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm truncate" style={{ color: "#f2f2f2" }}>{r.caption || "(no caption)"}</p>
@@ -1466,6 +1528,63 @@ export default function AdminPortalPage() {
                 <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
                   style={{ transform: aiStudioEnabled ? "translateX(20px)" : "translateX(0)" }} />
               </button>
+            </div>
+
+            {/* ── Speed up old posts (author backfill) ── */}
+            <p className="text-xs mt-4 mb-1" style={{ color: "#444" }}>Performance</p>
+            <div className="flex items-center gap-4 p-5 rounded-2xl"
+              style={{ background: "#131313", border: "1px solid rgba(52,211,153,0.18)" }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#34d399", fontVariationSettings: "'FILL' 1" }}>bolt</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Speed up old posts</p>
+                <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                  Stamps creator names onto older posts so the feed loads them with zero extra lookups. New posts are already fast. Safe to run anytime.
+                </p>
+              </div>
+              <button
+                onClick={runBackfill}
+                disabled={backfillRunning}
+                className="shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold border-none cursor-pointer flex items-center gap-1.5"
+                style={{ background: backfillRunning ? "rgba(255,255,255,0.05)" : "rgba(52,211,153,0.15)", color: backfillRunning ? "#555" : "#34d399", border: "1px solid rgba(52,211,153,0.2)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{backfillRunning ? "hourglass_empty" : "bolt"}</span>
+                {backfillRunning ? "Running…" : "Run"}
+              </button>
+            </div>
+            {backfillMsg && (
+              <p className="text-xs px-1" style={{ color: backfillMsg.startsWith("✅") ? "#34d399" : "#f87171" }}>{backfillMsg}</p>
+            )}
+
+            {/* ── Set your display name (applies everywhere: posts, comments, podcasts) ── */}
+            <p className="text-xs mt-4 mb-1" style={{ color: "#444" }}>Identity</p>
+            <div className="p-5 rounded-2xl" style={{ background: "#131313", border: "1px solid rgba(124,58,237,0.2)" }}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.25)" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>badge</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Your display name</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#555" }}>Changes how you appear everywhere — posts, comments, live &amp; podcasts.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input value={displayNameInput} onChange={(e) => setDisplayNameInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveDisplayName(); }}
+                  placeholder="e.g. Ghost Workout" maxLength={40}
+                  className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none"
+                  style={{ background: "#0d0618", color: "#f2f2f2", border: "1px solid rgba(124,58,237,0.25)" }} />
+                <button onClick={saveDisplayName} disabled={!displayNameInput.trim() || savingName}
+                  className="shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold border-none cursor-pointer"
+                  style={{ background: (!displayNameInput.trim() || savingName) ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#7C3AED,#a78bfa)", color: (!displayNameInput.trim() || savingName) ? "#444" : "#fff" }}>
+                  {savingName ? "Saving…" : "Save"}
+                </button>
+              </div>
+              {nameMsg && (
+                <p className="text-xs mt-2" style={{ color: nameMsg.startsWith("✅") ? "#34d399" : "#f87171" }}>{nameMsg}</p>
+              )}
             </div>
           </div>
 

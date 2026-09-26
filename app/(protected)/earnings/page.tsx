@@ -9,6 +9,7 @@ import {
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
+import { ListSkeleton } from "@/components/SkeletonCard";
 
 const FUND_MONTHLY_VIEW_THRESHOLD = 100_000;
 const FUND_FOLLOWER_THRESHOLD = 10_000;
@@ -398,7 +399,7 @@ export default function EarningsPage() {
         </div>
 
         {loadingEarnings ? (
-          <div className="flex justify-center py-10"><div className="spinner" /></div>
+          <div className="p-4"><ListSkeleton count={5} /></div>
         ) : earnings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6">
             <span className="material-symbols-outlined mb-3" style={{ fontSize: 36, color: "#222" }}>payments</span>
