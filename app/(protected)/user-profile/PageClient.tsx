@@ -21,6 +21,8 @@ interface UserProfile {
   followersCount?: number;
   followingCount?: number;
   badge?: string;
+  currentStreak?: number;
+  longestStreak?: number;
 }
 interface Post {
   id: string;
@@ -386,8 +388,22 @@ export default function UserProfilePage() {
       </div>
 
       {/* ── PR Badges ── */}
-      {(prStats.distPR !== null || prStats.pacePR !== null) && (
-        <div className="flex gap-2 px-4 pb-3">
+      {(prStats.distPR !== null || prStats.pacePR !== null || (profile?.currentStreak ?? 0) > 0) && (
+        <div className="flex gap-2 px-4 pb-3 flex-wrap">
+          {(profile?.currentStreak ?? 0) > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(255,122,26,0.08)", border: "1px solid rgba(255,122,26,0.22)" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#ff7a1a", fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
+              <div>
+                <div style={{ fontSize: 10, color: "#555", fontWeight: 700 }}>STREAK</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#ff7a1a" }}>
+                  {profile!.currentStreak} day{profile!.currentStreak === 1 ? "" : "s"}
+                  {(profile?.longestStreak ?? 0) > (profile?.currentStreak ?? 0) && (
+                    <span style={{ fontSize: 10, color: "#666", fontWeight: 600 }}> · best {profile!.longestStreak}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {prStats.distPR !== null && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
