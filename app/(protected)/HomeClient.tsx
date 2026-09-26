@@ -14,6 +14,8 @@ import { PostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
 import FelcinLogo from "@/components/FelcinLogo";
+import StreakChip from "@/components/StreakChip";
+import { useStreak } from "@/hooks/useStreak";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { sanitizePost } from "@/lib/sanitize";
 
@@ -131,6 +133,7 @@ const QUICK_LINKS = [
 export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[] }) {
   const { user } = useAuth();
   const unread = useUnreadCount();
+  const streak = useStreak();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
@@ -380,6 +383,11 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
               <div className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 10, color: activeBadge.color, fontVariationSettings: "'FILL' 1" }}>{activeBadge.icon}</span>
                 <span className="text-[9px] font-bold capitalize" style={{ color: activeBadge.color }}>{userBadge?.replace("_", " ")}</span>
+              </div>
+            )}
+            {!streak.loading && (
+              <div className="ml-auto">
+                <StreakChip current={streak.current} atRisk={streak.atRisk} activeToday={streak.activeToday} />
               </div>
             )}
           </div>
