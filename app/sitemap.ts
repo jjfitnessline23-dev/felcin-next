@@ -1,8 +1,21 @@
 import { MetadataRoute } from "next";
+import { listPublicProfileUids } from "@/lib/publicProfile";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = "https://www.felcin.com";
   const now = new Date();
+
+  // Public, indexable athlete profiles — every one is an organic-discovery landing page.
+  let profileEntries: MetadataRoute.Sitemap = [];
+  try {
+    const uids = await listPublicProfileUids(1000);
+    profileEntries = uids.map((uid) => ({
+      url: `${base}/u/${uid}`,
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: 0.7,
+    }));
+  } catch { profileEntries = []; }
 
   return [
     {
@@ -41,5 +54,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.3,
     },
+    ...profileEntries,
   ];
 }

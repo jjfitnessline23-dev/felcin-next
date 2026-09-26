@@ -232,7 +232,8 @@ export default function UserProfilePage() {
   };
 
   const shareProfile = () => {
-    const url = `${window.location.origin}/user-profile?uid=${uid}`;
+    // Share the public, SEO-indexed profile URL (great link previews + discovery).
+    const url = `https://www.felcin.com/u/${uid}`;
     if (navigator.share) navigator.share({ url, title: displayName }).catch(() => {});
     else navigator.clipboard?.writeText(url).catch(() => {});
   };
