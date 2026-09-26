@@ -8,8 +8,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import StripeCheckoutModal from "@/components/StripeCheckoutModal";
-import { isHalloweenActive, setHalloweenPref } from "@/components/HalloweenTheme";
-import { isChristmasActive, setChristmasPref } from "@/components/ChristmasTheme";
+import { isHalloweenActive, setHalloweenPref, isAutoHalloweenWindow } from "@/components/HalloweenTheme";
+import { isChristmasActive, setChristmasPref, isAutoChristmasWindow } from "@/components/ChristmasTheme";
 
 interface BlockedUser { uid: string; displayName?: string; photoURL?: string; }
 
@@ -131,6 +131,20 @@ export default function SettingsPage() {
   const [halloween, setHalloween] = useState(false);
   const [christmas, setChristmas] = useState(false);
   useEffect(() => { setHalloween(isHalloweenActive()); setChristmas(isChristmasActive()); }, []);
+
+  // Toggling stores an explicit on/off ONLY when it differs from what the date
+  // would do; otherwise it stores "auto" so seasonal auto-activation is preserved.
+  // (Previewing off-season and switching back off won't disable the auto window.)
+  const toggleHalloween = (v: boolean) => {
+    setHalloween(v);
+    setHalloweenPref(v === isAutoHalloweenWindow() ? "auto" : v ? "on" : "off");
+    if (v) { setChristmas(false); setChristmasPref(isAutoChristmasWindow() ? "off" : "auto"); }
+  };
+  const toggleChristmas = (v: boolean) => {
+    setChristmas(v);
+    setChristmasPref(v === isAutoChristmasWindow() ? "auto" : v ? "on" : "off");
+    if (v) { setHalloween(false); setHalloweenPref(isAutoHalloweenWindow() ? "off" : "auto"); }
+  };
 
   // Load settings
   useEffect(() => {
@@ -340,8 +354,8 @@ export default function SettingsPage() {
 
         {/* Support & Legal */}
         <Section title="Appearance">
-          <Row icon="dark_mode" label="Halloween theme" sub="🎃 Pumpkin colors, bats & cobwebs (auto in late October)" right={<Toggle on={halloween} onChange={(v) => { setHalloween(v); setHalloweenPref(v ? "on" : "off"); if (v) { setChristmas(false); setChristmasPref("off"); } }} />} />
-          <Row icon="ac_unit" label="Christmas theme" sub="🎄 Holly-red colors & falling snow (auto in December)" right={<Toggle on={christmas} onChange={(v) => { setChristmas(v); setChristmasPref(v ? "on" : "off"); if (v) { setHalloween(false); setHalloweenPref("off"); } }} />} />
+          <Row icon="dark_mode" label="Halloween theme" sub="🎃 Pumpkin colors, bats & cobwebs (auto in late October)" right={<Toggle on={halloween} onChange={toggleHalloween} />} />
+          <Row icon="ac_unit" label="Christmas theme" sub="🎄 Holly-red colors & falling snow (auto in December)" right={<Toggle on={christmas} onChange={toggleChristmas} />} />
         </Section>
 
         <Section title="Support & Legal">
