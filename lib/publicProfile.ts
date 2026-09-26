@@ -103,12 +103,9 @@ export async function listPublicProfileUids(max = 500): Promise<string[]> {
   if (!app) return [];
   try {
     const fdb = app.firestore();
-    let docs;
-    try {
-      docs = (await fdb.collection("users").orderBy("followersCount", "desc").limit(max).get()).docs;
-    } catch {
-      docs = (await fdb.collection("users").limit(max).get()).docs;
-    }
+    // Plain limited scan — NOT orderBy(followersCount), which silently drops every
+    // user missing that field (Firestore excludes docs lacking the ordered field).
+    const docs = (await fdb.collection("users").limit(max).get()).docs;
     return docs
       .filter((d) => !(d.data() as Record<string, any>).isPrivate)
       .map((d) => d.id);

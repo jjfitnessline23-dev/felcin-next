@@ -16,7 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ uid: stri
 
   const name = p.displayName;
   const handle = p.username ? ` (@${p.username})` : "";
-  const title = `${name}${handle} — Felcin`;
+  // Root layout applies a "%s | Felcin" template, so don't repeat "Felcin" here.
+  const title = `${name}${handle}`;
   const description = p.bio || `Follow ${name} on Felcin — workouts, runs, PRs and fitness progress.`;
   const url = `${BASE}/u/${uid}`;
   const images = p.photoURL ? [{ url: p.photoURL, width: 400, height: 400, alt: name }] : [];
