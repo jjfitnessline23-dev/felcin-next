@@ -20,8 +20,8 @@ export async function generateMetadata({ params }: { params: Promise<{ uid: stri
   const title = `${name}${handle}`;
   const description = p.bio || `Follow ${name} on Felcin — workouts, runs, PRs and fitness progress.`;
   const url = `${BASE}/u/${uid}`;
-  const images = p.photoURL ? [{ url: p.photoURL, width: 400, height: 400, alt: name }] : [];
 
+  // og:image / twitter:image are supplied by opengraph-image.tsx (the branded card).
   return {
     title,
     description,
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: { params: Promise<{ uid: stri
     robots: p.isPrivate
       ? { index: false, follow: false }
       : { index: true, follow: true },
-    openGraph: { title: `${name} on Felcin`, description, url, type: "profile", images },
-    twitter: { card: "summary", title: `${name} on Felcin`, description, images: p.photoURL ? [p.photoURL] : [] },
+    openGraph: { title: `${name} on Felcin`, description, url, type: "profile" },
+    twitter: { card: "summary_large_image", title: `${name} on Felcin`, description },
     other: { "apple-itunes-app": `app-id=${APP_ID}, app-argument=${BASE}/user-profile?uid=${uid}` },
   };
 }
