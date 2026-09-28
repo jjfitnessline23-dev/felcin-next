@@ -50,6 +50,15 @@ service cloud.firestore {
         allow read: if isAuth();
         allow write: if isAuth() && request.auth.uid == userId;
       }
+
+      // Story "seen by" — each viewer records their OWN view; only the story's
+      // author (or an admin) can read the list of who viewed it.
+      match /views/{userId} {
+        allow create, update: if isAuth() && request.auth.uid == userId;
+        allow read: if isAuth() && (
+          get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid || isAdmin()
+        );
+      }
     }
 
     // ── Reels ──
