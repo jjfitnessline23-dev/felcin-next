@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
+import { collection, addDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -25,26 +24,6 @@ const FILTERS = [
 
 type Mode = "post" | "reel" | "story";
 
-const NEEDS_CONVERSION = /\.(mov|hevc|avi|mkv|wmv|flv|3gp|m4v|ts|mts|webm)$/i;
-const FFMPEG_CORE = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js";
-const FFMPEG_WASM = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm";
-
-async function convertToMp4(file: File, onProgress: (pct: number) => void): Promise<File> {
-  const ffmpeg = new FFmpeg();
-  const coreURL = await toBlobURL(FFMPEG_CORE, "text/javascript");
-  const wasmURL = await toBlobURL(FFMPEG_WASM, "application/wasm");
-  await ffmpeg.load({ coreURL, wasmURL });
-  ffmpeg.on("progress", ({ progress }) => onProgress(Math.round(progress * 100)));
-  const inputName = "input" + file.name.slice(file.name.lastIndexOf("."));
-  await ffmpeg.writeFile(inputName, await fetchFile(file));
-  await ffmpeg.exec(["-i", inputName, "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", "-y", "output.mp4"]);
-  const raw = await ffmpeg.readFile("output.mp4");
-  const outName = file.name.replace(/\.[^.]+$/, ".mp4");
-  const src = typeof raw === "string" ? new TextEncoder().encode(raw) : raw;
-  const plainBuffer = new ArrayBuffer(src.byteLength);
-  new Uint8Array(plainBuffer).set(src);
-  return new File([plainBuffer], outName, { type: "video/mp4" });
-}
 
 async function uploadFile(file: File, uid: string, onProgress: (pct: number) => void): Promise<string> {
   const ext = file.name.split(".").pop() || "bin";
@@ -77,13 +56,8 @@ export default function CreatorPage() {
   const [uploadPct, setUploadPct] = useState(0);
   const [bgUploading, setBgUploading] = useState(false);
   const [bgPct, setBgPct] = useState(0);
-  const [converting, setConverting] = useState(false);
-  const [convertPct, setConvertPct] = useState(0);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const uploadPromiseRef = useRef<Promise<string> | null>(null);
-  // Background MP4 conversion result (or null if skipped/failed) — used to auto-upgrade
-  // the post's media to a universally-compatible version after it's posted instantly.
-  const mp4PromiseRef = useRef<Promise<string | null> | null>(null);
   const [scheduled, setScheduled] = useState(false);
   const [schedTime, setSchedTime] = useState("");
   const [maxViews, setMaxViews] = useState<number | "">("");
@@ -130,44 +104,33 @@ export default function CreatorPage() {
     setFile(f); setIsVideo(video); setActiveFilter(FILTERS[0]);
     setUploadedUrl(null); setBgUploading(false); setBgPct(0);
     uploadPromiseRef.current = null;
-    mp4PromiseRef.current = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(f));
 
     if (!user) return;
 
-    // Upload the ORIGINAL immediately so the post can go out instantly — no waiting
-    // on transcoding. Bytes start flying the moment a file is picked.
+    // Upload straight to Cloudinary the moment a file is picked — it stores the file
+    // once and delivers a compatible, optimized format to EVERY device (f_auto,q_auto),
+    // so there's no client-side transcoding at all. Falls back to Firebase Storage if
+    // Cloudinary is unreachable, so posting never breaks.
     setBgUploading(true); setBgPct(0);
-    const origPromise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
-    uploadPromiseRef.current = origPromise;
-    origPromise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
-               .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
-
-    // For .mov/HEVC etc., transcode to MP4 in the BACKGROUND (non-blocking). When it's
-    // ready, publish() swaps the post's media to this version so it plays on every
-    // device. Skipped for already-MP4 videos and files too big for FFmpeg.wasm.
-    const needsConvert = video && NEEDS_CONVERSION.test(fname) && f.size < 80 * 1024 * 1024;
-    if (needsConvert) {
-      setConverting(true); setConvertPct(0);
-      mp4PromiseRef.current = (async () => {
-        try {
-          const converted = await convertToMp4(f, (pct) => setConvertPct(pct));
-          return await uploadFile(converted, user.uid, () => {});
-        } catch {
-          return null;
-        } finally {
-          setConverting(false);
-        }
-      })();
-    }
+    const promise = (async () => {
+      try {
+        const { url } = await uploadToCloudinary(f, () => user.getIdToken(), (pct) => setBgPct(pct));
+        return url;
+      } catch {
+        return uploadFile(f, user.uid, (pct) => setBgPct(pct));
+      }
+    })();
+    uploadPromiseRef.current = promise;
+    promise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
+           .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
   }, [previewUrl, user]);
 
   const clearFile = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null); setPreviewUrl(null); setIsVideo(false); setActiveFilter(FILTERS[0]); setStatus(null);
     setUploadedUrl(null); setBgUploading(false); setBgPct(0); uploadPromiseRef.current = null;
-    mp4PromiseRef.current = null; setConverting(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -221,7 +184,7 @@ export default function CreatorPage() {
           authorPhoto = d.photoURL || authorPhoto;
         }
       } catch {}
-      const postRef = await addDoc(collection(db, col), {
+      await addDoc(collection(db, col), {
         authorId: user.uid, authorName, authorPhoto, caption, text: caption, mediaUrl,
         contentType: mode === "story" ? "story" : mode === "reel" ? "reel" : contentType,
         mimeType, likes: 0, comments: 0,
@@ -239,15 +202,6 @@ export default function CreatorPage() {
         collabPhoto: mode === "post" && collabUser ? collabUser.photoURL : null,
         createdAt: serverTimestamp(),
       });
-      // Self-heal: when the background MP4 transcode finishes, upgrade the post's media
-      // to the universally-compatible version (the original may be .mov/HEVC). Runs
-      // even after we navigate away; a no-op if conversion was skipped or failed.
-      if (mp4PromiseRef.current) {
-        mp4PromiseRef.current.then((mp4Url) => {
-          if (mp4Url) updateDoc(postRef, { mediaUrl: mp4Url, mimeType: "video/mp4" }).catch(() => {});
-        }).catch(() => {});
-        mp4PromiseRef.current = null;
-      }
       setStatus({ msg: scheduledAt ? "Scheduled!" : mode === "story" ? "Story shared!" : mode === "reel" ? "Reel shared!" : "Posted!", type: "success" });
       setTimeout(() => router.push(mode === "story" ? "/stories" : "/"), 900);
     } catch (err: unknown) {
@@ -329,12 +283,6 @@ export default function CreatorPage() {
               style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
             </button>
-            {converting && (
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(0,0,0,0.6)" }}>
-                <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
-                <span className="text-xs" style={{ color: "rgba(255,255,255,0.85)" }}>Optimizing for all devices…</span>
-              </div>
-            )}
             {bgUploading && (
               <div className="absolute bottom-0 left-0 right-0 px-3 pb-3">
                 <div className="rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", height: 4 }}>
