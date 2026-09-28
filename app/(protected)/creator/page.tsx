@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { Capacitor } from "@capacitor/core";
 import { useRouter, useSearchParams } from "next/navigation";
 import { collection, addDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -68,11 +69,13 @@ export default function CreatorPage() {
   const [showCollabSearch, setShowCollabSearch] = useState(false);
   const [allUsers, setAllUsers] = useState<CollabUser[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const openMediaPickerRef = useRef<(() => void) | undefined>(undefined);
   const [ready, setReady] = useState(false);
 
-  // useLayoutEffect fires before the browser paints — file picker opens with zero visible flash
+  // useLayoutEffect fires before the browser paints — picker opens with zero visible flash
   useLayoutEffect(() => {
-    fileRef.current?.click();
+    if (Capacitor.isNativePlatform()) openMediaPickerRef.current?.();
+    else fileRef.current?.click();
     setReady(true);
   }, []);
 
@@ -126,6 +129,35 @@ export default function CreatorPage() {
     promise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
            .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
   }, [previewUrl, user]);
+
+  // Opens the media picker. On the native app, jumps STRAIGHT to the photo+video
+  // gallery via the native picker (no iOS "Photo Library / Take Photo / Choose File"
+  // menu). On web — or if the native plugin isn't in the installed binary yet — it
+  // falls back to the normal file input, so this is safe to ship before the app rebuild.
+  const openMediaPicker = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) { fileRef.current?.click(); return; }
+    try {
+      const { FilePicker } = await import("@capawesome/capacitor-file-picker");
+      const res = await FilePicker.pickMedia({ readData: false });
+      const picked = res.files?.[0];
+      if (!picked) return; // user cancelled
+      let f: File | null = null;
+      if (picked.blob) {
+        f = new File([picked.blob], picked.name, { type: picked.mimeType });
+      } else if (picked.path) {
+        const src = Capacitor.convertFileSrc(picked.path);
+        const blob = await (await fetch(src)).blob();
+        f = new File([blob], picked.name, { type: picked.mimeType || blob.type });
+      }
+      if (f) handleFile(f);
+    } catch {
+      // Plugin unavailable (old binary) or error → fall back to the OS file menu.
+      fileRef.current?.click();
+    }
+  }, [handleFile]);
+  // Keep a ref in sync (assigned during render) so the mount effect can call the
+  // latest picker without adding it as a dependency.
+  openMediaPickerRef.current = openMediaPicker;
 
   const clearFile = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -261,7 +293,8 @@ export default function CreatorPage() {
       {/* Media area */}
       <div className="relative" style={{ background: "#000", aspectRatio: "1/1", maxHeight: 480 }}>
         {!file ? (
-          <label className="flex flex-col items-center justify-center gap-5 w-full h-full cursor-pointer" style={{ minHeight: 300 }}>
+          <label className="flex flex-col items-center justify-center gap-5 w-full h-full cursor-pointer" style={{ minHeight: 300 }}
+            onClick={(e) => { if (Capacitor.isNativePlatform()) { e.preventDefault(); openMediaPicker(); } }}>
             <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
               onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
@@ -299,7 +332,8 @@ export default function CreatorPage() {
               </div>
             )}
             <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer"
-              style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}>
+              style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
+              onClick={(e) => { if (Capacitor.isNativePlatform()) { e.preventDefault(); openMediaPicker(); } }}>
               <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
               Change
