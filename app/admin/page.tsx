@@ -262,6 +262,10 @@ export default function AdminPortalPage() {
   const [togglingAdvertise, setTogglingAdvertise] = useState(false);
   const [aiStudioEnabled, setAiStudioEnabled] = useState<boolean | null>(null);
   const [togglingAiStudio, setTogglingAiStudio] = useState(false);
+  const [forceHalloween, setForceHalloween] = useState<boolean | null>(null);
+  const [togglingHalloween, setTogglingHalloween] = useState(false);
+  const [forceChristmas, setForceChristmas] = useState<boolean | null>(null);
+  const [togglingChristmas, setTogglingChristmas] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<AdminWorkoutLog[]>([]);
   const [runRoutes, setRunRoutes] = useState<AdminRunRoute[]>([]);
@@ -328,8 +332,10 @@ export default function AdminPortalPage() {
         setAdsEnabled(data.adsEnabled ?? true);
         setAdvertiseEnabled(data.advertiseEnabled ?? true);
         setAiStudioEnabled(data.aiStudioEnabled ?? false);
+        setForceHalloween(data.forceHalloween ?? false);
+        setForceChristmas(data.forceChristmas ?? false);
       })
-      .catch(() => { setBadgesEnabled(true); setBoostEnabled(true); setAdsEnabled(true); setAdvertiseEnabled(true); setAiStudioEnabled(false); });
+      .catch(() => { setBadgesEnabled(true); setBoostEnabled(true); setAdsEnabled(true); setAdvertiseEnabled(true); setAiStudioEnabled(false); setForceHalloween(false); setForceChristmas(false); });
 
     // Load analytics
     const today = new Date().toISOString().split("T")[0];
@@ -547,6 +553,15 @@ export default function AdminPortalPage() {
   const toggleAds       = () => doToggle("adsEnabled",       adsEnabled,       setTogglingAds,       setAdsEnabled);
   const toggleAdvertise = () => doToggle("advertiseEnabled", advertiseEnabled, setTogglingAdvertise, setAdvertiseEnabled);
   const toggleAiStudio  = () => doToggle("aiStudioEnabled",  aiStudioEnabled,  setTogglingAiStudio,  setAiStudioEnabled);
+  // Mutually exclusive seasonal themes: turning one on turns the other off.
+  const toggleHalloween = () => {
+    if (!forceHalloween && forceChristmas) doToggle("forceChristmas", true, setTogglingChristmas, setForceChristmas);
+    doToggle("forceHalloween", forceHalloween, setTogglingHalloween, setForceHalloween);
+  };
+  const toggleChristmas = () => {
+    if (!forceChristmas && forceHalloween) doToggle("forceHalloween", true, setTogglingHalloween, setForceHalloween);
+    doToggle("forceChristmas", forceChristmas, setTogglingChristmas, setForceChristmas);
+  };
 
   const pendingReports = reports.filter((r) => r.status !== "reviewed");
 
@@ -1527,6 +1542,62 @@ export default function AdminPortalPage() {
                   style={{ background: aiStudioEnabled ? "#a78bfa" : "#2a2a2a" }} />
                 <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
                   style={{ transform: aiStudioEnabled ? "translateX(20px)" : "translateX(0)" }} />
+              </button>
+            </div>
+
+            <p className="text-xs mt-4 mb-1" style={{ color: "#444" }}>Seasonal themes — force on for everyone (otherwise auto by date)</p>
+
+            {/* Halloween theme toggle */}
+            <div className="flex items-center gap-4 p-5 rounded-2xl"
+              style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: forceHalloween ? "rgba(255,122,26,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${forceHalloween ? "rgba(255,122,26,0.25)" : "rgba(255,255,255,0.07)"}` }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: forceHalloween ? "#ff7a1a" : "#444", fontVariationSettings: "'FILL' 1" }}>
+                  dark_mode
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>🎃 Halloween theme</p>
+                <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                  {forceHalloween ? "Forced ON for all users (pumpkin colors, bats, cobwebs)" : "Auto-on Oct 24–Nov 1 · toggle to force on now"}
+                </p>
+              </div>
+              <button
+                onClick={toggleHalloween}
+                disabled={togglingHalloween || forceHalloween === null}
+                className="relative inline-block shrink-0 cursor-pointer border-none bg-transparent"
+                style={{ width: 44, height: 24 }}>
+                <span className="absolute inset-0 rounded-full transition-colors duration-200"
+                  style={{ background: forceHalloween ? "#ff7a1a" : "#2a2a2a" }} />
+                <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
+                  style={{ transform: forceHalloween ? "translateX(20px)" : "translateX(0)" }} />
+              </button>
+            </div>
+
+            {/* Christmas theme toggle */}
+            <div className="flex items-center gap-4 p-5 rounded-2xl mt-3"
+              style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: forceChristmas ? "rgba(226,59,59,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${forceChristmas ? "rgba(226,59,59,0.25)" : "rgba(255,255,255,0.07)"}` }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: forceChristmas ? "#e23b3b" : "#444", fontVariationSettings: "'FILL' 1" }}>
+                  ac_unit
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>🎄 Christmas theme</p>
+                <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                  {forceChristmas ? "Forced ON for all users (holly red, falling snow)" : "Auto-on Dec 1–26 · toggle to force on now"}
+                </p>
+              </div>
+              <button
+                onClick={toggleChristmas}
+                disabled={togglingChristmas || forceChristmas === null}
+                className="relative inline-block shrink-0 cursor-pointer border-none bg-transparent"
+                style={{ width: 44, height: 24 }}>
+                <span className="absolute inset-0 rounded-full transition-colors duration-200"
+                  style={{ background: forceChristmas ? "#e23b3b" : "#2a2a2a" }} />
+                <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
+                  style={{ transform: forceChristmas ? "translateX(20px)" : "translateX(0)" }} />
               </button>
             </div>
 

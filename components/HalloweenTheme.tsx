@@ -7,6 +7,8 @@
 // - Renders lightweight decorations (corner cobwebs + drifting bats) only while active.
 
 import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "@/lib/db";
+import { db } from "@/lib/firebase";
 
 const KEY = "felcin_halloween";
 export type HalloweenPref = "on" | "off" | "auto";
@@ -75,17 +77,26 @@ export default function HalloweenTheme() {
   const [active, setActive] = useState(false);
 
   useEffect(() => {
+    // Admin global override (config/features.forceHalloween) — lets the owner turn
+    // the theme on for everyone from the admin panel, independent of the date.
+    let forced = false;
     const apply = () => {
-      const on = isHalloweenActive();
+      const pref = getHalloweenPref();
+      const on = pref === "on" ? true : pref === "off" ? false : (forced || isAutoHalloweenWindow());
       setActive(on);
       document.documentElement.classList.toggle("theme-halloween", on);
     };
     apply();
     window.addEventListener("felcin-halloween-change", apply);
     window.addEventListener("focus", apply); // re-check the date window on return
+    const unsub = onSnapshot(doc(db, "config", "features"), (snap) => {
+      forced = !!snap.data()?.forceHalloween;
+      apply();
+    });
     return () => {
       window.removeEventListener("felcin-halloween-change", apply);
       window.removeEventListener("focus", apply);
+      unsub();
     };
   }, []);
 

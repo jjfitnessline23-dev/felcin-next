@@ -6,6 +6,8 @@
 // - Renders falling snow only while active.
 
 import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "@/lib/db";
+import { db } from "@/lib/firebase";
 
 const KEY = "felcin_christmas";
 export type ChristmasPref = "on" | "off" | "auto";
@@ -58,17 +60,25 @@ export default function ChristmasTheme() {
   const [active, setActive] = useState(false);
 
   useEffect(() => {
+    // Admin global override (config/features.forceChristmas).
+    let forced = false;
     const apply = () => {
-      const on = isChristmasActive();
+      const pref = getChristmasPref();
+      const on = pref === "on" ? true : pref === "off" ? false : (forced || isAutoChristmasWindow());
       setActive(on);
       document.documentElement.classList.toggle("theme-christmas", on);
     };
     apply();
     window.addEventListener("felcin-christmas-change", apply);
     window.addEventListener("focus", apply); // re-check date window on return
+    const unsub = onSnapshot(doc(db, "config", "features"), (snap) => {
+      forced = !!snap.data()?.forceChristmas;
+      apply();
+    });
     return () => {
       window.removeEventListener("felcin-christmas-change", apply);
       window.removeEventListener("focus", apply);
+      unsub();
     };
   }, []);
 
