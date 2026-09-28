@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc, addDoc, updateDoc, increment, arrayUnion, arrayRemove, serverTimestamp } from "@/lib/db";
+import { collection, query, orderBy, limit, onSnapshot, doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, increment, arrayUnion, arrayRemove, serverTimestamp } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
@@ -27,6 +27,15 @@ interface UserStories {
   authorPhoto: string;
   stories: Story[];
 }
+interface StoryViewer { id: string; uid?: string; displayName?: string; photoURL?: string; viewedAt?: { seconds: number }; }
+
+function timeAgo(seconds: number) {
+  const s = Math.floor(Date.now() / 1000 - seconds);
+  if (s < 60) return "now";
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
 
 function isVideo(s: Story) {
   const t = s.contentType || s.mimeType || "";
@@ -49,6 +58,8 @@ export default function StoriesStrip() {
   const [commentText, setCommentText] = useState("");
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [viewers, setViewers] = useState<StoryViewer[]>([]);
+  const [viewersOpen, setViewersOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -101,8 +112,8 @@ export default function StoriesStrip() {
 
   useEffect(() => {
     if (!activeGroup) return;
-    // Pause auto-advance while the viewer is typing a comment
-    if (commentOpen) {
+    // Pause auto-advance while typing a comment or viewing the "seen by" list
+    if (commentOpen || viewersOpen) {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
       return;
@@ -126,7 +137,7 @@ export default function StoriesStrip() {
       if (progressRef.current) clearInterval(progressRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGroup, activeIdx, commentOpen]);
+  }, [activeGroup, activeIdx, commentOpen, viewersOpen]);
 
   // Sync like/comment state whenever the visible story changes
   useEffect(() => {
@@ -137,6 +148,35 @@ export default function StoriesStrip() {
     setCommentCount(typeof s.comments === "number" ? s.comments : 0);
     setCommentOpen(false);
     setCommentText("");
+    setViewersOpen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroup, activeIdx, user]);
+
+  // Story "seen by": record my view of someone else's story; if it's MY story,
+  // subscribe to who viewed it.
+  useEffect(() => {
+    const s = activeGroup?.stories[activeIdx];
+    if (!s || !user) { setViewers([]); return; }
+    if (s.authorId !== user.uid) {
+      setDoc(doc(db, "posts", s.id, "views", user.uid), {
+        uid: user.uid,
+        displayName: user.displayName || "",
+        photoURL: user.photoURL || "",
+        viewedAt: serverTimestamp(),
+      }, { merge: true }).catch(() => {});
+      setViewers([]);
+      return;
+    }
+    const unsub = onSnapshot(
+      query(collection(db, "posts", s.id, "views"), limit(1000)),
+      (snap) => setViewers(
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<StoryViewer, "id">) }))
+          .sort((a, b) => (b.viewedAt?.seconds ?? 0) - (a.viewedAt?.seconds ?? 0))
+      ),
+      () => {}
+    );
+    return () => unsub();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup, activeIdx, user]);
 
@@ -333,6 +373,21 @@ export default function StoriesStrip() {
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
                   </button>
                 </div>
+              ) : current.authorId === user?.uid ? (
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => setViewersOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border-none cursor-pointer"
+                    style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}>visibility</span>
+                    <span className="text-sm font-semibold">Seen by {viewers.length}</span>
+                  </button>
+                  <button onClick={shareStory}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full border-none cursor-pointer ml-auto"
+                    style={{ background: "rgba(0,0,0,0.4)", color: "#fff" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>ios_share</span>
+                    {copied && <span className="text-xs font-semibold">Copied</span>}
+                  </button>
+                </div>
               ) : (
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <button onClick={likeStory}
@@ -356,6 +411,42 @@ export default function StoriesStrip() {
                 </div>
               )}
             </div>
+
+            {/* Viewers ("Seen by") sheet — owner only */}
+            {viewersOpen && (
+              <div className="absolute inset-0 z-40 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.55)" }}
+                onClick={() => setViewersOpen(false)}>
+                <div className="rounded-t-3xl flex flex-col" style={{ background: "#141414", maxHeight: "64%", paddingBottom: "env(safe-area-inset-bottom,0px)" }}
+                  onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#fff", fontVariationSettings: "'FILL' 1" }}>visibility</span>
+                      <span className="font-bold text-white text-base">Viewers · {viewers.length}</span>
+                    </div>
+                    <button onClick={() => setViewersOpen(false)} className="border-none bg-transparent cursor-pointer" style={{ color: "#888" }}>
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                  <div style={{ overflowY: "auto" }}>
+                    {viewers.length === 0 ? (
+                      <p className="text-center text-sm" style={{ color: "#666", padding: "40px 0" }}>No views yet</p>
+                    ) : viewers.map((v) => (
+                      <div key={v.id} className="flex items-center gap-3 px-5" style={{ paddingTop: 10, paddingBottom: 10 }}>
+                        {v.photoURL ? (
+                          <img src={v.photoURL} alt="" className="rounded-full object-cover" style={{ width: 38, height: 38 }} />
+                        ) : (
+                          <div className="rounded-full flex items-center justify-center font-bold" style={{ width: 38, height: 38, background: "#222", color: "#aaa" }}>
+                            {(v.displayName || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-white flex-1">{v.displayName || "User"}</span>
+                        <span className="text-xs" style={{ color: "#555" }}>{v.viewedAt ? timeAgo(v.viewedAt.seconds) : ""}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
