@@ -41,6 +41,14 @@ async function uploadFile(file: File, uid: string, onProgress: (pct: number) => 
   });
 }
 
+// True ONLY when the native media-picker plugin is actually compiled into the app
+// binary. On web, or on an older native build that predates the plugin, this is
+// false and we use the normal file input — calling a missing native plugin can
+// hang the app, so we must never attempt it unless it's really there.
+function nativePickerAvailable() {
+  return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("FilePicker");
+}
+
 export default function CreatorPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -74,7 +82,7 @@ export default function CreatorPage() {
 
   // useLayoutEffect fires before the browser paints — picker opens with zero visible flash
   useLayoutEffect(() => {
-    if (Capacitor.isNativePlatform()) openMediaPickerRef.current?.();
+    if (nativePickerAvailable()) openMediaPickerRef.current?.();
     else fileRef.current?.click();
     setReady(true);
   }, []);
@@ -135,7 +143,7 @@ export default function CreatorPage() {
   // menu). On web — or if the native plugin isn't in the installed binary yet — it
   // falls back to the normal file input, so this is safe to ship before the app rebuild.
   const openMediaPicker = useCallback(async () => {
-    if (!Capacitor.isNativePlatform()) { fileRef.current?.click(); return; }
+    if (!nativePickerAvailable()) { fileRef.current?.click(); return; }
     try {
       const { FilePicker } = await import("@capawesome/capacitor-file-picker");
       const res = await FilePicker.pickMedia({ readData: false });
@@ -294,7 +302,7 @@ export default function CreatorPage() {
       <div className="relative" style={{ background: "#000", aspectRatio: "1/1", maxHeight: 480 }}>
         {!file ? (
           <label className="flex flex-col items-center justify-center gap-5 w-full h-full cursor-pointer" style={{ minHeight: 300 }}
-            onClick={(e) => { if (Capacitor.isNativePlatform()) { e.preventDefault(); openMediaPicker(); } }}>
+            onClick={(e) => { if (nativePickerAvailable()) { e.preventDefault(); openMediaPicker(); } }}>
             <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
               onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
@@ -333,7 +341,7 @@ export default function CreatorPage() {
             )}
             <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer"
               style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
-              onClick={(e) => { if (Capacitor.isNativePlatform()) { e.preventDefault(); openMediaPicker(); } }}>
+              onClick={(e) => { if (nativePickerAvailable()) { e.preventDefault(); openMediaPicker(); } }}>
               <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
               Change
