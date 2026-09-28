@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, addDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
+import { collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -81,6 +81,9 @@ export default function CreatorPage() {
   const [convertPct, setConvertPct] = useState(0);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const uploadPromiseRef = useRef<Promise<string> | null>(null);
+  // Background MP4 conversion result (or null if skipped/failed) — used to auto-upgrade
+  // the post's media to a universally-compatible version after it's posted instantly.
+  const mp4PromiseRef = useRef<Promise<string | null> | null>(null);
   const [scheduled, setScheduled] = useState(false);
   const [schedTime, setSchedTime] = useState("");
   const [maxViews, setMaxViews] = useState<number | "">("");
@@ -127,42 +130,36 @@ export default function CreatorPage() {
     setFile(f); setIsVideo(video); setActiveFilter(FILTERS[0]);
     setUploadedUrl(null); setBgUploading(false); setBgPct(0);
     uploadPromiseRef.current = null;
+    mp4PromiseRef.current = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(f));
 
     if (!user) return;
 
-    // Auto-convert non-MP4 videos to MP4 — skip if file > 80MB (FFmpeg.wasm crashes on large files)
+    // Upload the ORIGINAL immediately so the post can go out instantly — no waiting
+    // on transcoding. Bytes start flying the moment a file is picked.
+    setBgUploading(true); setBgPct(0);
+    const origPromise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
+    uploadPromiseRef.current = origPromise;
+    origPromise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
+               .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
+
+    // For .mov/HEVC etc., transcode to MP4 in the BACKGROUND (non-blocking). When it's
+    // ready, publish() swaps the post's media to this version so it plays on every
+    // device. Skipped for already-MP4 videos and files too big for FFmpeg.wasm.
     const needsConvert = video && NEEDS_CONVERSION.test(fname) && f.size < 80 * 1024 * 1024;
     if (needsConvert) {
       setConverting(true); setConvertPct(0);
-      setStatus({ msg: "Converting video to MP4 for best compatibility…", type: "info" });
-      try {
-        const converted = await convertToMp4(f, (pct) => setConvertPct(pct));
-        setConverting(false);
-        setStatus({ msg: "Converted! Uploading…", type: "info" });
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(URL.createObjectURL(converted));
-        setFile(converted);
-        setBgUploading(true); setBgPct(0);
-        const promise = uploadFile(converted, user.uid, (pct) => setBgPct(pct));
-        uploadPromiseRef.current = promise;
-        promise.then((url) => { setUploadedUrl(url); setBgUploading(false); setStatus(null); })
-               .catch(() => { setBgUploading(false); setStatus({ msg: "Upload failed. Try again.", type: "error" }); uploadPromiseRef.current = null; });
-      } catch {
-        setConverting(false);
-        setBgUploading(true);
-        const promise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
-        uploadPromiseRef.current = promise;
-        promise.then((url) => { setUploadedUrl(url); setBgUploading(false); setStatus(null); })
-               .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
-      }
-    } else {
-      setBgUploading(true); setBgPct(0);
-      const promise = uploadFile(f, user.uid, (pct) => setBgPct(pct));
-      uploadPromiseRef.current = promise;
-      promise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
-             .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
+      mp4PromiseRef.current = (async () => {
+        try {
+          const converted = await convertToMp4(f, (pct) => setConvertPct(pct));
+          return await uploadFile(converted, user.uid, () => {});
+        } catch {
+          return null;
+        } finally {
+          setConverting(false);
+        }
+      })();
     }
   }, [previewUrl, user]);
 
@@ -170,6 +167,7 @@ export default function CreatorPage() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null); setPreviewUrl(null); setIsVideo(false); setActiveFilter(FILTERS[0]); setStatus(null);
     setUploadedUrl(null); setBgUploading(false); setBgPct(0); uploadPromiseRef.current = null;
+    mp4PromiseRef.current = null; setConverting(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -223,7 +221,7 @@ export default function CreatorPage() {
           authorPhoto = d.photoURL || authorPhoto;
         }
       } catch {}
-      await addDoc(collection(db, col), {
+      const postRef = await addDoc(collection(db, col), {
         authorId: user.uid, authorName, authorPhoto, caption, text: caption, mediaUrl,
         contentType: mode === "story" ? "story" : mode === "reel" ? "reel" : contentType,
         mimeType, likes: 0, comments: 0,
@@ -241,6 +239,15 @@ export default function CreatorPage() {
         collabPhoto: mode === "post" && collabUser ? collabUser.photoURL : null,
         createdAt: serverTimestamp(),
       });
+      // Self-heal: when the background MP4 transcode finishes, upgrade the post's media
+      // to the universally-compatible version (the original may be .mov/HEVC). Runs
+      // even after we navigate away; a no-op if conversion was skipped or failed.
+      if (mp4PromiseRef.current) {
+        mp4PromiseRef.current.then((mp4Url) => {
+          if (mp4Url) updateDoc(postRef, { mediaUrl: mp4Url, mimeType: "video/mp4" }).catch(() => {});
+        }).catch(() => {});
+        mp4PromiseRef.current = null;
+      }
       setStatus({ msg: scheduledAt ? "Scheduled!" : mode === "story" ? "Story shared!" : mode === "reel" ? "Reel shared!" : "Posted!", type: "success" });
       setTimeout(() => router.push(mode === "story" ? "/stories" : "/"), 900);
     } catch (err: unknown) {
@@ -323,16 +330,12 @@ export default function CreatorPage() {
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
             </button>
             {converting && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: "rgba(0,0,0,0.75)" }}>
-                <div className="spinner" />
-                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Converting to MP4… {convertPct}%</p>
-                <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${convertPct}%`, background: "#a78bfa" }} />
-                </div>
-                <p className="text-xs" style={{ color: "#666" }}>Making it compatible with all devices</p>
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(0,0,0,0.6)" }}>
+                <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
+                <span className="text-xs" style={{ color: "rgba(255,255,255,0.85)" }}>Optimizing for all devices…</span>
               </div>
             )}
-            {!converting && bgUploading && (
+            {bgUploading && (
               <div className="absolute bottom-0 left-0 right-0 px-3 pb-3">
                 <div className="rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", height: 4 }}>
                   <div className="h-full rounded-full transition-all duration-300" style={{ width: `${bgPct}%`, background: "#a78bfa" }} />
