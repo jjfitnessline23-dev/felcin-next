@@ -509,7 +509,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     if (!canDelete) return;
     if (!confirm("Delete this post?")) return;
     setDotMenu(false);
-    await deleteDoc(doc(db, "posts", post.id)).catch(() => {});
+    const col = post.contentType === "reel" ? "reels" : "posts";
+    await deleteDoc(doc(db, col, post.id)).catch(() => {});
     setDeleted(true);
   };
 
@@ -531,7 +532,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         createdAt: serverTimestamp(),
         likes: 0, comments: 0,
       });
-      await updateDoc(doc(db, "posts", post.id), { repostCount: increment(1) });
+      await updateDoc(doc(db, post.contentType === "reel" ? "reels" : "posts", post.id), { repostCount: increment(1) });
       setReposted(true);
       setRepostCount((c) => c + 1);
       if (post.authorId !== user.uid) {

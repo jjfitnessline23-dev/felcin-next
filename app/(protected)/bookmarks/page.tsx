@@ -21,8 +21,11 @@ export default function BookmarksPage() {
     return onSnapshot(q, async (snap) => {
       const fetched = await Promise.all(snap.docs.map(async (d) => {
         try {
+          // A bookmark id can be a post OR a reel — check both (reels were invisible before).
           const s = await getDoc(doc(db, "posts", d.id));
-          return s.exists() ? { id: s.id, ...(s.data() as Omit<Post, "id">) } : null;
+          if (s.exists()) return { id: s.id, ...(s.data() as Omit<Post, "id">) };
+          const r = await getDoc(doc(db, "reels", d.id));
+          return r.exists() ? { id: r.id, ...(r.data() as Omit<Post, "id">) } : null;
         } catch { return null; }
       }));
       setPosts(fetched.filter(Boolean) as Post[]);

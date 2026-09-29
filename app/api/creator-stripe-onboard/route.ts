@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import { verifyToken, getCreatorStripeId } from "@/lib/firebaseAdmin";
+import { verifyToken, getCreatorStripeId, getAdminApp } from "@/lib/firebaseAdmin";
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -35,13 +35,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
-  const { token, existingAccountId } = body;
+  const { token } = body;
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
   const uid = await verifyToken(req.headers.get("authorization") ?? body?.token);
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-  let accountId = existingAccountId || null;
+  // Only ever resume the caller's OWN persisted account — never trust a client-supplied
+  // account id (that let a caller open someone else's onboarding).
+  let accountId = await getCreatorStripeId(uid);
 
   if (!accountId) {
     const account = await stripe.accounts.create({
@@ -49,6 +51,10 @@ export async function POST(req: NextRequest) {
       metadata: { felcinUid: uid },
     });
     accountId = account.id;
+    // Persist it — payouts + every monetization read depend on this field, and without
+    // it a brand-new orphan account was created on every visit.
+    const app = getAdminApp();
+    if (app) await app.firestore().doc(`users/${uid}/public/profile`).set({ stripeAccountId: accountId }, { merge: true });
   }
 
   const link = await stripe.accountLinks.create({
