@@ -516,10 +516,24 @@ export default function AdminPortalPage() {
   };
 
   const deleteUser = async (id: string, name: string) => {
-    if (!confirm(`Delete user "${name}"? This removes their profile data.`)) return;
-    await deleteDoc(doc(db, "users", id)).catch(() => {});
-    await deleteDoc(doc(db, "users", id, "public", "profile")).catch(() => {});
-    setUsers((u) => u.filter((x) => x.id !== id));
+    if (!confirm(`Delete user "${name}"? This removes their profile, posts, reels, and follow connections.`)) return;
+    const prev = users;
+    setUsers((u) => u.filter((x) => x.id !== id)); // optimistic
+    // Server-side cascade (Admin SDK): removes authored content, reciprocal follow edges +
+    // count fixes, and the whole user tree. A client delete only reached the root doc and
+    // left everything else orphaned.
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ targetUid: id }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setUsers(prev); // roll back
+      alert("Delete failed — please try again.");
+    }
   };
 
   const toggleBan = async (id: string, currentlyBanned: boolean) => {
