@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection, query, where, getDocs, limit, orderBy,
-  doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, updateDoc, increment,
+  doc, getDoc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp,
 } from "@/lib/db";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
+import { followRequest } from "@/lib/follow";
 import Link from "next/link";
 import InAppPaymentModal from "@/components/InAppPaymentModal";
 
@@ -186,19 +187,13 @@ export default function UserProfilePage() {
 
   const toggleFollow = async () => {
     if (!user || isSelf) return;
-    const ref = doc(db, "users", uid, "followers", user.uid);
-    // Mirror doc on MY side — the Following feed + following list read users/{me}/following.
-    const myFollowingRef = doc(db, "users", user.uid, "following", uid);
-    if (following) {
-      await deleteDoc(ref);
-      deleteDoc(myFollowingRef).catch(() => {});
-      updateDoc(doc(db, "users", uid), { followersCount: increment(-1) }).catch(() => {});
-      updateDoc(doc(db, "users", user.uid), { followingCount: increment(-1) }).catch(() => {});
-    } else {
-      await setDoc(ref, { followerId: user.uid, createdAt: new Date() });
-      setDoc(myFollowingRef, { followingId: uid, createdAt: new Date() }).catch(() => {});
-      updateDoc(doc(db, "users", uid), { followersCount: increment(1) }).catch(() => {});
-      updateDoc(doc(db, "users", user.uid), { followingCount: increment(1) }).catch(() => {});
+    const wasFollowing = following;
+    setFollowing(!wasFollowing); // optimistic — the onSnapshot listener reconciles with server truth
+    // All relationship docs + both denormalized counters are written server-side in one
+    // transaction (a viewer can't write the followed user's followersCount directly).
+    const ok = await followRequest(uid, wasFollowing ? "unfollow" : "follow");
+    if (!ok) { setFollowing(wasFollowing); return; } // roll back on failure
+    if (!wasFollowing) {
       addDoc(collection(db, "notifications"), {
         recipientId: uid,
         senderId: user.uid,
