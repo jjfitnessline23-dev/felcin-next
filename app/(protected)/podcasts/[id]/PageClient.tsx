@@ -79,10 +79,12 @@ export default function EpisodePage() {
     }).catch(() => setLoading(false));
   }, [epId]);
 
-  // Reflect whether the current user has liked this episode
+  // Reflect whether the current user has liked this episode. Keyed on ids (not the
+  // episode/user OBJECTS) so a re-fetch / auth-token refresh doesn't revert a fresh like.
   useEffect(() => {
     if (user && episode) setLiked(Array.isArray(episode.likedBy) && episode.likedBy.includes(user.uid));
-  }, [user, episode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, episode?.id]);
 
   // Live comments
   useEffect(() => {

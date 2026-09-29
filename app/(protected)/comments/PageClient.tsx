@@ -152,7 +152,10 @@ export default function PageClient() {
       initialLoadDone.current = true;
     });
     return () => { unsub(); clearTimeout(scrollTimer.current); };
-  }, [postId, col, isReel, router, user]);
+  // Keyed on user?.uid (not the user object) so an auth-token refresh doesn't re-run
+  // this loader and revert a like the user just made.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId, col, isReel, router, user?.uid]);
 
   useEffect(() => {
     if (!user || !postId) return;

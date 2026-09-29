@@ -189,10 +189,13 @@ export default function BadgesPage() {
   useEffect(() => {
     const sessionId = searchParams.get("badge_session_id");
     if (!sessionId) return;
-    fetch(`/api/badge-purchase-verify?session_id=${sessionId}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.ok) { setCurrentBadge(d.badgeId); showToast("Badge activated on your profile!"); } })
-      .catch(() => {});
+    (async () => {
+      const token = await auth.currentUser?.getIdToken();
+      fetch(`/api/badge-purchase-verify?session_id=${sessionId}`, { headers: { authorization: `Bearer ${token ?? ""}` } })
+        .then((r) => r.json())
+        .then((d) => { if (d.ok) { setCurrentBadge(d.badgeId); showToast("Badge activated on your profile!"); } })
+        .catch(() => {});
+    })();
   }, [searchParams]);
 
   const purchaseBadge = async (badgeId: string) => {
@@ -402,12 +405,13 @@ export default function BadgesPage() {
           badgeLabel={paymentModal.label}
           amountCents={paymentModal.amount}
           onClose={() => setPaymentModal(null)}
-          onSuccess={(paymentIntentId) => {
+          onSuccess={async (paymentIntentId) => {
             const activatedBadgeId = paymentModal.badgeId;
             setPaymentModal(null);
+            const token = await auth.currentUser?.getIdToken();
             fetch("/api/badge-intent-verify", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", authorization: `Bearer ${token ?? ""}` },
               body: JSON.stringify({ paymentIntentId }),
             })
               .then((r) => r.json())

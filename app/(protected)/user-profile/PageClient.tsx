@@ -187,12 +187,18 @@ export default function UserProfilePage() {
   const toggleFollow = async () => {
     if (!user || isSelf) return;
     const ref = doc(db, "users", uid, "followers", user.uid);
+    // Mirror doc on MY side — the Following feed + following list read users/{me}/following.
+    const myFollowingRef = doc(db, "users", user.uid, "following", uid);
     if (following) {
       await deleteDoc(ref);
+      deleteDoc(myFollowingRef).catch(() => {});
       updateDoc(doc(db, "users", uid), { followersCount: increment(-1) }).catch(() => {});
+      updateDoc(doc(db, "users", user.uid), { followingCount: increment(-1) }).catch(() => {});
     } else {
       await setDoc(ref, { followerId: user.uid, createdAt: new Date() });
+      setDoc(myFollowingRef, { followingId: uid, createdAt: new Date() }).catch(() => {});
       updateDoc(doc(db, "users", uid), { followersCount: increment(1) }).catch(() => {});
+      updateDoc(doc(db, "users", user.uid), { followingCount: increment(1) }).catch(() => {});
       addDoc(collection(db, "notifications"), {
         recipientId: uid,
         senderId: user.uid,

@@ -179,6 +179,18 @@ service cloud.firestore {
         allow write: if isAuth() && request.auth.uid == userId;
       }
 
+      // Progress photos — private to the owner (FIX: was denied by the read-only catch-all)
+      match /progressPhotos/{docId} {
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
+      // Mood logs — private to the owner (FIX: was denied by the read-only catch-all)
+      match /moodLogs/{docId} {
+        allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
       // Catch-all: read-only for owner/admin — write is INTENTIONALLY omitted here
       // so the catch-all never silently bypasses the validated rules above (earnings, etc.)
       match /{subcollection}/{docId} {
@@ -201,6 +213,13 @@ service cloud.firestore {
         allow read: if isAuth();
         allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
         allow update, delete: if false;
+      }
+
+      // PPV unlock records — written server-side (Admin SDK); the buyer/host may read
+      // their own so a returning buyer isn't shown the paywall again. (FIX: was denied)
+      match /purchases/{buyerId} {
+        allow read: if isAuth() && (request.auth.uid == buyerId || isAdmin());
+        allow write: if false;
       }
     }
 
@@ -250,7 +269,13 @@ service cloud.firestore {
     match /challenges/{challengeId} {
       allow read: if isAuth();
       allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
-      allow update: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
+      // Any joiner may bump nodeCount when they add a node (FIX: was author-only, so
+      // joining someone else's chain threw).
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.authorId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nodeCount']) ||
+        isAdmin()
+      );
       allow delete: if isAdmin();
 
       match /nodes/{nodeId} {
@@ -315,8 +340,23 @@ service cloud.firestore {
     // ── Live Podcasts (doc id = host uid) ──
     match /livePodcasts/{hostId} {
       allow read: if isAuth();
-      allow create, update: if isAuth() && request.auth.uid == hostId;
+      // Host owns the show; any listener may bump listenerCount join/leave. (FIX: was
+      // host-only, so the live listener count never moved.)
+      allow create: if isAuth() && request.auth.uid == hostId;
+      allow update: if isAuth() && (
+        request.auth.uid == hostId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['listenerCount']) ||
+        isAdmin()
+      );
       allow delete: if isAuth() && (request.auth.uid == hostId || isAdmin());
+
+      // Live chat (FIX: subcollection had no rule → chat never loaded or sent)
+      match /chat/{msgId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.senderId == request.auth.uid;
+        allow update: if false;
+        allow delete: if isAuth() && (request.auth.uid == hostId || isAdmin());
+      }
     }
 
     // ── Time Capsules (FIX: was missing, defaulted to deny) ──
