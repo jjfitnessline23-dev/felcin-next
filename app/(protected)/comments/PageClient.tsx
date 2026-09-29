@@ -10,6 +10,7 @@ import {
 import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
+import { recordView } from "@/lib/recordView";
 import Link from "next/link";
 
 interface Post {
@@ -93,15 +94,9 @@ export default function PageClient() {
             const newCount = (p.viewCount ?? 0) + 1;
             if (newCount >= p.maxViews) { await deleteDoc(postRef); router.replace("/"); return; }
           }
-          // Track view for creator fund
-          const month = new Date().toISOString().slice(0, 7);
-          await Promise.all([
-            updateDoc(postRef, { viewCount: increment(1) }),
-            ...(p.authorId ? [
-              updateDoc(doc(db, "users", p.authorId), { totalViews: increment(1) }),
-              setDoc(doc(db, "users", p.authorId, "monthlyViews", month), { views: increment(1) }, { merge: true }),
-            ] : []),
-          ]).catch(() => {});
+          // Track view for creator fund — recorded server-side (client writes to the
+          // author's totalViews/monthlyViews are denied by rules → under-counting).
+          recordView(isReel ? "reel" : "post", postId);
         }
       }
 

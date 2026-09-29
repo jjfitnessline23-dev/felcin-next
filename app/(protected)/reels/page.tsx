@@ -5,6 +5,7 @@ import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, set
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
+import { recordView } from "@/lib/recordView";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -82,18 +83,14 @@ export default function ReelsPage() {
           const tryPlay = () => v.play().catch(() => {});
           if (v.readyState >= 2) { tryPlay(); }
           else { v.load(); v.addEventListener("loadeddata", tryPlay, { once: true }); }
-          // View tracking
+          // View tracking — recorded server-side (client writes to the author's
+          // totalViews/monthlyViews are denied by rules → views were under-counting).
           const reel = reels[idx];
           if (reel && user && reel.authorId !== user.uid) {
             const key = `viewed_${reel.id}`;
             if (!sessionStorage.getItem(key)) {
               sessionStorage.setItem(key, "1");
-              const month = new Date().toISOString().slice(0, 7);
-              Promise.all([
-                updateDoc(doc(db, "reels", reel.id), { viewCount: increment(1) }),
-                updateDoc(doc(db, "users", reel.authorId), { totalViews: increment(1) }),
-                setDoc(doc(db, "users", reel.authorId, "monthlyViews", month), { views: increment(1) }, { merge: true }),
-              ]).catch(() => {});
+              recordView("reel", reel.id);
             }
           }
         } else {
