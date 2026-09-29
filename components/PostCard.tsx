@@ -261,10 +261,14 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     }
   };
 
+  // Initialize like state when this card first shows a given post. Deliberately keyed
+  // on post.id (not post.likedBy/likes) so a stale feed refresh of the SAME post can't
+  // overwrite a like the user just made — the previous cause of "likes disappearing".
   useEffect(() => {
     setLiked(Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || ""));
     setLikeCount(typeof post.likes === "number" ? post.likes : 0);
-  }, [post.likedBy, post.likes, user?.uid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post.id, user?.uid]);
 
   useEffect(() => {
     if (!user) return;
@@ -373,7 +377,10 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     setLiked(newLiked);
     setLikeCount((c) => c + (newLiked ? 1 : -1));
     try {
-      await updateDoc(doc(db, "posts", post.id), {
+      // Reels live in the "reels" collection, not "posts" — writing to the wrong one
+      // meant reel/video likes never persisted and disappeared on the next refresh.
+      const col = post.contentType === "reel" ? "reels" : "posts";
+      await updateDoc(doc(db, col, post.id), {
         likes: increment(newLiked ? 1 : -1),
         likedBy: newLiked ? arrayUnion(user.uid) : arrayRemove(user.uid),
       });
