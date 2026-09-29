@@ -24,8 +24,12 @@ export async function POST(req: NextRequest) {
   const app = getAdminApp();
   if (!app) return NextResponse.json({ error: "Server error" }, { status: 500 });
 
-  const sessionDocId = `${traineeId}_${trainerId}_${Date.now()}`;
-  await app.firestore().collection("trainingSessions").doc(sessionDocId).set({
+  // Deterministic id from the payment → a refresh/replay can't create duplicate sessions.
+  const sessionDocId = stripeSessionId;
+  const ref = app.firestore().collection("trainingSessions").doc(sessionDocId);
+  const existing = await ref.get();
+  if (existing.exists) return NextResponse.json({ ok: true, sessionId: sessionDocId, alreadyExists: true });
+  await ref.set({
     trainerId, traineeId, sessionDate,
     price: Number(price), stripeSessionId,
     status: "pending", exercises: "", notes: "",

@@ -363,8 +363,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
       setLbText(""); // clear only after successful save
       setLbComments((prev) => [...prev, { id: ref.id, authorName: user.displayName || "User", authorPhoto: user.photoURL || "", text: t }]);
       if (post.authorId && post.authorId !== user.uid) {
-        addDoc(collection(db, "notifications"), { recipientId: post.authorId, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "comment", postId: post.id, read: false, createdAt: serverTimestamp() }).catch(() => {});
-        sendNotification({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id });
+        addDoc(collection(db, "notifications"), { recipientId: post.authorId, senderId: user.uid, senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "", type: "comment", postId: post.id, isReel: post.contentType === "reel", read: false, createdAt: serverTimestamp() }).catch(() => {});
+        sendNotification({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id, isReel: post.contentType === "reel" });
       }
     } catch {}
     setLbSending(false);
@@ -392,10 +392,11 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           senderPhoto: user.photoURL || "",
           type: "like",
           postId: post.id,
+          isReel: post.contentType === "reel",
           read: false,
           createdAt: serverTimestamp(),
         }).catch(() => {});
-        sendNotification({ recipientUid: post.authorId, type: "like", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id });
+        sendNotification({ recipientUid: post.authorId, type: "like", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id, isReel: post.contentType === "reel" });
       }
     } catch {
       setLiked(!newLiked);

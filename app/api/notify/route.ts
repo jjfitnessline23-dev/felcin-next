@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const caller = await verifyToken(req, app);
   if (!caller) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
-  const { recipientUid, type, senderName, postId, senderId, message } = await req.json().catch(() => ({}));
+  const { recipientUid, type, senderName, postId, senderId, isReel, message } = await req.json().catch(() => ({}));
   if (!recipientUid || !type) return NextResponse.json({ ok: false });
 
   // Caller must match the senderId they claim
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const link = type === "message" && senderId
       ? `https://felcin.com/private-chats?uid=${senderId}`
       : postId
-        ? `https://felcin.com/comments?postId=${postId}`
+        ? `https://felcin.com/comments?postId=${postId}${isReel ? "&type=reel" : ""}`
         : "https://felcin.com/";
 
     await app.messaging().send({

@@ -19,6 +19,7 @@ export async function sendNotification(params: {
   senderName: string;
   senderId?: string;
   postId?: string;
+  isReel?: boolean;
   message?: string;
 }) {
   try {

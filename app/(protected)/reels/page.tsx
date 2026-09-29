@@ -53,15 +53,23 @@ export default function ReelsPage() {
         return r;
       }));
       setReels(enriched);
-      // Seed like state
+      // Seed like + bookmark state so they reflect what's already saved
       if (user) {
         const liked = new Set<string>();
         enriched.forEach((r) => { if (Array.isArray(r.likedBy) && r.likedBy.includes(user.uid)) liked.add(r.id); });
         setLikedIds(liked);
+        try {
+          const bm = await getDocs(collection(db, "users", user.uid, "bookmarks"));
+          const bmIds = new Set(bm.docs.map((d) => d.id));
+          setBookmarkedIds(new Set(enriched.filter((r) => bmIds.has(r.id)).map((r) => r.id)));
+        } catch {}
       }
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [user]);
+  // Keyed on user?.uid (not the user object) so a Capacitor auth-token refresh doesn't
+  // re-run this and wipe optimistic like/comment/repost state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
   // Intersection observer — autoplay current reel
   useEffect(() => {
@@ -138,7 +146,7 @@ export default function ReelsPage() {
       setRepostedIds((prev) => new Set([...prev, reel.id]));
       setReels((prev) => prev.map((r) => r.id !== reel.id ? r : { ...r, repostCount: (r.repostCount ?? 0) + 1 }));
       if (reel.authorId !== user.uid) {
-        sendNotification({ recipientUid: reel.authorId, type: "repost", senderName: user.displayName || "Someone", senderId: user.uid, postId: reel.id });
+        sendNotification({ recipientUid: reel.authorId, type: "repost", senderName: user.displayName || "Someone", senderId: user.uid, postId: reel.id, isReel: true });
       }
     } catch {}
     setRepostingId(null);

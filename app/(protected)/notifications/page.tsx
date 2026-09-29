@@ -9,7 +9,7 @@ import PageHeader from "@/components/PageHeader";
 
 interface Notif {
   id: string; type: string; senderId?: string; senderName?: string; senderPhoto?: string;
-  postId?: string; read: boolean; createdAt?: { seconds: number }; message?: string;
+  postId?: string; isReel?: boolean; read: boolean; createdAt?: { seconds: number }; message?: string;
 }
 
 function timeAgo(s: number) {
@@ -176,7 +176,7 @@ export default function NotificationsPage() {
                     const { icon, color, bg, border } = notifConfig(n.type);
                     const href = n.type === "message"
                       ? `/private-chats?uid=${n.senderId}`
-                      : n.postId ? `/comments?postId=${n.postId}`
+                      : n.postId ? `/comments?postId=${n.postId}${n.isReel ? "&type=reel" : ""}`
                       : n.senderId ? `/user-profile?uid=${n.senderId}` : "#";
                     return (
                       <Link key={n.id} href={href}
