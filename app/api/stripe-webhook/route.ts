@@ -55,11 +55,10 @@ async function recordPayment(type: string, meta: Record<string, string>, amountC
   });
 }
 
-async function handleSession(session: Stripe.Checkout.Session) {
-  const meta = (session.metadata ?? {}) as Record<string, string>;
-  const amount = session.amount_total ?? 0;
-  const sessionId = session.id;
-
+// Shared core — works for both Checkout sessions and direct PaymentIntents (embedded
+// card sheet). A PaymentIntent that originated from a Checkout Session has no metadata
+// (it lives on the session), so processing both events never double-counts.
+async function handlePayment(meta: Record<string, string>, amount: number, sessionId: string) {
   const usd = amount / 100;
 
   // ── Badge purchase (badge-purchase / badge-checkout routes) ──
@@ -158,6 +157,16 @@ async function handleSession(session: Stripe.Checkout.Session) {
   }
 }
 
+async function handleSession(session: Stripe.Checkout.Session) {
+  await handlePayment((session.metadata ?? {}) as Record<string, string>, session.amount_total ?? 0, session.id);
+}
+
+async function handlePaymentIntent(pi: Stripe.PaymentIntent) {
+  // Only direct PIs (tip/subscribe/badge via the embedded card sheet) carry metadata;
+  // Checkout-originated PIs have none → no-op, so no double processing.
+  await handlePayment((pi.metadata ?? {}) as Record<string, string>, pi.amount ?? 0, pi.id);
+}
+
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   const body         = await req.text();
@@ -187,6 +196,11 @@ export async function POST(req: NextRequest) {
         console.error("Webhook handler error:", e.message)
       );
     }
+  } else if (event.type === "payment_intent.succeeded") {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    await handlePaymentIntent(pi).catch((e) =>
+      console.error("Webhook PI handler error:", e.message)
+    );
   }
 
   return NextResponse.json({ received: true });
