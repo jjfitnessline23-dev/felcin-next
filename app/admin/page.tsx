@@ -525,8 +525,22 @@ export default function AdminPortalPage() {
   const toggleBan = async (id: string, currentlyBanned: boolean) => {
     const action = currentlyBanned ? "Unban" : "Ban";
     if (!confirm(`${action} this user?`)) return;
-    await updateDoc(doc(db, "users", id), { banned: !currentlyBanned }).catch(() => {});
-    setUsers((u) => u.map((x) => x.id === id ? { ...x, banned: !currentlyBanned } : x));
+    const next = !currentlyBanned;
+    setUsers((u) => u.map((x) => x.id === id ? { ...x, banned: next } : x)); // optimistic
+    // Must go server-side: rules only let a user update their OWN doc, so a client-side
+    // ban write to another user's doc is denied (it silently used to no-op here).
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/ban-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ targetUid: id, banned: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setUsers((u) => u.map((x) => x.id === id ? { ...x, banned: currentlyBanned } : x)); // roll back
+      alert(`${action} failed — please try again.`);
+    }
   };
 
   const doToggle = async (
