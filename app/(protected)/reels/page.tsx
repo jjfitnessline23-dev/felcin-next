@@ -16,12 +16,16 @@ interface Reel {
 }
 
 function isVideoReel(reel: Reel): boolean {
-  if (reel.mimeType) return reel.mimeType.startsWith("video/");
-  if (reel.contentType && reel.contentType !== "reel") {
-    return reel.contentType === "video" || reel.contentType.startsWith("video/");
-  }
+  const mil = (reel.mimeType || "").toLowerCase();
+  if (mil) return mil.startsWith("video/");
+  const ctl = (reel.contentType || "").toLowerCase();
+  if (ctl && ctl !== "reel") return ctl === "video" || ctl.startsWith("video/");
   const url = reel.mediaUrl || "";
-  return /\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(url);
+  // No type metadata (old reels / empty file.type) — respect explicit image signals,
+  // otherwise a reel is a video by nature. Defaulting to image would render it in an
+  // <img> → broken thumbnail.
+  if (/\/image\/upload\//i.test(url) || /\.(jpg|jpeg|png|gif|webp|heic|avif)(\?|$)/i.test(url)) return false;
+  return true;
 }
 
 export default function ReelsPage() {

@@ -151,7 +151,13 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, marginBottom: 28 }}>
                 {p.posts.map((post) => (
                   <Link key={post.id} href={`/login?ref=${uid}`} style={{ position: "relative", aspectRatio: "1", background: "#111", borderRadius: 4, overflow: "hidden", display: "block" }}>
-                    <img src={post.mediaUrl} alt={post.caption || `Post by ${name} on Felcin`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {post.isVideo && !post.posterUrl ? (
+                      // No still frame available — show the video's first frame (a video URL
+                      // in an <img> would just be a broken thumbnail).
+                      <video src={post.mediaUrl} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <img src={post.posterUrl || post.mediaUrl} alt={post.caption || `Post by ${name} on Felcin`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
                     {post.isVideo && <span className="material-symbols-outlined" style={{ position: "absolute", top: 6, right: 6, fontSize: 16, color: "#fff", filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.8))", fontVariationSettings: "'FILL' 1" }}>play_arrow</span>}
                   </Link>
                 ))}

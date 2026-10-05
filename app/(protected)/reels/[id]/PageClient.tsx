@@ -21,14 +21,17 @@ interface Comment {
   text: string; createdAt?: { seconds: number };
 }
 
-// Same detection used in the reels feed: a reel is a photo unless it's clearly video.
+// Same detection used in the reels feed: a reel is a video unless it's clearly an image.
 function isVideoReel(reel: Reel): boolean {
-  if (reel.mimeType) return reel.mimeType.startsWith("video/");
-  if (reel.contentType && reel.contentType !== "reel") {
-    return reel.contentType === "video" || reel.contentType.startsWith("video/");
-  }
+  const mil = (reel.mimeType || "").toLowerCase();
+  if (mil) return mil.startsWith("video/");
+  const ctl = (reel.contentType || "").toLowerCase();
+  if (ctl && ctl !== "reel") return ctl === "video" || ctl.startsWith("video/");
   const url = reel.mediaUrl || "";
-  return /\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(url);
+  // No type metadata (old reels / empty file.type) — respect explicit image signals,
+  // otherwise a reel is a video by nature (defaulting to image → broken <img>).
+  if (/\/image\/upload\//i.test(url) || /\.(jpg|jpeg|png|gif|webp|heic|avif)(\?|$)/i.test(url)) return false;
+  return true;
 }
 
 export default function ReelDetailPage() {

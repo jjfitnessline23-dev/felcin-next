@@ -16,6 +16,28 @@ export interface PublicProfilePost {
   mediaUrl: string;
   caption: string;
   isVideo: boolean;
+  posterUrl: string; // a real thumbnail for video posts (Cloudinary frame), else ""
+}
+
+function detectVideo(p: Record<string, any>): boolean {
+  const ct = String(p.contentType || "").toLowerCase();
+  const mt = String(p.mimeType || "").toLowerCase();
+  const url = String(p.mediaUrl || "");
+  if (p.isVideoReel || p.isVideo) return true;
+  if (ct === "video" || ct.startsWith("video/")) return true;
+  if (mt === "video" || mt.startsWith("video/")) return true;
+  if (/\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(url)) return true;
+  if (/\/video\/upload\//i.test(url)) return true;
+  return false;
+}
+
+// Cloudinary can render a still frame from a video by swapping the delivery path to an
+// image and asking for the first second (so_0). Gives logged-out visitors a real
+// thumbnail instead of a broken <img>. Non-Cloudinary videos return "" (fall back to <video>).
+function videoPoster(url: string): string {
+  if (!/\/video\/upload\//i.test(url)) return "";
+  const jpg = url.replace(/\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i, ".jpg");
+  return jpg.replace(/\/video\/upload\//i, "/video/upload/so_0/");
 }
 
 export interface PublicProfile {
@@ -59,12 +81,16 @@ async function fetchUncached(uid: string): Promise<PublicProfile | null> {
           .filter((p) => p.mediaUrl && !p.isStory && p.status !== "scheduled")
           .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
           .slice(0, 9)
-          .map((p) => ({
-            id: p.id,
-            mediaUrl: String(p.mediaUrl),
-            caption: String(p.caption || ""),
-            isVideo: !!(p.isVideoReel || p.isVideo),
-          }));
+          .map((p) => {
+            const isVideo = detectVideo(p);
+            return {
+              id: p.id,
+              mediaUrl: String(p.mediaUrl),
+              caption: String(p.caption || ""),
+              isVideo,
+              posterUrl: isVideo ? videoPoster(String(p.mediaUrl)) : "",
+            };
+          });
       } catch { posts = []; }
     }
 
