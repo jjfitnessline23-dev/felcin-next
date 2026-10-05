@@ -12,7 +12,13 @@ import Link from "next/link";
 interface Reel {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   mediaUrl?: string; caption?: string; likes?: number; likedBy?: string[];
-  comments?: number; repostCount?: number; mimeType?: string; contentType?: string;
+  comments?: number; repostCount?: number; viewCount?: number; mimeType?: string; contentType?: string;
+}
+
+function fmtCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(n);
 }
 
 function isVideoReel(reel: Reel): boolean {
@@ -302,6 +308,13 @@ export default function ReelsPage() {
                 <button onClick={() => handleBookmark(reel)} className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
                   <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#fff", fontVariationSettings: bookmarked ? "'FILL' 1" : "'FILL' 0", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>bookmark</span>
                 </button>
+                {/* Views (display only) */}
+                {(reel.viewCount ?? 0) > 0 && (
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fff", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>visibility</span>
+                    <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{fmtCount(reel.viewCount!)}</span>
+                  </div>
+                )}
                 {/* Delete — only shown to the reel author */}
                 {user?.uid === reel.authorId && (
                   <button onClick={() => handleDeleteReel(reel)}

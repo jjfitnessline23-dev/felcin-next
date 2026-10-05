@@ -54,6 +54,12 @@ function resolveMediaType(contentType?: string, mimeType?: string, url?: string)
   return "image";
 }
 
+function fmtCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(n);
+}
+
 function timeAgo(seconds: number): string {
   const diff = Math.floor(Date.now() / 1000) - seconds;
   if (diff < 60) return "just now";
@@ -798,6 +804,13 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
             <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: bookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
           </button>
         </div>
+
+        {(post.viewCount ?? 0) > 0 && (
+          <div className="flex items-center gap-1 px-1 mb-1.5" style={{ color: "#555" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>visibility</span>
+            <span className="text-xs font-medium">{fmtCount(post.viewCount!)} {post.viewCount === 1 ? "view" : "views"}</span>
+          </div>
+        )}
 
         {caption && (
           <p className="text-sm leading-relaxed px-1" style={{ color: "#aaa" }}>

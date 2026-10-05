@@ -40,6 +40,12 @@ function resolveMediaType(ct?: string, mime?: string, url?: string) {
   return "image";
 }
 
+function fmtCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(n);
+}
+
 function timeAgo(s: number) {
   const d = Math.floor(Date.now() / 1000) - s;
   if (d < 60) return "just now";
@@ -500,6 +506,14 @@ export default function PageClient() {
                 <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: bookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
               </button>
             </div>
+
+            {/* View count */}
+            {(post.viewCount ?? 0) > 0 && (
+              <div className="flex items-center gap-1 px-4 pb-1" style={{ color: "#555" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>visibility</span>
+                <span className="text-xs font-medium">{fmtCount(post.viewCount!)} {post.viewCount === 1 ? "view" : "views"}</span>
+              </div>
+            )}
 
             {/* Caption */}
             {caption && (
