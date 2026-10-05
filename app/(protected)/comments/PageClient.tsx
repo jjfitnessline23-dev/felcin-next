@@ -218,6 +218,18 @@ export default function PageClient() {
     inputRef.current?.focus();
   };
 
+  const handleDeleteComment = async (c: Comment) => {
+    if (!user) return;
+    if (!confirm("Delete this comment?")) return;
+    // Optimistic — also drop any replies to it so they don't linger (onSnapshot reconciles).
+    setComments((prev) => prev.filter((x) => x.id !== c.id));
+    try {
+      await deleteDoc(doc(db, col, postId, "comments", c.id));
+      // Keep the post's comment counter in step (onlyEngagementFields allows this).
+      updateDoc(doc(db, col, postId), { comments: increment(-1) }).catch(() => {});
+    } catch { /* snapshot will restore it if the delete was denied */ }
+  };
+
   const handleCommentLike = async (c: Comment) => {
     if (!user) return;
     const newLiked = !(c.likedBy ?? []).includes(user.uid);
@@ -322,10 +334,13 @@ export default function PageClient() {
   const canDotMenu = !!post && !!user;
 
   // Flat thread model: replies are comments carrying a parentId. Group them under parents.
-  const topLevelComments = comments.filter((c) => !c.parentId);
+  // A reply whose parent was deleted (parentId no longer exists) is promoted to top level
+  // so it still shows instead of silently vanishing.
+  const idSet = new Set(comments.map((c) => c.id));
+  const topLevelComments = comments.filter((c) => !c.parentId || !idSet.has(c.parentId));
   const repliesByParent: Record<string, Comment[]> = {};
   for (const c of comments) {
-    if (c.parentId) (repliesByParent[c.parentId] ||= []).push(c);
+    if (c.parentId && idSet.has(c.parentId)) (repliesByParent[c.parentId] ||= []).push(c);
   }
 
   const CommentRow = ({ c, isReply = false }: { c: Comment; isReply?: boolean }) => {
@@ -333,6 +348,7 @@ export default function PageClient() {
     const avatar = isReply ? 28 : 32;
     const cLiked = !!user && (c.likedBy ?? []).includes(user.uid);
     const cLikes = c.likes ?? 0;
+    const canDeleteC = !!user && (user.uid === c.authorId || isOwner);
     return (
       <div className="flex items-start gap-3">
         <Link href={`/user-profile?uid=${c.authorId}`} className="shrink-0">
@@ -360,6 +376,11 @@ export default function PageClient() {
             <button onClick={() => startReply(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
               Reply
             </button>
+            {canDeleteC && (
+              <button onClick={() => handleDeleteComment(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+                Delete
+              </button>
+            )}
           </div>
         </div>
         <button onClick={() => handleCommentLike(c)} disabled={!user}
