@@ -566,6 +566,12 @@ export default function PageClient() {
                 <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
                 <span className="text-sm font-semibold">{likeCount}</span>
               </button>
+              {(post.viewCount ?? 0) > 0 && (
+                <span className="flex items-center gap-1.5 px-2.5 py-1.5" style={{ color: "#555" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>visibility</span>
+                  <span className="text-sm font-semibold">{fmtCount(post.viewCount!)}</span>
+                </span>
+              )}
               <button onClick={handleShare}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer"
                 style={{ color: "#555", background: "transparent" }}>
@@ -577,14 +583,6 @@ export default function PageClient() {
                 <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: bookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
               </button>
             </div>
-
-            {/* View count */}
-            {(post.viewCount ?? 0) > 0 && (
-              <div className="flex items-center gap-1 px-4 pb-1" style={{ color: "#555" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>visibility</span>
-                <span className="text-xs font-medium">{fmtCount(post.viewCount!)} {post.viewCount === 1 ? "view" : "views"}</span>
-              </div>
-            )}
 
             {/* Caption */}
             {caption && (
