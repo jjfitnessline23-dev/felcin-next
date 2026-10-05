@@ -147,6 +147,18 @@ export default function StreamViewerPage() {
     }).catch(() => {});
   }, [user]);
 
+  // Live viewer count — a non-host viewer bumps viewerCount on join and drops it on
+  // leave. Keyed on stable values (not the whole stream object) so it fires once, not on
+  // every snapshot. Previously viewerCount was displayed but never actually updated.
+  useEffect(() => {
+    const hostId = stream?.hostId;
+    if (!user || !hostId || !hasAccess || user.uid === hostId) return;
+    const ref = doc(db, "streams", streamId);
+    updateDoc(ref, { viewerCount: increment(1) }).catch(() => {});
+    return () => { updateDoc(ref, { viewerCount: increment(-1) }).catch(() => {}); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, stream?.hostId, hasAccess, streamId]);
+
   useEffect(() => {
     if (!streamId) return;
     const q = query(
