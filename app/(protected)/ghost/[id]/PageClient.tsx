@@ -122,6 +122,7 @@ export default function GhostSessionPage() {
 
   function start() {
     if (!workout) return;
+    setSessionRecorded(false); // allow "Do it again" to record a fresh session
     advance(0, workout);
   }
 
