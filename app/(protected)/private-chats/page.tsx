@@ -53,6 +53,7 @@ export default function PrivateChatsPage() {
   const [otherPhoto, setOtherPhoto] = useState("");
   const [otherOnline, setOtherOnline] = useState(false);
   const [otherLastSeen, setOtherLastSeen] = useState<number | null>(null);
+  const [blockState, setBlockState] = useState<"none" | "blocked" | "blockedBy">("none");
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +87,22 @@ export default function PrivateChatsPage() {
         setOtherLastSeen(snap.data().lastSeen?.seconds ?? null);
       }
     }, () => {});
+  }, [activeChat, user]);
+
+  // Block state for the open chat — can't message if I blocked them or they blocked me.
+  useEffect(() => {
+    if (!activeChat || !user) { setBlockState("none"); return; }
+    const otherUid = activeChat.split("_").find((id) => id !== user.uid);
+    if (!otherUid) { setBlockState("none"); return; }
+    let cancelled = false;
+    Promise.all([
+      getDoc(doc(db, "users", user.uid, "blocked", otherUid)),
+      getDoc(doc(db, "users", user.uid, "blockedBy", otherUid)),
+    ]).then(([b, bb]) => {
+      if (cancelled) return;
+      setBlockState(b.exists() ? "blocked" : bb.exists() ? "blockedBy" : "none");
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [activeChat, user]);
 
   // Chat list
@@ -155,7 +172,7 @@ export default function PrivateChatsPage() {
   }, [activeChat, user, messages.length]);
 
   const sendMsg = async () => {
-    if (!text.trim() || !user || !activeChat || sending) return;
+    if (!text.trim() || !user || !activeChat || sending || blockState !== "none") return;
     setSending(true); const t = text.trim(); setText("");
     try {
       await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp(), lastSender: user.uid }, { merge: true });
@@ -173,7 +190,7 @@ export default function PrivateChatsPage() {
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !user || !activeChat) return;
+    if (!file || !user || !activeChat || blockState !== "none") return;
     setUploading(true);
     try {
       try {
@@ -196,6 +213,7 @@ export default function PrivateChatsPage() {
   };
 
   const toggleRecording = async () => {
+    if (blockState !== "none") return;
     if (recording) {
       mediaRecorderRef.current?.stop();
       setRecording(false);
@@ -460,6 +478,16 @@ export default function PrivateChatsPage() {
           {/* Input bar */}
           <div className="shrink-0 nav-composer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(9,9,9,0.97)", backdropFilter: "blur(20px)" }}>
 
+            {blockState !== "none" ? (
+              <div className="flex items-center justify-center gap-2 px-4 py-4 text-center"
+                style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))", color: "#666" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>block</span>
+                <span className="text-sm">
+                  {blockState === "blocked" ? "You blocked this person. Unblock them from their profile to message." : "You can't message this person."}
+                </span>
+              </div>
+            ) : (
+            <>
             {/* Recording indicator */}
             {recording && (
               <div className="flex items-center gap-2 px-4 pt-2" style={{ color: "#ef4444", fontSize: 12 }}>
@@ -569,6 +597,8 @@ export default function PrivateChatsPage() {
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
         </div>
       ) : chats.length > 0 ? (
