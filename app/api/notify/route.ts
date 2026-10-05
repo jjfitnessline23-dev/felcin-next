@@ -32,6 +32,21 @@ export async function POST(req: NextRequest) {
   if (senderId && caller.uid !== senderId) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   try {
+    // Respect the recipient's notification preferences (Settings). Only the server can
+    // read another user's private settings, so this is where the toggles take effect.
+    // Important/transactional types (message, tip, subscribe) are never suppressed.
+    const prefKey: Record<string, string> = {
+      like: "notifLikes", comment: "notifComments", follow: "notifFollows",
+      repost: "notifReposts", live: "notifLive",
+    };
+    const key = prefKey[type];
+    if (key) {
+      const prefSnap = await app.firestore().doc(`users/${recipientUid}/settings/preferences`).get();
+      if (prefSnap.exists && prefSnap.data()?.[key] === false) {
+        return NextResponse.json({ ok: false, reason: "muted by preference" });
+      }
+    }
+
     const tokenDoc = await app.firestore()
       .doc(`users/${recipientUid}/pushTokens/web`).get();
     if (!tokenDoc.exists) return NextResponse.json({ ok: false, reason: "no token" });
