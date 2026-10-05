@@ -42,8 +42,8 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth()
                     && request.resource.data.authorId == request.auth.uid
-                    && (!('text' in request.resource.data) || validText('text', 2000))
-                    && request.resource.data.keys().size() <= 25;
+                    && (!('text' in request.resource.data) || validText('text', 2200))
+                    && request.resource.data.keys().size() <= 30;
       allow update: if isAuth() && (
         request.auth.uid == resource.data.authorId ||
         onlyEngagementFields() ||

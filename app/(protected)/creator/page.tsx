@@ -311,7 +311,7 @@ export default function CreatorPage() {
             </div>
             <div className="text-center px-8">
               <p className="font-semibold text-base mb-1" style={{ color: "#f2f2f2" }}>Tap to add photo or video</p>
-              <p className="text-sm" style={{ color: "#555" }}>Up to 200MB</p>
+              <p className="text-sm" style={{ color: "#555" }}>Up to 500MB</p>
             </div>
           </label>
         ) : (
