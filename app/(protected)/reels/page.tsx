@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp, deleteDoc } from "@/lib/db";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, setDoc, increment, arrayUnion, arrayRemove, addDoc, serverTimestamp, deleteDoc, startAfter, QueryDocumentSnapshot } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
@@ -50,37 +50,70 @@ export default function ReelsPage() {
   const [sendingComment, setSendingComment] = useState<string | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const currentRef = useRef(0);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const loadingMoreRef = useRef(false);
+  const loadMoreRef = useRef<() => void>(() => {});
+
+  const REEL_PAGE = 20;
+
+  const enrichReels = useCallback(async (raw: Reel[]): Promise<Reel[]> => {
+    return Promise.all(raw.map(async (r) => {
+      try {
+        const pub = await getDoc(doc(db, "users", r.authorId, "public", "profile"));
+        if (pub.exists()) { const d = pub.data(); return { ...r, authorName: d.displayName || "User", authorPhoto: d.photoURL || "" }; }
+        const root = await getDoc(doc(db, "users", r.authorId));
+        if (root.exists()) { const d = root.data(); return { ...r, authorName: d.displayName || "User", authorPhoto: d.photoURL || "" }; }
+      } catch {}
+      return r;
+    }));
+  }, []);
+
+  // Merge (never replace) like/bookmark state so pagination doesn't wipe earlier reels.
+  const seedEngagement = useCallback(async (list: Reel[], uid: string) => {
+    setLikedIds((prev) => {
+      const n = new Set(prev);
+      list.forEach((r) => { if (Array.isArray(r.likedBy) && r.likedBy.includes(uid)) n.add(r.id); });
+      return n;
+    });
+    try {
+      const bm = await getDocs(collection(db, "users", uid, "bookmarks"));
+      const bmIds = new Set(bm.docs.map((d) => d.id));
+      setBookmarkedIds((prev) => { const n = new Set(prev); list.forEach((r) => { if (bmIds.has(r.id)) n.add(r.id); }); return n; });
+    } catch {}
+  }, []);
 
   useEffect(() => {
-    getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(20))).then(async (snap) => {
+    getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(REEL_PAGE))).then(async (snap) => {
       const raw: Reel[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })).filter((r) => r.mediaUrl);
-      const enriched = await Promise.all(raw.map(async (r) => {
-        try {
-          const pub = await getDoc(doc(db, "users", r.authorId, "public", "profile"));
-          if (pub.exists()) { const d = pub.data(); return { ...r, authorName: d.displayName || "User", authorPhoto: d.photoURL || "" }; }
-          const root = await getDoc(doc(db, "users", r.authorId));
-          if (root.exists()) { const d = root.data(); return { ...r, authorName: d.displayName || "User", authorPhoto: d.photoURL || "" }; }
-        } catch {}
-        return r;
-      }));
+      const enriched = await enrichReels(raw);
       setReels(enriched);
-      // Seed like + bookmark state so they reflect what's already saved
-      if (user) {
-        const liked = new Set<string>();
-        enriched.forEach((r) => { if (Array.isArray(r.likedBy) && r.likedBy.includes(user.uid)) liked.add(r.id); });
-        setLikedIds(liked);
-        try {
-          const bm = await getDocs(collection(db, "users", user.uid, "bookmarks"));
-          const bmIds = new Set(bm.docs.map((d) => d.id));
-          setBookmarkedIds(new Set(enriched.filter((r) => bmIds.has(r.id)).map((r) => r.id)));
-        } catch {}
-      }
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === REEL_PAGE);
+      if (user) await seedEngagement(enriched, user.uid);
       setLoading(false);
     }).catch(() => setLoading(false));
   // Keyed on user?.uid (not the user object) so a Capacitor auth-token refresh doesn't
   // re-run this and wipe optimistic like/comment/repost state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMore || !lastDoc) return;
+    loadingMoreRef.current = true;
+    try {
+      const snap = await getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), startAfter(lastDoc), limit(REEL_PAGE)));
+      const raw: Reel[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })).filter((r) => r.mediaUrl);
+      const enriched = await enrichReels(raw);
+      setReels((prev) => { const ids = new Set(prev.map((r) => r.id)); return [...prev, ...enriched.filter((r) => !ids.has(r.id))]; });
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === REEL_PAGE);
+      if (user) await seedEngagement(enriched, user.uid);
+    } catch {}
+    loadingMoreRef.current = false;
+  }, [hasMore, lastDoc, user, enrichReels, seedEngagement]);
+
+  useEffect(() => { loadMoreRef.current = loadMore; }, [loadMore]);
 
   // Intersection observer — autoplay current reel
   useEffect(() => {
@@ -90,6 +123,8 @@ export default function ReelsPage() {
         if (entry.isIntersecting) {
           const idx = videoRefs.current.indexOf(v);
           currentRef.current = idx;
+          // Prefetch the next page as the viewer nears the end of the loaded reels.
+          if (idx >= 0 && idx >= reels.length - 3) loadMoreRef.current();
           const tryPlay = () => v.play().catch(() => {});
           if (v.readyState >= 2) { tryPlay(); }
           else { v.load(); v.addEventListener("loadeddata", tryPlay, { once: true }); }
