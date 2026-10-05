@@ -22,7 +22,7 @@ interface Post {
 }
 interface Comment {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
-  text: string; createdAt?: { seconds: number };
+  text: string; createdAt?: { seconds: number }; editedAt?: { seconds: number };
   likes?: number; likedBy?: string[]; parentId?: string | null;
 }
 
@@ -54,6 +54,85 @@ function timeAgo(s: number) {
   return Math.floor(d / 86400) + "d";
 }
 
+// Top-level (stable identity) so the controlled edit input keeps focus across renders.
+function CommentRow({
+  c, isReply = false, currentUid, isOwner, editingId, editText, setEditText,
+  onLike, onReply, onDelete, onStartEdit, onSaveEdit, onCancelEdit,
+}: {
+  c: Comment; isReply?: boolean; currentUid?: string; isOwner: boolean;
+  editingId: string | null; editText: string; setEditText: (s: string) => void;
+  onLike: (c: Comment) => void; onReply: (c: Comment) => void; onDelete: (c: Comment) => void;
+  onStartEdit: (c: Comment) => void; onSaveEdit: (c: Comment) => void; onCancelEdit: () => void;
+}) {
+  const cInitial = (c.authorName || "U").charAt(0).toUpperCase();
+  const avatar = isReply ? 28 : 32;
+  const cLiked = !!currentUid && (c.likedBy ?? []).includes(currentUid);
+  const cLikes = c.likes ?? 0;
+  const isMine = !!currentUid && currentUid === c.authorId;
+  const canDeleteC = isMine || isOwner;
+  const isEditing = editingId === c.id;
+  return (
+    <div className="flex items-start gap-3">
+      <Link href={`/user-profile?uid=${c.authorId}`} className="shrink-0">
+        {c.authorPhoto ? (
+          <img src={c.authorPhoto} alt="" className="rounded-full object-cover" style={{ width: avatar, height: avatar }} />
+        ) : (
+          <div className="rounded-full flex items-center justify-center text-xs font-bold"
+            style={{ width: avatar, height: avatar, background: "#1a1a1a", color: "#666" }}>{cInitial}</div>
+        )}
+      </Link>
+      <div className="flex-1 min-w-0">
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <input autoFocus value={editText} onChange={(e) => setEditText(e.target.value)} maxLength={1000}
+              onKeyDown={(e) => { if (e.key === "Enter") onSaveEdit(c); if (e.key === "Escape") onCancelEdit(); }}
+              className="flex-1 px-3 py-1.5 rounded-lg outline-none text-sm"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#f2f2f2" }} />
+            <button onClick={() => onSaveEdit(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#fff" }}>Save</button>
+            <button onClick={onCancelEdit} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>Cancel</button>
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed" style={{ color: "#ccc" }}>
+            <Link href={`/user-profile?uid=${c.authorId}`} className="font-semibold mr-1" style={{ color: "#f2f2f2" }}>
+              {c.authorName || "User"}
+            </Link>
+            {c.text}
+            {c.editedAt?.seconds && <span className="ml-1.5 text-xs" style={{ color: "#444" }}>(edited)</span>}
+          </p>
+        )}
+        {!isEditing && (
+          <div className="flex items-center gap-4 mt-1">
+            {c.createdAt?.seconds && (
+              <span className="text-xs" style={{ color: "#444" }}>{timeAgo(c.createdAt.seconds)}</span>
+            )}
+            {cLikes > 0 && (
+              <span className="text-xs" style={{ color: "#555" }}>{cLikes} {cLikes === 1 ? "like" : "likes"}</span>
+            )}
+            <button onClick={() => onReply(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+              Reply
+            </button>
+            {isMine && (
+              <button onClick={() => onStartEdit(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+                Edit
+              </button>
+            )}
+            {canDeleteC && (
+              <button onClick={() => onDelete(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+                Delete
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <button onClick={() => onLike(c)} disabled={!currentUid}
+        className="flex items-center justify-center border-none bg-transparent cursor-pointer shrink-0 mt-0.5"
+        style={{ width: 28, height: 28, color: cLiked ? "#ef4444" : "#555" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: cLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+      </button>
+    </div>
+  );
+}
+
 export default function PageClient() {
   const searchParams = useSearchParams();
   const postId = searchParams.get("postId") || "";
@@ -67,6 +146,8 @@ export default function PageClient() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const [authorData, setAuthorData] = useState<{ name: string; photo: string } | null>(null);
 
   const [liked, setLiked] = useState(false);
@@ -236,6 +317,21 @@ export default function PageClient() {
     } catch { /* snapshot will restore it if the delete was denied */ }
   };
 
+  const startEdit = (c: Comment) => {
+    setEditingId(c.id);
+    setEditText(c.text);
+  };
+
+  const saveEdit = async (c: Comment) => {
+    const t = editText.trim();
+    if (!user || !t || t === c.text) { setEditingId(null); return; }
+    setEditingId(null);
+    setComments((prev) => prev.map((x) => x.id === c.id ? { ...x, text: t, editedAt: { seconds: Math.floor(Date.now() / 1000) } } : x));
+    try {
+      await updateDoc(doc(db, col, postId, "comments", c.id), { text: t, editedAt: serverTimestamp() });
+    } catch { /* snapshot reconciles on failure */ }
+  };
+
   const handleCommentLike = async (c: Comment) => {
     if (!user) return;
     const newLiked = !(c.likedBy ?? []).includes(user.uid);
@@ -348,55 +444,6 @@ export default function PageClient() {
   for (const c of comments) {
     if (c.parentId && idSet.has(c.parentId)) (repliesByParent[c.parentId] ||= []).push(c);
   }
-
-  const CommentRow = ({ c, isReply = false }: { c: Comment; isReply?: boolean }) => {
-    const cInitial = (c.authorName || "U").charAt(0).toUpperCase();
-    const avatar = isReply ? 28 : 32;
-    const cLiked = !!user && (c.likedBy ?? []).includes(user.uid);
-    const cLikes = c.likes ?? 0;
-    const canDeleteC = !!user && (user.uid === c.authorId || isOwner);
-    return (
-      <div className="flex items-start gap-3">
-        <Link href={`/user-profile?uid=${c.authorId}`} className="shrink-0">
-          {c.authorPhoto ? (
-            <img src={c.authorPhoto} alt="" className="rounded-full object-cover" style={{ width: avatar, height: avatar }} />
-          ) : (
-            <div className="rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ width: avatar, height: avatar, background: "#1a1a1a", color: "#666" }}>{cInitial}</div>
-          )}
-        </Link>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm leading-relaxed" style={{ color: "#ccc" }}>
-            <Link href={`/user-profile?uid=${c.authorId}`} className="font-semibold mr-1" style={{ color: "#f2f2f2" }}>
-              {c.authorName || "User"}
-            </Link>
-            {c.text}
-          </p>
-          <div className="flex items-center gap-4 mt-1">
-            {c.createdAt?.seconds && (
-              <span className="text-xs" style={{ color: "#444" }}>{timeAgo(c.createdAt.seconds)}</span>
-            )}
-            {cLikes > 0 && (
-              <span className="text-xs" style={{ color: "#555" }}>{cLikes} {cLikes === 1 ? "like" : "likes"}</span>
-            )}
-            <button onClick={() => startReply(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
-              Reply
-            </button>
-            {canDeleteC && (
-              <button onClick={() => handleDeleteComment(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
-                Delete
-              </button>
-            )}
-          </div>
-        </div>
-        <button onClick={() => handleCommentLike(c)} disabled={!user}
-          className="flex items-center justify-center border-none bg-transparent cursor-pointer shrink-0 mt-0.5"
-          style={{ width: 28, height: 28, color: cLiked ? "#ef4444" : "#555" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: cLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
-        </button>
-      </div>
-    );
-  };
 
   return (
     <>
@@ -530,16 +577,23 @@ export default function PageClient() {
             <p className="text-center py-10 text-sm" style={{ color: "#444" }}>No comments yet — be the first!</p>
           ) : (
             <div className="flex flex-col gap-4">
-              {topLevelComments.map((c) => (
-                <div key={c.id} className="flex flex-col gap-3">
-                  <CommentRow c={c} />
-                  {(repliesByParent[c.id] || []).length > 0 && (
-                    <div className="flex flex-col gap-3 pl-11">
-                      {(repliesByParent[c.id] || []).map((r) => <CommentRow key={r.id} c={r} isReply />)}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {topLevelComments.map((c) => {
+                const rowProps = {
+                  currentUid: user?.uid, isOwner: !!isOwner, editingId, editText, setEditText,
+                  onLike: handleCommentLike, onReply: startReply, onDelete: handleDeleteComment,
+                  onStartEdit: startEdit, onSaveEdit: saveEdit, onCancelEdit: () => setEditingId(null),
+                };
+                return (
+                  <div key={c.id} className="flex flex-col gap-3">
+                    <CommentRow c={c} {...rowProps} />
+                    {(repliesByParent[c.id] || []).length > 0 && (
+                      <div className="flex flex-col gap-3 pl-11">
+                        {(repliesByParent[c.id] || []).map((r) => <CommentRow key={r.id} c={r} isReply {...rowProps} />)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           <div ref={bottomRef} />

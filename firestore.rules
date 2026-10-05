@@ -24,6 +24,12 @@ service cloud.firestore {
         .hasOnly(['likes', 'likedBy']);
     }
 
+    // The comment's own author may edit its text (and the edited marker) — nothing else.
+    function commentTextEditByAuthor() {
+      return request.auth.uid == resource.data.authorId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt']);
+    }
+
     // Validates a text field exists, is a string, and is within maxLen characters
     function validText(field, maxLen) {
       return field in request.resource.data
@@ -49,7 +55,7 @@ service cloud.firestore {
         allow read: if isAuth();
         allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
         allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
-        allow update: if isAuth() && onlyCommentLike();
+        allow update: if isAuth() && (onlyCommentLike() || commentTextEditByAuthor());
       }
 
       match /reactions/{userId} {
@@ -82,7 +88,7 @@ service cloud.firestore {
         allow read: if isAuth();
         allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
         allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
-        allow update: if isAuth() && onlyCommentLike();
+        allow update: if isAuth() && (onlyCommentLike() || commentTextEditByAuthor());
       }
     }
 
