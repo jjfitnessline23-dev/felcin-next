@@ -4,22 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   doc, getDoc, updateDoc, increment, collection, addDoc,
-  query, orderBy, onSnapshot, arrayUnion, arrayRemove, serverTimestamp,
+  arrayUnion, arrayRemove, serverTimestamp,
 } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
+import CommentThread from "@/components/CommentThread";
 import Link from "next/link";
 
 interface Reel {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   mediaUrl?: string; caption?: string; likes?: number; likedBy?: string[];
   comments?: number; repostCount?: number; shareCount?: number; mimeType?: string; contentType?: string;
-}
-
-interface Comment {
-  id: string; authorId: string; authorName: string; authorPhoto?: string;
-  text: string; createdAt?: { seconds: number };
 }
 
 // Same detection used in the reels feed: a reel is a video unless it's clearly an image.
@@ -45,9 +41,6 @@ export default function ReelDetailPage() {
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [commentText, setCommentText] = useState("");
-  const [posting, setPosting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [authorProfile, setAuthorProfile] = useState<{ name: string; photo: string } | null>(null);
 
@@ -75,18 +68,8 @@ export default function ReelDetailPage() {
     if (user && reel) setLiked(Array.isArray(reel.likedBy) && reel.likedBy.includes(user.uid));
   }, [user, reel]);
 
-  // Live comments
-  useEffect(() => {
-    const unsub = onSnapshot(
-      query(collection(db, "reels", reelId, "comments"), orderBy("createdAt", "desc")),
-      (snap) => setComments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Comment, "id">) }))),
-      () => {}
-    );
-    return () => unsub();
-  }, [reelId]);
-
   // Notify the reel author (in-app doc + push), mirroring posts. No-op for self-actions.
-  function notifyAuthor(type: "like" | "comment") {
+  function notifyAuthor(type: "like") {
     if (!user || !reel || reel.authorId === user.uid) return;
     addDoc(collection(db, "notifications"), {
       recipientId: reel.authorId,
@@ -122,24 +105,6 @@ export default function ReelDetailPage() {
       }
     } catch { return; }
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
-  }
-
-  async function postComment() {
-    if (!user || !commentText.trim() || posting) return;
-    setPosting(true);
-    try {
-      await addDoc(collection(db, "reels", reelId, "comments"), {
-        authorId: user.uid,
-        authorName: user.displayName || user.email?.split("@")[0] || "User",
-        authorPhoto: user.photoURL || null,
-        text: commentText.trim(),
-        createdAt: serverTimestamp(),
-      });
-      updateDoc(doc(db, "reels", reelId), { comments: increment(1) }).catch(() => {});
-      setCommentText("");
-      notifyAuthor("comment");
-    } catch {}
-    setPosting(false);
   }
 
   if (loading) return <div className="flex justify-center py-32"><div className="spinner" /></div>;
@@ -209,7 +174,7 @@ export default function ReelDetailPage() {
         </button>
         <div className="flex items-center gap-1.5" style={{ color: "#888" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 25 }}>mode_comment</span>
-          {comments.length > 0 && <span className="text-sm font-semibold">{comments.length}</span>}
+          {(reel.comments ?? 0) > 0 && <span className="text-sm font-semibold">{reel.comments}</span>}
         </div>
         <button onClick={share} aria-label="Share"
           className="flex items-center gap-1.5 border-none bg-transparent cursor-pointer p-0 ml-auto"
@@ -219,46 +184,8 @@ export default function ReelDetailPage() {
         </button>
       </div>
 
-      {/* Comments */}
-      <div>
-        <p className="text-sm font-bold mb-3" style={{ color: "#f2f2f2" }}>
-          Comments {comments.length > 0 && <span style={{ color: "#555" }}>({comments.length})</span>}
-        </p>
-        <div className="flex items-center gap-2 mb-5">
-          <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") postComment(); }}
-            placeholder="Add a comment…"
-            className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
-            style={{ background: "#131313", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.08)" }} />
-          <button onClick={postComment} disabled={!commentText.trim() || posting}
-            className="px-4 py-2.5 rounded-full text-sm font-bold border-none cursor-pointer"
-            style={{ background: (!commentText.trim() || posting) ? "rgba(255,255,255,0.06)" : "#f2f2f2", color: (!commentText.trim() || posting) ? "#444" : "#000" }}>
-            {posting ? "…" : "Post"}
-          </button>
-        </div>
-        {comments.length === 0 ? (
-          <p className="text-sm text-center py-6" style={{ color: "#444" }}>No comments yet — be the first!</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {comments.map((c) => (
-              <div key={c.id} className="flex items-start gap-2.5">
-                {c.authorPhoto ? (
-                  <img src={c.authorPhoto} alt="" className="rounded-full object-cover flex-shrink-0" style={{ width: 30, height: 30 }} />
-                ) : (
-                  <div className="rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={{ width: 30, height: 30, background: "#222", color: "#aaa" }}>
-                    {(c.authorName || "U").charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold" style={{ color: "#ddd" }}>{c.authorName}</p>
-                  <p className="text-sm break-words" style={{ color: "#aaa" }}>{c.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Comments — full-featured shared thread (likes, replies, edit, delete, who-liked) */}
+      <CommentThread col="reels" parentId={reelId} parentAuthorId={reel.authorId} />
     </div>
   );
 }
