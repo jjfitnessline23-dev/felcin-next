@@ -13,7 +13,7 @@ import Link from "next/link";
 interface Reel {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   mediaUrl?: string; caption?: string; likes?: number; likedBy?: string[];
-  comments?: number; repostCount?: number; mimeType?: string; contentType?: string;
+  comments?: number; repostCount?: number; shareCount?: number; mimeType?: string; contentType?: string;
 }
 
 interface Comment {
@@ -95,6 +95,8 @@ export default function ReelDetailPage() {
   }
 
   async function share() {
+    setReel((r) => r ? { ...r, shareCount: (r.shareCount ?? 0) + 1 } : r); // optimistic
+    updateDoc(doc(db, "reels", reelId), { shareCount: increment(1) }).catch(() => {});
     const url = typeof window !== "undefined" ? window.location.href : `https://felcin.com/reels/${reelId}`;
     const isVid = reel ? isVideoReel(reel) : true;
     const title = reel?.caption || (isVid ? "Felcin video" : "Felcin photo");

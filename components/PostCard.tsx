@@ -32,6 +32,7 @@ interface Post {
   collabName?: string | null;
   collabPhoto?: string | null;
   repostCount?: number;
+  shareCount?: number;
   isRepost?: boolean;
   repostOf?: string | null;
   repostOriginalAuthorName?: string | null;
@@ -164,6 +165,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const [reposted, setReposted] = useState(false);
   const [repostCount, setRepostCount] = useState(post.repostCount ?? 0);
   const [reposting, setReposting] = useState(false);
+  const [shareCount, setShareCount] = useState(post.shareCount ?? 0);
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [boosting, setBoosting] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -431,7 +433,14 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     setBookmarking(false);
   };
 
+  const countShare = () => {
+    setShareCount((c) => c + 1); // optimistic
+    const col = post.contentType === "reel" ? "reels" : "posts";
+    updateDoc(doc(db, col, post.id), { shareCount: increment(1) }).catch(() => setShareCount((c) => Math.max(0, c - 1)));
+  };
+
   const handleShare = async () => {
+    countShare();
     const postUrl = `${window.location.origin}/comments?postId=${post.id}`;
     const shareTitle = caption || "Check this out on Felcin";
 
@@ -787,6 +796,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer"
             style={{ color: "#555", background: "transparent" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>ios_share</span>
+            {shareCount > 0 && <span className="text-sm font-semibold">{shareCount}</span>}
           </button>
 
           {user?.uid === post.authorId && boostEnabled && (

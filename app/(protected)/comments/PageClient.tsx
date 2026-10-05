@@ -18,7 +18,7 @@ interface Post {
   caption?: string; text?: string; mediaUrl?: string;
   contentType?: string; mimeType?: string;
   maxViews?: number | null; viewCount?: number;
-  likes?: number; likedBy?: string[]; comments?: number;
+  likes?: number; likedBy?: string[]; comments?: number; shareCount?: number;
 }
 interface Comment {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
@@ -158,6 +158,7 @@ export default function PageClient() {
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [shareCount, setShareCount] = useState(0);
   const [liking, setLiking] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [dotMenu, setDotMenu] = useState(false);
@@ -184,6 +185,7 @@ export default function PageClient() {
       const p = snap.data() as Post;
       setPost(p);
       setLikeCount(typeof p.likes === "number" ? p.likes : 0);
+      setShareCount(typeof p.shareCount === "number" ? p.shareCount : 0);
       if (user) setLiked(Array.isArray(p.likedBy) && p.likedBy.includes(user.uid));
 
       if (user?.uid !== p.authorId) {
@@ -403,6 +405,8 @@ export default function PageClient() {
   };
 
   const handleShare = () => {
+    setShareCount((c) => c + 1); // optimistic
+    updateDoc(doc(db, col, postId), { shareCount: increment(1) }).catch(() => setShareCount((c) => Math.max(0, c - 1)));
     const url = `${window.location.origin}/comments?postId=${postId}`;
     if (navigator.share) navigator.share({ url }).catch(() => {});
     else navigator.clipboard?.writeText(url).catch(() => {});
@@ -576,6 +580,7 @@ export default function PageClient() {
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer"
                 style={{ color: "#555", background: "transparent" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>ios_share</span>
+                {shareCount > 0 && <span className="text-sm font-semibold">{shareCount}</span>}
               </button>
               <button onClick={handleBookmark}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-none cursor-pointer ml-auto transition-all"

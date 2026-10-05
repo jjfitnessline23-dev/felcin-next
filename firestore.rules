@@ -15,7 +15,7 @@ service cloud.firestore {
 
     function onlyEngagementFields() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['likes', 'likedBy', 'comments', 'repostCount', 'viewCount']);
+        .hasOnly(['likes', 'likedBy', 'comments', 'repostCount', 'viewCount', 'shareCount']);
     }
 
     // A comment can only ever be mutated to add/remove a like (any authed user) — nothing else.

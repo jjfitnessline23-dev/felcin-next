@@ -12,7 +12,7 @@ import Link from "next/link";
 interface Reel {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   mediaUrl?: string; caption?: string; likes?: number; likedBy?: string[];
-  comments?: number; repostCount?: number; viewCount?: number; mimeType?: string; contentType?: string;
+  comments?: number; repostCount?: number; viewCount?: number; shareCount?: number; mimeType?: string; contentType?: string;
 }
 
 function fmtCount(n: number): string {
@@ -159,6 +159,15 @@ export default function ReelsPage() {
     setRepostingId(null);
   }
 
+  function handleShareReel(reel: Reel) {
+    setReels((prev) => prev.map((r) => r.id !== reel.id ? r : { ...r, shareCount: (r.shareCount ?? 0) + 1 }));
+    updateDoc(doc(db, "reels", reel.id), { shareCount: increment(1) })
+      .catch(() => setReels((prev) => prev.map((r) => r.id !== reel.id ? r : { ...r, shareCount: Math.max(0, (r.shareCount ?? 1) - 1) })));
+    const url = `${window.location.origin}/reels/${reel.id}`;
+    if (navigator.share) navigator.share({ url }).catch(() => {});
+    else navigator.clipboard?.writeText(url).catch(() => {});
+  }
+
   async function handleDeleteReel(reel: Reel) {
     if (!user || user.uid !== reel.authorId) return;
     if (!confirm("Delete this reel? This cannot be undone.")) return;
@@ -300,9 +309,10 @@ export default function ReelsPage() {
                   {(reel.repostCount ?? 0) > 0 && <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(reel.repostCount ?? 0).toLocaleString()}</span>}
                 </button>
                 {/* Share */}
-                <button onClick={() => { const url = `${window.location.origin}/reels/${reel.id}`; if (navigator.share) navigator.share({ url }).catch(() => {}); else navigator.clipboard?.writeText(url).catch(() => {}); }}
+                <button onClick={() => handleShareReel(reel)}
                   className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
                   <span className="material-symbols-outlined" style={{ fontSize: 30, color: "#fff", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.7))" }}>ios_share</span>
+                  {(reel.shareCount ?? 0) > 0 && <span className="text-xs font-bold text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{(reel.shareCount ?? 0).toLocaleString()}</span>}
                 </button>
                 {/* Bookmark */}
                 <button onClick={() => handleBookmark(reel)} className="flex flex-col items-center gap-1 border-none bg-transparent cursor-pointer">
