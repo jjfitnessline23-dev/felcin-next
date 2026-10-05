@@ -8,6 +8,7 @@ import {
 } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 import Link from "next/link";
 
 interface Reel {
@@ -84,6 +85,19 @@ export default function ReelDetailPage() {
     return () => unsub();
   }, [reelId]);
 
+  // Notify the reel author (in-app doc + push), mirroring posts. No-op for self-actions.
+  function notifyAuthor(type: "like" | "comment") {
+    if (!user || !reel || reel.authorId === user.uid) return;
+    addDoc(collection(db, "notifications"), {
+      recipientId: reel.authorId,
+      senderId: user.uid,
+      senderName: user.displayName || "Someone",
+      senderPhoto: user.photoURL || "",
+      type, postId: reelId, isReel: true, read: false, createdAt: serverTimestamp(),
+    }).catch(() => {});
+    sendNotification({ recipientUid: reel.authorId, type, senderName: user.displayName || "Someone", senderId: user.uid, postId: reelId, isReel: true });
+  }
+
   async function toggleLike() {
     if (!user || !reel) return;
     const next = !liked;
@@ -92,6 +106,7 @@ export default function ReelDetailPage() {
       likes: increment(next ? 1 : -1),
       likedBy: next ? arrayUnion(user.uid) : arrayRemove(user.uid),
     }).catch(() => { setLiked(!next); setLikeCount((c) => Math.max(0, c + (next ? -1 : 1))); });
+    if (next) notifyAuthor("like");
   }
 
   async function share() {
@@ -122,6 +137,7 @@ export default function ReelDetailPage() {
       });
       updateDoc(doc(db, "reels", reelId), { comments: increment(1) }).catch(() => {});
       setCommentText("");
+      notifyAuthor("comment");
     } catch {}
     setPosting(false);
   }

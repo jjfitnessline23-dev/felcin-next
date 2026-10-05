@@ -112,6 +112,24 @@ export default function ReelsPage() {
     return () => obs.disconnect();
   }, [reels, user]);
 
+  // Notify a reel's author (in-app doc + push), mirroring how posts notify. No-op for
+  // self-actions. Previously reel likes/comments notified the creator of nothing.
+  function notifyReelAuthor(reel: Reel, type: "like" | "comment" | "repost") {
+    if (!user || reel.authorId === user.uid) return;
+    addDoc(collection(db, "notifications"), {
+      recipientId: reel.authorId,
+      senderId: user.uid,
+      senderName: user.displayName || "Someone",
+      senderPhoto: user.photoURL || "",
+      type,
+      postId: reel.id,
+      isReel: true,
+      read: false,
+      createdAt: serverTimestamp(),
+    }).catch(() => {});
+    sendNotification({ recipientUid: reel.authorId, type, senderName: user.displayName || "Someone", senderId: user.uid, postId: reel.id, isReel: true });
+  }
+
   async function handleLike(reel: Reel) {
     if (!user) return;
     const liked = likedIds.has(reel.id);
@@ -121,6 +139,7 @@ export default function ReelsPage() {
       likes: increment(liked ? -1 : 1),
       likedBy: liked ? arrayRemove(user.uid) : arrayUnion(user.uid),
     }).catch(() => {});
+    if (!liked) notifyReelAuthor(reel, "like"); // notify only on like, not unlike
   }
 
   async function handleBookmark(reel: Reel) {
@@ -152,9 +171,7 @@ export default function ReelsPage() {
       await updateDoc(doc(db, "reels", reel.id), { repostCount: increment(1) }).catch(() => {});
       setRepostedIds((prev) => new Set([...prev, reel.id]));
       setReels((prev) => prev.map((r) => r.id !== reel.id ? r : { ...r, repostCount: (r.repostCount ?? 0) + 1 }));
-      if (reel.authorId !== user.uid) {
-        sendNotification({ recipientUid: reel.authorId, type: "repost", senderName: user.displayName || "Someone", senderId: user.uid, postId: reel.id, isReel: true });
-      }
+      notifyReelAuthor(reel, "repost");
     } catch {}
     setRepostingId(null);
   }
@@ -187,6 +204,7 @@ export default function ReelsPage() {
       await updateDoc(doc(db, "reels", reel.id), { comments: increment(1) }).catch(() => {});
       setCommentTexts((p) => ({ ...p, [reel.id]: "" }));
       setReels((prev) => prev.map((r) => r.id !== reel.id ? r : { ...r, comments: (r.comments ?? 0) + 1 }));
+      notifyReelAuthor(reel, "comment");
     } catch {}
     setSendingComment(null);
   }
