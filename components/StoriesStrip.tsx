@@ -68,6 +68,7 @@ export default function StoriesStrip() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const storyVideoRef = useRef<HTMLVideoElement>(null);
+  const goNextRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200));
@@ -124,10 +125,7 @@ export default function StoriesStrip() {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
     };
-    const advance = () => {
-      if (activeIdx < activeGroup.stories.length - 1) setActiveIdx((i) => i + 1);
-      else closeViewer();
-    };
+    const advance = () => goNextRef.current();
 
     // Pause auto-advance while typing a comment or viewing the "seen by" list
     if (commentOpen || viewersOpen) {
@@ -291,11 +289,23 @@ export default function StoriesStrip() {
   };
   const goNext = () => {
     if (!activeGroup) return;
-    if (activeIdx < activeGroup.stories.length - 1) setActiveIdx((i) => i + 1);
+    if (activeIdx < activeGroup.stories.length - 1) { setActiveIdx((i) => i + 1); return; }
+    // End of this person's stories → advance to the next person's, or close.
+    const gi = groups.findIndex((g) => g.authorId === activeGroup.authorId);
+    const next = gi >= 0 ? groups[gi + 1] : undefined;
+    if (next) { setActiveGroup(next); setActiveIdx(0); }
     else closeViewer();
   };
-  const goPrev = () => { if (activeIdx > 0) setActiveIdx((i) => i - 1); };
+  const goPrev = () => {
+    if (activeIdx > 0) { setActiveIdx((i) => i - 1); return; }
+    // Start of this person's stories → jump back to the previous person's last story.
+    if (!activeGroup) return;
+    const gi = groups.findIndex((g) => g.authorId === activeGroup.authorId);
+    const prev = gi > 0 ? groups[gi - 1] : undefined;
+    if (prev) { setActiveGroup(prev); setActiveIdx(Math.max(0, prev.stories.length - 1)); }
+  };
   const current = activeGroup?.stories[activeIdx];
+  goNextRef.current = goNext;
 
   return (
     <>
