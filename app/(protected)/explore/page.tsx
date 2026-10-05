@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { collection, query, orderBy, limit, getDocs, getDoc, doc, startAfter, QueryDocumentSnapshot, where } from "@/lib/db";
+import { collection, query, orderBy, limit, getDocs, getDoc, doc, startAfter, QueryDocumentSnapshot, where, onSnapshot } from "@/lib/db";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
 
 interface Post {
@@ -55,6 +56,7 @@ const PAGE_SIZE = 12;
 
 export default function ExplorePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQ, setSearchQ] = useState("");
@@ -64,6 +66,7 @@ export default function ExplorePage() {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
+  const [blockedByUids, setBlockedByUids] = useState<Set<string>>(new Set());
   const [posts, setPosts] = useState<Post[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
   const [ghosts, setGhosts] = useState<GhostWorkout[]>([]);
@@ -82,6 +85,14 @@ export default function ExplorePage() {
     }
   }, [searchParams]);
 
+  // Hide posts from people I've blocked or who've blocked me (was never loaded here).
+  useEffect(() => {
+    if (!user) return;
+    const u1 = onSnapshot(collection(db, "users", user.uid, "blocked"), (s) => setBlockedUids(new Set(s.docs.map((d) => d.id))), () => {});
+    const u2 = onSnapshot(collection(db, "users", user.uid, "blockedBy"), (s) => setBlockedByUids(new Set(s.docs.map((d) => d.id))), () => {});
+    return () => { u1(); u2(); };
+  }, [user]);
+
   // ── Search ──────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -93,16 +104,18 @@ export default function ExplorePage() {
           // Server-side prefix range query — works at any user count.
           // Run two queries (original case + lowercase) so "mia" and "Mia" both find "Mia Sterling".
           const RANGE_SUFFIX = "";
-          const qLow = q.toLowerCase();
-          const [s1, s2] = await Promise.all([
-            getDocs(query(collection(db, "users"), where("displayName", ">=", q), where("displayName", "<=", q + RANGE_SUFFIX), limit(15))),
-            getDocs(query(collection(db, "users"), where("displayName", ">=", qLow), where("displayName", "<=", qLow + RANGE_SUFFIX), limit(15))),
-          ]);
+          // Case variants so "mia", "Mia" and "MIA" all find a stored "Mia Sterling"
+          // (no normalized field needed).
+          const cap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase();
+          const variants = Array.from(new Set([q, q.toLowerCase(), cap]));
+          const snaps = await Promise.all(
+            variants.map((v) => getDocs(query(collection(db, "users"), where("displayName", ">=", v), where("displayName", "<=", v + RANGE_SUFFIX), limit(15))))
+          );
           const seen = new Set<string>();
           const results: UserResult[] = [];
-          [...s1.docs, ...s2.docs].forEach((d) => {
+          snaps.forEach((s) => s.docs.forEach((d) => {
             if (!seen.has(d.id)) { seen.add(d.id); results.push({ uid: d.id, ...(d.data() as Omit<UserResult, "uid">) }); }
-          });
+          }));
           setSearchUsers(results.slice(0, 20));
         } else {
           const tag = q.replace(/^#/, "").toLowerCase();
@@ -365,7 +378,7 @@ export default function ExplorePage() {
             <>
               <div className="flex flex-col gap-5 px-4">
                 {filtered
-                  .filter((p) => !blockedUids.has(p.authorId))
+                  .filter((p) => !blockedUids.has(p.authorId) && !blockedByUids.has(p.authorId))
                   .map((post) => (
                     <PostCard key={post.id} post={post} onBlock={(uid) => setBlockedUids((prev) => new Set([...prev, uid]))} />
                   ))}
