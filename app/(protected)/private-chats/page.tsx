@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { sendNotification } from "@/lib/notify";
 import { assertMediaClean, NudityBlockedError } from "@/lib/moderateMedia";
 
-interface Chat { id: string; participants: string[]; lastMessage?: string; lastAt?: { seconds: number }; otherName?: string; otherPhoto?: string; }
+interface Chat { id: string; participants: string[]; lastMessage?: string; lastAt?: { seconds: number }; lastSender?: string; lastRead?: Record<string, { seconds: number }>; otherName?: string; otherPhoto?: string; }
 interface Msg { id: string; senderId: string; text?: string; type?: "text" | "image" | "audio"; imageUrl?: string; audioUrl?: string; createdAt?: { seconds: number }; }
 
 function chatId(a: string, b: string) { return [a, b].sort().join("_"); }
@@ -147,11 +147,18 @@ export default function PrivateChatsPage() {
     return () => { unsub(); clearTimeout(scrollTimer.current); };
   }, [activeChat]);
 
+  // Mark the open chat as read (on open + as new messages arrive while viewing). Merge
+  // into the lastRead map so the other participant's entry isn't clobbered.
+  useEffect(() => {
+    if (!activeChat || !user) return;
+    setDoc(doc(db, "chats", activeChat), { lastRead: { [user.uid]: serverTimestamp() } }, { merge: true }).catch(() => {});
+  }, [activeChat, user, messages.length]);
+
   const sendMsg = async () => {
     if (!text.trim() || !user || !activeChat || sending) return;
     setSending(true); const t = text.trim(); setText("");
     try {
-      await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: t, lastAt: serverTimestamp(), lastSender: user.uid }, { merge: true });
       await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, type: "text", text: t, createdAt: serverTimestamp() });
       const otherUid = activeChat.split("_").find((id) => id !== user.uid);
       if (otherUid) {
@@ -177,7 +184,7 @@ export default function PrivateChatsPage() {
       const sRef = storageRef(storage, `chat-media/${activeChat}/${Date.now()}-${user.uid}`);
       const snapshot = await uploadBytes(sRef, file);
       const url = await getDownloadURL(snapshot.ref);
-      await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: "📷 Photo", lastAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: "📷 Photo", lastAt: serverTimestamp(), lastSender: user.uid }, { merge: true });
       await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, type: "image", imageUrl: url, createdAt: serverTimestamp() });
       const otherUid = activeChat.split("_").find((id) => id !== user.uid);
       if (otherUid) {
@@ -208,7 +215,7 @@ export default function PrivateChatsPage() {
           const sRef = storageRef(storage, `chat-audio/${activeChat}/${Date.now()}-${user.uid}.webm`);
           const snapshot = await uploadBytes(sRef, blob);
           const url = await getDownloadURL(snapshot.ref);
-          await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: "🎤 Voice message", lastAt: serverTimestamp() }, { merge: true });
+          await setDoc(doc(db, "chats", activeChat), { participants: activeChat.split("_"), lastMessage: "🎤 Voice message", lastAt: serverTimestamp(), lastSender: user.uid }, { merge: true });
           await addDoc(collection(db, "chats", activeChat, "messages"), { senderId: user.uid, type: "audio", audioUrl: url, createdAt: serverTimestamp() });
           const otherUid = activeChat.split("_").find((id) => id !== user.uid);
           if (otherUid) {
@@ -278,6 +285,7 @@ export default function PrivateChatsPage() {
             {chats.map((c) => {
               const init = (c.otherName || "U").charAt(0).toUpperCase();
               const isActive = activeChat === c.id;
+              const unread = !!user && (c.lastAt?.seconds ?? 0) > (c.lastRead?.[user.uid]?.seconds ?? 0) && !!c.lastSender && c.lastSender !== user.uid;
               return (
                 <button key={c.id}
                   onClick={() => { setActiveChat(c.id); setOtherName(c.otherName || "User"); setOtherPhoto(c.otherPhoto || ""); }}
@@ -299,11 +307,12 @@ export default function PrivateChatsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
-                      <p className="font-bold text-sm" style={{ color: isActive ? "#f2f2f2" : "#d0d0d0" }}>{c.otherName || "User"}</p>
-                      {c.lastAt?.seconds && <p className="text-xs" style={{ color: "#333" }}>{timeAgo(c.lastAt.seconds)}</p>}
+                      <p className="font-bold text-sm" style={{ color: isActive ? "#f2f2f2" : unread ? "#f2f2f2" : "#d0d0d0" }}>{c.otherName || "User"}</p>
+                      {c.lastAt?.seconds && <p className="text-xs" style={{ color: unread ? "#06b6d4" : "#333" }}>{timeAgo(c.lastAt.seconds)}</p>}
                     </div>
-                    {c.lastMessage && <p className="text-xs truncate" style={{ color: "#555" }}>{c.lastMessage}</p>}
+                    {c.lastMessage && <p className="text-xs truncate" style={{ color: unread ? "#bbb" : "#555", fontWeight: unread ? 600 : 400 }}>{c.lastMessage}</p>}
                   </div>
+                  {unread && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#06b6d4" }} />}
                 </button>
               );
             })}
