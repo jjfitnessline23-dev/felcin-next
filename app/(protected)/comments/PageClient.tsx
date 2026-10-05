@@ -57,12 +57,13 @@ function timeAgo(s: number) {
 // Top-level (stable identity) so the controlled edit input keeps focus across renders.
 function CommentRow({
   c, isReply = false, currentUid, isOwner, editingId, editText, setEditText,
-  onLike, onReply, onDelete, onStartEdit, onSaveEdit, onCancelEdit,
+  onLike, onReply, onDelete, onStartEdit, onSaveEdit, onCancelEdit, onShowLikes,
 }: {
   c: Comment; isReply?: boolean; currentUid?: string; isOwner: boolean;
   editingId: string | null; editText: string; setEditText: (s: string) => void;
   onLike: (c: Comment) => void; onReply: (c: Comment) => void; onDelete: (c: Comment) => void;
   onStartEdit: (c: Comment) => void; onSaveEdit: (c: Comment) => void; onCancelEdit: () => void;
+  onShowLikes: (c: Comment) => void;
 }) {
   const cInitial = (c.authorName || "U").charAt(0).toUpperCase();
   const avatar = isReply ? 28 : 32;
@@ -106,7 +107,9 @@ function CommentRow({
               <span className="text-xs" style={{ color: "#444" }}>{timeAgo(c.createdAt.seconds)}</span>
             )}
             {cLikes > 0 && (
-              <span className="text-xs" style={{ color: "#555" }}>{cLikes} {cLikes === 1 ? "like" : "likes"}</span>
+              <button onClick={() => onShowLikes(c)} className="text-xs border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+                {cLikes} {cLikes === 1 ? "like" : "likes"}
+              </button>
             )}
             <button onClick={() => onReply(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
               Reply
@@ -148,6 +151,9 @@ export default function PageClient() {
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [likesModal, setLikesModal] = useState<Comment | null>(null);
+  const [likesList, setLikesList] = useState<{ uid: string; name: string; photo: string }[]>([]);
+  const [likesLoading, setLikesLoading] = useState(false);
   const [authorData, setAuthorData] = useState<{ name: string; photo: string } | null>(null);
 
   const [liked, setLiked] = useState(false);
@@ -315,6 +321,24 @@ export default function PageClient() {
       // Keep the post's comment counter in step (onlyEngagementFields allows this).
       updateDoc(doc(db, col, postId), { comments: increment(-1) }).catch(() => {});
     } catch { /* snapshot will restore it if the delete was denied */ }
+  };
+
+  const showLikes = async (c: Comment) => {
+    const uids = (c.likedBy ?? []).slice(0, 50);
+    setLikesModal(c);
+    setLikesList([]);
+    setLikesLoading(true);
+    try {
+      const rows = await Promise.all(uids.map(async (uid) => {
+        try {
+          const pub = await getDoc(doc(db, "users", uid, "public", "profile"));
+          const d = pub.exists() ? pub.data() : {};
+          return { uid, name: d.displayName || d.username || "User", photo: d.photoURL || "" };
+        } catch { return { uid, name: "User", photo: "" }; }
+      }));
+      setLikesList(rows);
+    } catch { setLikesList([]); }
+    setLikesLoading(false);
   };
 
   const startEdit = (c: Comment) => {
@@ -582,6 +606,7 @@ export default function PageClient() {
                   currentUid: user?.uid, isOwner: !!isOwner, editingId, editText, setEditText,
                   onLike: handleCommentLike, onReply: startReply, onDelete: handleDeleteComment,
                   onStartEdit: startEdit, onSaveEdit: saveEdit, onCancelEdit: () => setEditingId(null),
+                  onShowLikes: showLikes,
                 };
                 return (
                   <div key={c.id} className="flex flex-col gap-3">
@@ -631,6 +656,38 @@ export default function PageClient() {
         </div>
       </div>
     </div>
+
+    {/* Likes list bottom sheet */}
+    {likesModal && (
+      <>
+        <div className="fixed inset-0" style={{ background: "rgba(0,0,0,0.5)", zIndex: 90 }} onClick={() => setLikesModal(null)} />
+        <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden flex flex-col"
+          style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom,0px)", zIndex: 95, maxHeight: "70vh" }}>
+          <div className="w-10 h-1 rounded-full mx-auto mt-3 mb-2" style={{ background: "rgba(255,255,255,0.15)" }} />
+          <h3 className="font-bold text-base px-5 pb-3" style={{ color: "#f2f2f2" }}>Likes</h3>
+          <div className="overflow-y-auto px-2 pb-4">
+            {likesLoading ? (
+              <p className="text-center py-8 text-sm" style={{ color: "#555" }}>Loading…</p>
+            ) : likesList.length === 0 ? (
+              <p className="text-center py-8 text-sm" style={{ color: "#555" }}>No likes yet</p>
+            ) : (
+              likesList.map((u) => (
+                <Link key={u.uid} href={`/user-profile?uid=${u.uid}`} onClick={() => setLikesModal(null)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ color: "#f2f2f2" }}>
+                  {u.photo ? (
+                    <img src={u.photo} alt="" className="rounded-full object-cover shrink-0" style={{ width: 40, height: 40 }} />
+                  ) : (
+                    <div className="rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                      style={{ width: 40, height: 40, background: "#222", color: "#aaa" }}>{u.name.charAt(0).toUpperCase()}</div>
+                  )}
+                  <span className="font-semibold text-sm truncate">{u.name}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+      </>
+    )}
 
     {/* 3-dot bottom sheet */}
     {dotMenu && (
