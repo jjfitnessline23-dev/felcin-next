@@ -12,7 +12,7 @@ import { collection, collectionGroup, query, orderBy, limit, getDocs, doc, delet
 import { auth, db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 
-interface Post { id: string; authorId: string; caption?: string; mediaUrl?: string; contentType?: string; status?: string; createdAt?: { seconds: number }; }
+interface Post { id: string; authorId: string; caption?: string; mediaUrl?: string; contentType?: string; mimeType?: string; status?: string; createdAt?: { seconds: number }; }
 interface Reel { id: string; authorId: string; caption?: string; mediaUrl?: string; status?: string; createdAt?: { seconds: number }; }
 interface UserRecord { id: string; displayName?: string; email?: string; photoURL?: string; badge?: string; banned?: boolean; createdAt?: { seconds: number }; }
 interface Report { id: string; postId?: string; reelId?: string; authorId?: string; reporterId?: string; reason?: string; status?: string; type?: string; createdAt?: { seconds: number }; }
@@ -830,7 +830,7 @@ export default function AdminPortalPage() {
               <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl"
                 style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
                 {p.mediaUrl ? (
-                  (p.contentType?.startsWith("video") || /\.(mp4|webm|mov|m4v|avi|3gp|mkv)(\?|%3F|$)/i.test(p.mediaUrl)) ? (
+                  (p.contentType?.startsWith("video") || p.mimeType?.startsWith("video/") || /\.(mp4|webm|mov|m4v|avi|3gp|mkv)(\?|%3F|$)/i.test(p.mediaUrl) || /\/video\/upload\//i.test(p.mediaUrl)) ? (
                     <div className="rounded-lg shrink-0 overflow-hidden" style={{ width: 80, height: 112, background: "#000" }}>
                       <video src={p.mediaUrl} controls muted playsInline preload="metadata"
                         style={{ width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />

@@ -38,9 +38,14 @@ function timeAgo(seconds: number) {
 }
 
 function isVideo(s: Story) {
-  const t = s.contentType || s.mimeType || "";
-  if (t === "video" || t.startsWith("video/")) return true;
-  return /\.(mp4|webm|mov|avi|3gp)(\?|$)/i.test(s.mediaUrl || "");
+  // A story carries contentType "story" with the video type only in mimeType, so a
+  // `contentType || mimeType` short-circuit would miss it and render video in an <img>.
+  const ctl = (s.contentType || "").toLowerCase();
+  const mil = (s.mimeType || "").toLowerCase();
+  if (ctl === "video" || ctl.startsWith("video/")) return true;
+  if (mil === "video" || mil.startsWith("video/")) return true;
+  const u = s.mediaUrl || "";
+  return /\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(u) || /\/video\/upload\//i.test(u);
 }
 
 const STORY_DURATION = 5000;

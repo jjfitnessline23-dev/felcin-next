@@ -40,9 +40,14 @@ async function fetchAuthorName(authorId: string): Promise<string | null> {
 }
 
 function isVideo(contentType?: string, mimeType?: string, url?: string) {
-  const t = contentType || mimeType || "";
-  if (t === "video" || t.startsWith("video/")) return true;
-  return /\.(mp4|webm|mov|avi|3gp)(\?|$)/i.test(url || "");
+  // Check contentType AND mimeType independently so reels/stories (contentType
+  // "reel"/"story", video type in mimeType) aren't mistaken for images.
+  const ctl = (contentType || "").toLowerCase();
+  const mil = (mimeType || "").toLowerCase();
+  if (ctl === "video" || ctl.startsWith("video/")) return true;
+  if (mil === "video" || mil.startsWith("video/")) return true;
+  const u = url || "";
+  return /\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(u) || /\/video\/upload\//i.test(u);
 }
 
 export async function generateMetadata(

@@ -37,9 +37,15 @@ interface Post {
 }
 
 function resolveMediaType(ct?: string, mime?: string, url?: string) {
-  const t = ct || mime || "";
-  if (t === "video" || t.startsWith("video/")) return "video";
-  if (/\.(mp4|webm|mov|avi|3gp)(\?|$)/i.test(url || "")) return "video";
+  // Check contentType AND mimeType independently — reels/stories carry contentType
+  // "reel"/"story" with the video type only in mimeType, so `ct || mime` would miss them.
+  const ctl = (ct || "").toLowerCase();
+  const mil = (mime || "").toLowerCase();
+  if (ctl === "video" || ctl.startsWith("video/")) return "video";
+  if (mil === "video" || mil.startsWith("video/")) return "video";
+  const u = url || "";
+  if (/\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(u)) return "video";
+  if (/\/video\/upload\//i.test(u)) return "video";
   return "image";
 }
 
