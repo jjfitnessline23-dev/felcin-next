@@ -41,9 +41,16 @@ interface Post {
 }
 
 function resolveMediaType(contentType?: string, mimeType?: string, url?: string): "video" | "image" {
-  const t = contentType || mimeType || "";
-  if (t === "video" || t.startsWith("video/")) return "video";
-  if (/\.(mp4|webm|mov|avi|3gp)(\?|$)/i.test(url || "")) return "video";
+  // Check contentType AND mimeType independently — a reel/story stores contentType as
+  // "reel"/"story" with the video-ness only in mimeType ("video/mp4"), so a `ct || mime`
+  // short-circuit would miss it and render the video in an <img> (broken thumbnail).
+  const ctl = (contentType || "").toLowerCase();
+  const mil = (mimeType || "").toLowerCase();
+  if (ctl === "video" || ctl.startsWith("video/")) return "video";
+  if (mil === "video" || mil.startsWith("video/")) return "video";
+  const u = url || "";
+  if (/\.(mp4|webm|mov|avi|3gp|m4v|mkv)(\?|$)/i.test(u)) return "video";
+  if (/\/video\/upload\//i.test(u)) return "video"; // Cloudinary video delivery URL (no extension)
   return "image";
 }
 
