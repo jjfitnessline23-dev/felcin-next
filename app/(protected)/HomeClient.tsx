@@ -260,6 +260,7 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
 
   const [posts, setPosts] = useState<Post[]>(() => _cachedPosts ?? []);
   const [loading, setLoading] = useState<boolean>(() => !_cachedPosts);
+  const [forYouError, setForYouError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -271,6 +272,7 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
 
   const loadForYou = useCallback(async () => {
     try {
+      setForYouError(false);
       const snap = await getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE)));
       const raw: Post[] = snap.docs.map((d) => sanitizePost(d.data() as Record<string, unknown>, d.id) as unknown as Post)
         .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
@@ -286,7 +288,12 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
         return merged;
       });
       try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ posts: enriched, ts: Date.now() })); } catch {}
-    } catch { setLoading(false); }
+    } catch {
+      setLoading(false);
+      // Only surface the error screen if we have nothing to show — otherwise keep the
+      // cached/seeded posts on screen rather than blanking the feed.
+      setPosts((cur) => { if (cur.length === 0) setForYouError(true); return cur; });
+    }
   }, []);
 
   useEffect(() => { loadForYou(); }, [loadForYou]);
@@ -536,6 +543,18 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
         {tab === "foryou" && (
           loading ? (
             <div className="flex flex-col gap-5">{[1,2,3].map((i) => <PostCardSkeleton key={i} />)}</div>
+          ) : forYouError && posts.length === 0 ? (
+            <div className="ghost-bg text-center py-20 rounded-3xl">
+              <span className="material-symbols-outlined" style={{ fontSize: 48, display: "block", marginBottom: 12, color: "#4a3030" }}>error_outline</span>
+              <p className="text-lg font-semibold mb-1" style={{ color: "#f1f1f1" }}>Couldn&apos;t load the feed</p>
+              <p className="text-sm mb-5" style={{ color: "#555" }}>Check your connection and try again.</p>
+              <button onClick={() => { setLoading(true); loadForYou(); }}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm border-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.08)", color: "#f2f2f2", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                Retry
+              </button>
+            </div>
           ) : posts.length === 0 ? (
             <div className="flex flex-col gap-3 py-8">
               <div className="text-center pb-4">
