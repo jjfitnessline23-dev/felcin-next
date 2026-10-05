@@ -55,10 +55,22 @@ async function recordPayment(type: string, meta: Record<string, string>, amountC
   });
 }
 
+// Write a creator earnings-ledger entry. Deterministic id (= the session/PI id) makes it
+// idempotent, so the redirect-verify route and the webhook can both run for a Checkout
+// payment without double-recording. amountUsd is in CENTS (the earnings UI divides by 100),
+// and the sort field MUST be `timestamp`.
+async function writeEarning(creatorUid: string, sessionId: string, fields: Record<string, unknown>) {
+  const app = getAdminApp();
+  if (!app || !creatorUid || !sessionId) return;
+  await app.firestore().collection("users").doc(creatorUid).collection("earnings").doc(sessionId).set(
+    { ...fields, source: "webhook", timestamp: new Date() }, { merge: true }
+  );
+}
+
 // Shared core — works for both Checkout sessions and direct PaymentIntents (embedded
 // card sheet). A PaymentIntent that originated from a Checkout Session has no metadata
 // (it lives on the session), so processing both events never double-counts.
-async function handlePayment(meta: Record<string, string>, amount: number, sessionId: string) {
+async function handlePayment(meta: Record<string, string>, amount: number, sessionId: string, source: "session" | "pi" = "session") {
   const usd = amount / 100;
 
   // ── Badge purchase (badge-purchase / badge-checkout routes) ──
@@ -96,6 +108,12 @@ async function handlePayment(meta: Record<string, string>, amount: number, sessi
   // ── Tip ──
   if (meta.fromUid && meta.creatorUid) {
     await recordPayment("tip", meta, amount, sessionId);
+    // Embedded card-sheet tips (PaymentIntent) have no redirect, so tip-verify never runs
+    // and the creator's earnings ledger would miss them. Record it here. Checkout tips
+    // (source "session") are left to tip-verify to avoid a double entry.
+    if (source === "pi") {
+      await writeEarning(meta.creatorUid, sessionId, { type: "tip", fromUid: meta.fromUid, amountUsd: amount - Math.round(amount * 0.20) });
+    }
     const [email, creatorSnap] = await Promise.all([
       getUserEmail(meta.fromUid),
       getAdminApp()?.firestore().collection("users").doc(meta.creatorUid).get(),
@@ -158,13 +176,13 @@ async function handlePayment(meta: Record<string, string>, amount: number, sessi
 }
 
 async function handleSession(session: Stripe.Checkout.Session) {
-  await handlePayment((session.metadata ?? {}) as Record<string, string>, session.amount_total ?? 0, session.id);
+  await handlePayment((session.metadata ?? {}) as Record<string, string>, session.amount_total ?? 0, session.id, "session");
 }
 
 async function handlePaymentIntent(pi: Stripe.PaymentIntent) {
   // Only direct PIs (tip/subscribe/badge via the embedded card sheet) carry metadata;
   // Checkout-originated PIs have none → no-op, so no double processing.
-  await handlePayment((pi.metadata ?? {}) as Record<string, string>, pi.amount ?? 0, pi.id);
+  await handlePayment((pi.metadata ?? {}) as Record<string, string>, pi.amount ?? 0, pi.id, "pi");
 }
 
 export async function POST(req: NextRequest) {

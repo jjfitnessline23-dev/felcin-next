@@ -34,7 +34,8 @@ export async function GET(req: NextRequest) {
       if (authorId) {
         await db.collection("users").doc(authorId).collection("earnings").add({
           type: "ppv", fromUid, postId, amountUsd: creatorShare, // cents — the earnings UI divides by 100
-          sessionId, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          // Field MUST be `timestamp` — the earnings list orders by it (createdAt would hide the row).
+          sessionId, timestamp: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
     }
