@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     if (!existing.exists) {
       await tipRef.set({ fromUid, amountCents: amountCentsNum, creatorShare, sessionId, createdAt: admin.firestore.FieldValue.serverTimestamp() });
       await db.collection("users").doc(creatorUid).collection("earnings").add({
-        type: "tip", fromUid, amountUsd: creatorShare / 100,
+        type: "tip", fromUid, amountUsd: creatorShare, // cents — the earnings UI divides by 100
         sessionId, createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }

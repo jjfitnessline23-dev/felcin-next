@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { collection, query, where, limit, orderBy, onSnapshot, updateDoc, doc, writeBatch } from "@/lib/db";
+import { collection, query, where, limit, orderBy, onSnapshot, updateDoc, doc, getDoc, writeBatch } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
@@ -44,6 +44,12 @@ function notifConfig(type: string) {
   }
 }
 
+// Maps a notification type to its Settings toggle. Types not listed are always shown.
+const PREF_KEY: Record<string, string> = {
+  like: "notifLikes", comment: "notifComments", follow: "notifFollows",
+  repost: "notifReposts", live: "notifLive",
+};
+
 function groupByDate(notifs: Notif[]) {
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
@@ -80,9 +86,26 @@ function NotifSkeleton() {
 
 export default function NotificationsPage() {
   const { user } = useAuth();
-  const [notifs, setNotifs] = useState<Notif[]>([]);
+  const [allNotifs, setAllNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
   const [displayLimit, setDisplayLimit] = useState(30);
+  const [mutedTypes, setMutedTypes] = useState<Set<string>>(new Set());
+
+  // Load the viewer's own notification preferences (readable only by them) and hide
+  // muted types from the list — mirrors the push suppression done server-side.
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, "users", user.uid, "settings", "preferences")).then((snap) => {
+      if (!snap.exists()) return;
+      const p = snap.data();
+      const muted = new Set<string>();
+      for (const [type, key] of Object.entries(PREF_KEY)) if (p[key] === false) muted.add(type);
+      setMutedTypes(muted);
+    }).catch(() => {});
+  }, [user]);
+
+  // Visible notifications = all minus muted types.
+  const notifs = allNotifs.filter((n) => !mutedTypes.has(n.type));
 
   useEffect(() => {
     if (!user) return;
@@ -94,7 +117,7 @@ export default function NotificationsPage() {
     );
     return onSnapshot(q,
       (snap) => {
-        setNotifs(snap.docs
+        setAllNotifs(snap.docs
           .map((d) => ({ id: d.id, ...(d.data() as Omit<Notif, "id">) }))
           .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
         setLoading(false);

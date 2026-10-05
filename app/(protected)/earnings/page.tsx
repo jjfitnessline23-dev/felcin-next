@@ -6,6 +6,7 @@ import {
   collection, doc, getDoc, getDocs, setDoc,
   query, orderBy, limit,
 } from "@/lib/db";
+import { getAggregateFromServer, sum } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
@@ -96,8 +97,14 @@ export default function EarningsPage() {
         };
       });
       setEarnings(items);
-      setTotalUsd(items.reduce((s, i) => s + i.amountUsd, 0));
+      setTotalUsd(items.reduce((s, i) => s + i.amountUsd, 0)); // fast total from the loaded page
       setLoadingEarnings(false);
+      // Accurate lifetime total via server-side aggregation — not capped at the 500 we
+      // load for the list. Falls back silently to the page sum if unavailable.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getAggregateFromServer(collection(db, "users", user.uid, "earnings") as any, { total: sum("amountUsd") })
+        .then((agg) => { const t = Number(agg.data().total); if (!Number.isNaN(t)) setTotalUsd(t); })
+        .catch(() => {});
     }).catch(() => setLoadingEarnings(false));
   }, [user]);
 

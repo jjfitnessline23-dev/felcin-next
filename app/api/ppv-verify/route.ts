@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       await purchaseRef.set({ fromUid, sessionId, priceCents: priceCentsNum, unlockedAt: admin.firestore.FieldValue.serverTimestamp() });
       if (authorId) {
         await db.collection("users").doc(authorId).collection("earnings").add({
-          type: "ppv", fromUid, postId, amountUsd: creatorShare / 100,
+          type: "ppv", fromUid, postId, amountUsd: creatorShare, // cents — the earnings UI divides by 100
           sessionId, createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
