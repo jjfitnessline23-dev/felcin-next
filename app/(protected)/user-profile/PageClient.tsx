@@ -58,6 +58,7 @@ export default function UserProfilePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [visiblePosts, setVisiblePosts] = useState(12);
   const [podcasts, setPodcasts] = useState<{ id: string; title: string; coverUrl?: string; duration?: number; plays?: number; publishedAt?: { seconds: number } }[]>([]);
+  const [reels, setReels] = useState<{ id: string; mediaUrl?: string; caption?: string; thumbnailUrl?: string }[]>([]);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [prStats, setPrStats] = useState<{ distPR: number | null; pacePR: number | null }>({ distPR: null, pacePR: null });
@@ -118,6 +119,7 @@ export default function UserProfilePage() {
     setProfile(null);
     setLoading(true);
     setPosts([]);
+    setReels([]);
     setVisiblePosts(12);
     setFollowing(false);
     setBlocked(false);
@@ -174,6 +176,17 @@ export default function UserProfilePage() {
       });
       setPosts(all.filter((p) => p.mediaUrl && !p.isStory).sort((a, b) => ((b as any).createdAt?.seconds ?? 0) - ((a as any).createdAt?.seconds ?? 0)));
     }).catch(() => {});
+
+    // Fetch this creator's reels (own collection — they never showed on the profile before)
+    getDocs(query(collection(db, "reels"), where("authorId", "==", uid), limit(50)))
+      .then((snap) => {
+        const rs = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) }))
+          .filter((r) => (r as { mediaUrl?: string }).mediaUrl && !(r as { isRepost?: boolean }).isRepost)
+          .sort((a, b) => (((b as Record<string, { seconds?: number }>).createdAt?.seconds) ?? 0) - (((a as Record<string, { seconds?: number }>).createdAt?.seconds) ?? 0))
+          .map((r) => ({ id: r.id, mediaUrl: (r as { mediaUrl?: string }).mediaUrl, caption: (r as { caption?: string }).caption, thumbnailUrl: (r as { thumbnailUrl?: string }).thumbnailUrl }));
+        setReels(rs);
+      }).catch(() => {});
 
     // Fetch this creator's podcast episodes (sorted client-side to avoid a composite index)
     getDocs(query(collection(db, "podcasts"), where("hostId", "==", uid), limit(50)))
@@ -689,6 +702,30 @@ export default function UserProfilePage() {
             ))}
           </div>
           <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginTop: 16 }} />
+        </div>
+      )}
+
+      {/* ── Reels grid ── */}
+      {reels.length > 0 && (
+        <div className="mt-4">
+          <div className="flex items-center gap-2 px-4 mb-2">
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#a78bfa", fontVariationSettings: "'FILL' 1" }}>play_circle</span>
+            <span className="text-sm font-bold" style={{ color: "#f2f2f2" }}>Reels</span>
+            <span className="text-xs" style={{ color: "#555" }}>({reels.length})</span>
+          </div>
+          <div className="grid grid-cols-3" style={{ gap: 2 }}>
+            {reels.map((r) => (
+              <Link key={r.id} href={`/reels/${r.id}`}
+                className="relative block" style={{ aspectRatio: "9/16", overflow: "hidden", background: "#0f0f0f" }}>
+                {r.thumbnailUrl
+                  ? <img src={r.thumbnailUrl} alt={r.caption || "Reel"} className="w-full h-full object-cover" loading="lazy" />
+                  : <video src={r.mediaUrl ? `${r.mediaUrl}#t=0.5` : undefined} preload="metadata" muted playsInline
+                      className="w-full h-full object-cover" style={{ pointerEvents: "none" }} />}
+                <span className="material-symbols-outlined absolute top-2 right-2 text-white"
+                  style={{ fontSize: 15, opacity: 0.9, fontVariationSettings: "'FILL' 1" }}>play_circle</span>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
