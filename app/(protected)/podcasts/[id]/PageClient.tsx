@@ -8,6 +8,7 @@ import {
 } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notify";
 import Link from "next/link";
 
 interface Episode {
@@ -96,6 +97,17 @@ export default function EpisodePage() {
     return () => unsub();
   }, [epId]);
 
+  // Notify the podcast host (in-app doc + push), mirroring posts/reels. No-op for self.
+  function notifyHost(type: "like" | "comment") {
+    if (!user || !episode?.hostId || episode.hostId === user.uid) return;
+    addDoc(collection(db, "notifications"), {
+      recipientId: episode.hostId, senderId: user.uid,
+      senderName: user.displayName || "Someone", senderPhoto: user.photoURL || "",
+      type, postId: epId, read: false, createdAt: serverTimestamp(),
+    }).catch(() => {});
+    sendNotification({ recipientUid: episode.hostId, type, senderName: user.displayName || "Someone", senderId: user.uid, postId: epId });
+  }
+
   async function toggleLike() {
     if (!user || !episode) return;
     const next = !liked;
@@ -104,6 +116,7 @@ export default function EpisodePage() {
       likes: increment(next ? 1 : -1),
       likedBy: next ? arrayUnion(user.uid) : arrayRemove(user.uid),
     }).catch(() => { setLiked(!next); setLikeCount((c) => Math.max(0, c + (next ? -1 : 1))); });
+    if (next) notifyHost("like");
   }
 
   async function share() {
@@ -130,6 +143,7 @@ export default function EpisodePage() {
         createdAt: serverTimestamp(),
       });
       setCommentText("");
+      notifyHost("comment");
     } catch {}
     setPosting(false);
   }
