@@ -269,27 +269,39 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
   const [followingError, setFollowingError] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE)))
-      .then(async (snap) => {
-        const raw: Post[] = snap.docs.map((d) => sanitizePost(d.data() as Record<string, unknown>, d.id) as unknown as Post)
-          .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
-        setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
-        setHasMore(snap.docs.length === PAGE_SIZE);
-        setPosts(raw); setLoading(false);
-        setFeaturedCreators((prev) => mergeCreators(prev, creatorsFromPosts(raw)));
-        enrichWithAuthor(raw).then((enriched) => {
-          setPosts(enriched);
-          setFeaturedCreators((prev) => {
-            const merged = mergeCreators(prev, creatorsFromPosts(enriched));
-            try { localStorage.setItem("felcin_creators", JSON.stringify(merged)); } catch {}
-            return merged;
-          });
-          try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ posts: enriched, ts: Date.now() })); } catch {}
-        }).catch(() => {});
-      })
-      .catch(() => setLoading(false));
+  const loadForYou = useCallback(async () => {
+    try {
+      const snap = await getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE)));
+      const raw: Post[] = snap.docs.map((d) => sanitizePost(d.data() as Record<string, unknown>, d.id) as unknown as Post)
+        .filter((p) => p.status !== "scheduled" && !p.isStory && (p.maxViews == null || (p.viewCount ?? 0) < p.maxViews));
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setPosts(raw); setLoading(false);
+      setFeaturedCreators((prev) => mergeCreators(prev, creatorsFromPosts(raw)));
+      const enriched = await enrichWithAuthor(raw);
+      setPosts(enriched);
+      setFeaturedCreators((prev) => {
+        const merged = mergeCreators(prev, creatorsFromPosts(enriched));
+        try { localStorage.setItem("felcin_creators", JSON.stringify(merged)); } catch {}
+        return merged;
+      });
+      try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ posts: enriched, ts: Date.now() })); } catch {}
+    } catch { setLoading(false); }
   }, []);
+
+  useEffect(() => { loadForYou(); }, [loadForYou]);
+
+  // Tapping the Home tab while already on Home fires this: jump to top + reload the feed.
+  useEffect(() => {
+    const onRefresh = () => {
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { window.scrollTo(0, 0); }
+      setTab("foryou");
+      setFollowingIds(null); // force the Following tab to reload next time it's opened
+      loadForYou();
+    };
+    window.addEventListener("felcin:home-refresh", onRefresh);
+    return () => window.removeEventListener("felcin:home-refresh", onRefresh);
+  }, [loadForYou]);
 
   const loadMore = useCallback(async () => {
     if (!lastDoc || loadingMore || !hasMore) return;

@@ -149,6 +149,13 @@ export default function MobileNav() {
           const inactiveColor = tab.run ? "#2a5c3a" : tab.accent ? "#6d51c4" : "#555";
           return (
             <Link key={tab.href} href={tab.href}
+              onClick={(e) => {
+                // Tapping Home while already on Home: don't no-op — scroll to top + refresh the feed.
+                if (tab.href === "/" && pathname === "/") {
+                  e.preventDefault();
+                  window.dispatchEvent(new Event("felcin:home-refresh"));
+                }
+              }}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5"
               style={{ color: tab.active ? activeColor : inactiveColor }}>
               <span className="material-symbols-outlined" style={{
