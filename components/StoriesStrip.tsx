@@ -67,6 +67,7 @@ export default function StoriesStrip() {
   const [viewersOpen, setViewersOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const storyVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200));
@@ -117,30 +118,44 @@ export default function StoriesStrip() {
 
   useEffect(() => {
     if (!activeGroup) return;
-    // Pause auto-advance while typing a comment or viewing the "seen by" list
-    if (commentOpen || viewersOpen) {
+    const s = activeGroup.stories[activeIdx];
+    const vid = !!s && isVideo(s);
+    const clearTimers = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
+    };
+    const advance = () => {
+      if (activeIdx < activeGroup.stories.length - 1) setActiveIdx((i) => i + 1);
+      else closeViewer();
+    };
+
+    // Pause auto-advance while typing a comment or viewing the "seen by" list
+    if (commentOpen || viewersOpen) {
+      clearTimers();
+      if (vid) storyVideoRef.current?.pause();
       return;
     }
-    setProgress(0);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (progressRef.current) clearInterval(progressRef.current);
 
+    clearTimers();
+
+    // Video stories: progress + advance are driven by the <video> element's own
+    // timeupdate/ended events (below), so the clip plays for its full length instead of
+    // being chopped at 5s. Resume playback; keep a long safety timeout in case it stalls.
+    if (vid) {
+      storyVideoRef.current?.play().catch(() => {});
+      timerRef.current = setTimeout(advance, 60000);
+      return clearTimers;
+    }
+
+    // Image stories: fixed duration.
+    setProgress(0);
     const startTime = Date.now();
     progressRef.current = setInterval(() => {
       setProgress(Math.min(100, ((Date.now() - startTime) / STORY_DURATION) * 100));
     }, 50);
+    timerRef.current = setTimeout(advance, STORY_DURATION);
 
-    timerRef.current = setTimeout(() => {
-      if (activeIdx < activeGroup.stories.length - 1) setActiveIdx((i) => i + 1);
-      else closeViewer();
-    }, STORY_DURATION);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (progressRef.current) clearInterval(progressRef.current);
-    };
+    return clearTimers;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup, activeIdx, commentOpen, viewersOpen]);
 
@@ -348,7 +363,11 @@ export default function StoriesStrip() {
             </div>
             <div className="flex-1 flex items-center justify-center">
               {isVideo(current) ? (
-                <video key={current.id} src={current.mediaUrl} autoPlay playsInline muted className="w-full h-full object-contain" style={{ maxHeight: "100vh" }} />
+                <video key={current.id} ref={storyVideoRef} src={current.mediaUrl} autoPlay playsInline muted
+                  className="w-full h-full object-contain" style={{ maxHeight: "100vh" }}
+                  onTimeUpdate={(e) => { const v = e.currentTarget; if (v.duration && !commentOpen && !viewersOpen) setProgress(Math.min(100, (v.currentTime / v.duration) * 100)); }}
+                  onEnded={goNext}
+                  onError={goNext} />
               ) : current.mediaUrl ? (
                 <img key={current.id} src={current.mediaUrl} alt="Story" className="w-full h-full object-contain" style={{ maxHeight: "100vh" }} />
               ) : (
