@@ -18,6 +18,12 @@ service cloud.firestore {
         .hasOnly(['likes', 'likedBy', 'comments', 'repostCount', 'viewCount']);
     }
 
+    // A comment can only ever be mutated to add/remove a like (any authed user) — nothing else.
+    function onlyCommentLike() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['likes', 'likedBy']);
+    }
+
     // Validates a text field exists, is a string, and is within maxLen characters
     function validText(field, maxLen) {
       return field in request.resource.data
@@ -43,7 +49,7 @@ service cloud.firestore {
         allow read: if isAuth();
         allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
         allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
-        allow update: if false;
+        allow update: if isAuth() && onlyCommentLike();
       }
 
       match /reactions/{userId} {
@@ -76,7 +82,7 @@ service cloud.firestore {
         allow read: if isAuth();
         allow create: if isAuth() && request.resource.data.authorId == request.auth.uid;
         allow delete: if isAuth() && (request.auth.uid == resource.data.authorId || isAdmin());
-        allow update: if false;
+        allow update: if isAuth() && onlyCommentLike();
       }
     }
 

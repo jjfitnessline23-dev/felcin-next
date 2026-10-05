@@ -23,6 +23,7 @@ interface Post {
 interface Comment {
   id: string; authorId: string; authorName?: string; authorPhoto?: string;
   text: string; createdAt?: { seconds: number };
+  likes?: number; likedBy?: string[]; parentId?: string | null;
 }
 
 function resolveMediaType(ct?: string, mime?: string, url?: string) {
@@ -52,6 +53,7 @@ export default function PageClient() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [authorData, setAuthorData] = useState<{ name: string; photo: string } | null>(null);
 
   const [liked, setLiked] = useState(false);
@@ -169,19 +171,27 @@ export default function PageClient() {
     if (!text.trim() || !user || sending) return;
     setSending(true);
     const t = text.trim();
+    const parent = replyingTo;
     try {
       await addDoc(collection(db, col, postId, "comments"), {
         authorId: user.uid,
         authorName: user.displayName || user.email || "User",
         authorPhoto: user.photoURL || "",
         text: t,
+        parentId: parent?.id ?? null,
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, col, postId), { comments: increment(1) });
-      setText(""); // clear only after successful save
-      if (post && post.authorId && post.authorId !== user.uid) {
+      setText("");        // clear only after successful save
+      setReplyingTo(null);
+      // Notify the post author (always) + the comment author being replied to (if different).
+      const notifyTargets = new Set<string>();
+      if (post?.authorId && post.authorId !== user.uid) notifyTargets.add(post.authorId);
+      const replyTargetId = parent ? comments.find((c) => c.id === parent.id)?.authorId : undefined;
+      if (replyTargetId && replyTargetId !== user.uid) notifyTargets.add(replyTargetId);
+      for (const recipientId of notifyTargets) {
         addDoc(collection(db, "notifications"), {
-          recipientId: post.authorId,
+          recipientId,
           senderId: user.uid,
           senderName: user.displayName || user.email || "Someone",
           senderPhoto: user.photoURL || "",
@@ -190,10 +200,32 @@ export default function PageClient() {
           read: false,
           createdAt: serverTimestamp(),
         }).catch(() => {});
-        sendNotification({ recipientUid: post.authorId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId });
+        sendNotification({ recipientUid: recipientId, type: "comment", senderName: user.displayName || "Someone", senderId: user.uid, postId });
       }
     } catch { /* text already preserved since we didn't clear it */ }
     setSending(false);
+  };
+
+  const startReply = (c: Comment) => {
+    setReplyingTo({ id: c.parentId ?? c.id, name: c.authorName || "User" });
+    inputRef.current?.focus();
+  };
+
+  const handleCommentLike = async (c: Comment) => {
+    if (!user) return;
+    const newLiked = !(c.likedBy ?? []).includes(user.uid);
+    // Optimistic — onSnapshot will reconcile (and revert on failure).
+    setComments((prev) => prev.map((x) => x.id === c.id ? {
+      ...x,
+      likes: Math.max(0, (x.likes ?? 0) + (newLiked ? 1 : -1)),
+      likedBy: newLiked ? [...(x.likedBy ?? []), user.uid] : (x.likedBy ?? []).filter((u) => u !== user.uid),
+    } : x));
+    try {
+      await updateDoc(doc(db, col, postId, "comments", c.id), {
+        likes: increment(newLiked ? 1 : -1),
+        likedBy: newLiked ? arrayUnion(user.uid) : arrayRemove(user.uid),
+      });
+    } catch { /* snapshot reconciles the optimistic change */ }
   };
 
   const handleLike = async () => {
@@ -281,6 +313,56 @@ export default function PageClient() {
   const isOwner = user && OWNER_UIDS.includes(user.uid);
   const canDelete = post && user && (user.uid === post.authorId || isOwner);
   const canDotMenu = !!post && !!user;
+
+  // Flat thread model: replies are comments carrying a parentId. Group them under parents.
+  const topLevelComments = comments.filter((c) => !c.parentId);
+  const repliesByParent: Record<string, Comment[]> = {};
+  for (const c of comments) {
+    if (c.parentId) (repliesByParent[c.parentId] ||= []).push(c);
+  }
+
+  const CommentRow = ({ c, isReply = false }: { c: Comment; isReply?: boolean }) => {
+    const cInitial = (c.authorName || "U").charAt(0).toUpperCase();
+    const avatar = isReply ? 28 : 32;
+    const cLiked = !!user && (c.likedBy ?? []).includes(user.uid);
+    const cLikes = c.likes ?? 0;
+    return (
+      <div className="flex items-start gap-3">
+        <Link href={`/user-profile?uid=${c.authorId}`} className="shrink-0">
+          {c.authorPhoto ? (
+            <img src={c.authorPhoto} alt="" className="rounded-full object-cover" style={{ width: avatar, height: avatar }} />
+          ) : (
+            <div className="rounded-full flex items-center justify-center text-xs font-bold"
+              style={{ width: avatar, height: avatar, background: "#1a1a1a", color: "#666" }}>{cInitial}</div>
+          )}
+        </Link>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm leading-relaxed" style={{ color: "#ccc" }}>
+            <Link href={`/user-profile?uid=${c.authorId}`} className="font-semibold mr-1" style={{ color: "#f2f2f2" }}>
+              {c.authorName || "User"}
+            </Link>
+            {c.text}
+          </p>
+          <div className="flex items-center gap-4 mt-1">
+            {c.createdAt?.seconds && (
+              <span className="text-xs" style={{ color: "#444" }}>{timeAgo(c.createdAt.seconds)}</span>
+            )}
+            {cLikes > 0 && (
+              <span className="text-xs" style={{ color: "#555" }}>{cLikes} {cLikes === 1 ? "like" : "likes"}</span>
+            )}
+            <button onClick={() => startReply(c)} className="text-xs font-semibold border-none bg-transparent cursor-pointer" style={{ color: "#555" }}>
+              Reply
+            </button>
+          </div>
+        </div>
+        <button onClick={() => handleCommentLike(c)} disabled={!user}
+          className="flex items-center justify-center border-none bg-transparent cursor-pointer shrink-0 mt-0.5"
+          style={{ width: 28, height: 28, color: cLiked ? "#ef4444" : "#555" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: cLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+        </button>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -406,28 +488,16 @@ export default function PageClient() {
             <p className="text-center py-10 text-sm" style={{ color: "#444" }}>No comments yet — be the first!</p>
           ) : (
             <div className="flex flex-col gap-4">
-              {comments.map((c) => {
-                const cInitial = (c.authorName || "U").charAt(0).toUpperCase();
-                return (
-                  <div key={c.id} className="flex items-start gap-3">
-                    {c.authorPhoto ? (
-                      <img src={c.authorPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
-                    ) : (
-                      <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                        style={{ width: 32, height: 32, background: "#1a1a1a", color: "#666" }}>{cInitial}</div>
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm leading-relaxed" style={{ color: "#ccc" }}>
-                        <span className="font-semibold mr-1" style={{ color: "#f2f2f2" }}>{c.authorName || "User"}</span>
-                        {c.text}
-                      </p>
-                      {c.createdAt?.seconds && (
-                        <p className="text-xs mt-1" style={{ color: "#444" }}>{timeAgo(c.createdAt.seconds)}</p>
-                      )}
+              {topLevelComments.map((c) => (
+                <div key={c.id} className="flex flex-col gap-3">
+                  <CommentRow c={c} />
+                  {(repliesByParent[c.id] || []).length > 0 && (
+                    <div className="flex flex-col gap-3 pl-11">
+                      {(repliesByParent[c.id] || []).map((r) => <CommentRow key={r.id} c={r} isReply />)}
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </div>
+              ))}
             </div>
           )}
           <div ref={bottomRef} />
@@ -437,6 +507,14 @@ export default function PageClient() {
       {/* Comment input */}
       <div className="fixed bottom-0 left-0 right-0 px-4 py-3 lg:relative lg:bottom-auto"
         style={{ background: "rgba(9,9,9,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", zIndex: 80, paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
+        {replyingTo && (
+          <div className="flex items-center justify-between max-w-xl mx-auto mb-2 px-1">
+            <span className="text-xs" style={{ color: "#777" }}>Replying to <span style={{ color: "#aaa" }}>{replyingTo.name}</span></span>
+            <button onClick={() => setReplyingTo(null)} className="border-none bg-transparent cursor-pointer flex items-center" style={{ color: "#777" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-3 max-w-xl mx-auto">
           {user?.photoURL ? (
             <img src={user.photoURL} alt="" className="rounded-full object-cover shrink-0" style={{ width: 32, height: 32 }} />
@@ -447,7 +525,7 @@ export default function PageClient() {
           <input ref={inputRef} type="text" value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendComment()}
             maxLength={1000}
-            placeholder="Add a comment…" className="flex-1 px-4 py-2.5 rounded-full outline-none"
+            placeholder={replyingTo ? `Reply to ${replyingTo.name}…` : "Add a comment…"} className="flex-1 px-4 py-2.5 rounded-full outline-none"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#f2f2f2", fontSize: 16 }} />
           <button onClick={sendComment} disabled={!text.trim() || sending}
             className="font-semibold text-sm border-none bg-transparent cursor-pointer transition-colors"
