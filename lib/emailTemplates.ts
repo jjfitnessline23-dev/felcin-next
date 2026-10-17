@@ -20,6 +20,20 @@ export async function getUserEmail(uid: string): Promise<string | null> {
   } catch { return null; }
 }
 
+// Plain-text fallback from the HTML. Sending HTML-only is a spam-filter penalty; a
+// multipart message (text + html) scores better and renders in text-only clients.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<\/(p|div|h[1-6]|li|tr|br)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .split("\n").map((l) => l.trim()).join("\n")
+    .trim();
+}
+
 // ─── send via Resend ──────────────────────────────────────────────────────────
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
@@ -28,7 +42,8 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     const res = await fetch("https://api.resend.com/emails", {
       method:  "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ from: FROM, to, subject, html }),
+      // text fallback + a real reply-to both improve inbox placement.
+      body:    JSON.stringify({ from: FROM, to, subject, html, text: htmlToText(html), reply_to: SUPPORT }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
