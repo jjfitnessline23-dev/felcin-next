@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       mode: "payment",
       success_url: `https://felcin.com/user-profile?uid=${creatorUid}&tip_session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://felcin.com/user-profile?uid=${creatorUid}`,
-      metadata: { creatorUid, fromUid, amountCents: String(amountCents), creatorShare: String(amountCents - platformFee) },
+      metadata: { app: "felcin", creatorUid, fromUid, amountCents: String(amountCents), creatorShare: String(amountCents - platformFee) },
       payment_intent_data: { application_fee_amount: platformFee, transfer_data: { destination: creatorStripeId } },
     });
     return NextResponse.json({ url: session.url });

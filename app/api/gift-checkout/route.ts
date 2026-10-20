@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       mode: "payment",
       success_url: `https://felcin.com/live/${streamId}?gift_session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://felcin.com/live/${streamId}`,
-      metadata: {
+      metadata: { app: "felcin",
         giftType,
         giftEmoji: gift.emoji,
         streamId,

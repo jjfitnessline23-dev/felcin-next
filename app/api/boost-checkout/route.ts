@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }],
     success_url: `https://felcin.com/?boost_session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `https://felcin.com/`,
-    metadata: { postId, tier, uid, reach: String(tierData.reach), days: String(tierData.days) },
+    metadata: { app: "felcin", postId, tier, uid, reach: String(tierData.reach), days: String(tierData.days) },
   });
 
   return NextResponse.json({ url: session.url });

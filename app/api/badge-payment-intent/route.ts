@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       amount: badge.priceCents,
       currency: "usd",
       automatic_payment_methods: { enabled: true },
-      metadata: { uid, badgeId, badgeLabel: badge.label },
+      metadata: { app: "felcin", uid, badgeId, badgeLabel: badge.label },
     });
 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret, badgeLabel: badge.label, amount: badge.priceCents });

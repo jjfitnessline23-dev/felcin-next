@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     mode: "payment",
     success_url: `${base}?uid=${encodeURIComponent(toUid)}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}?uid=${encodeURIComponent(toUid)}`,
-    metadata: {
+    metadata: { app: "felcin",
       tier,
       fromUid,
       toUid,

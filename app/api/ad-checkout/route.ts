@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }],
     success_url: `https://felcin.com/advertise?ad_session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `https://felcin.com/advertise`,
-    metadata: {
+    metadata: { app: "felcin",
       uid,
       tier,
       title: title.slice(0, 200),

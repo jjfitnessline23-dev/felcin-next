@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       line_items: [{ price_data: { currency: "usd", unit_amount: tierData.amount, product_data: { name: `${tierData.name} - ${creatorName}` } }, quantity: 1 }],
       success_url: `${origin}/subscribe/${creatorUid}?sub_session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/user-profile?uid=${creatorUid}`,
-      metadata: { buyerUid, creatorUid, tier },
+      metadata: { app: "felcin", buyerUid, creatorUid, tier },
     };
 
     if (creatorStripeId) {

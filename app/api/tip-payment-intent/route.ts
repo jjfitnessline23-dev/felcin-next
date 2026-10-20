@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       amount: amountCents,
       currency: "usd",
       automatic_payment_methods: { enabled: true },
-      metadata: { creatorUid, fromUid, amountCents: String(amountCents), creatorName: creatorName || "Creator" },
+      metadata: { app: "felcin", creatorUid, fromUid, amountCents: String(amountCents), creatorName: creatorName || "Creator" },
     };
     if (creatorStripeId) {
       params.application_fee_amount = platformFee;

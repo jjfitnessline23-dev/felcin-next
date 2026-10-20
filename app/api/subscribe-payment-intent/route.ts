@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       amount: tierData.amount,
       currency: "usd",
       automatic_payment_methods: { enabled: true },
-      metadata: { buyerUid, creatorUid, tier, creatorName },
+      metadata: { app: "felcin", buyerUid, creatorUid, tier, creatorName },
     };
     if (creatorStripeId) {
       params.application_fee_amount = platformFee;

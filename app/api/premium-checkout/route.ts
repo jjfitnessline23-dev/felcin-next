@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ui_mode: "embedded" as any,
       return_url: `https://felcin.com/?premium_session_id={CHECKOUT_SESSION_ID}`,
-      metadata: { uid, plan },
+      metadata: { app: "felcin", uid, plan },
     });
 
     return NextResponse.json({ clientSecret: session.client_secret });
