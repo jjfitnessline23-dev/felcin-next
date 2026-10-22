@@ -56,6 +56,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     setPlatform(getPlatform());
+    // Referral: felcin.com/login?ref=<referrer uid> → save it for signup (applied in lib/auth)
+    // and drop a referred visitor straight into the signup flow.
+    try {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref) { localStorage.setItem("felcin_ref", ref); setMode("signup"); }
+    } catch {}
   }, []);
 
   useEffect(() => {

@@ -138,6 +138,14 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           </div>
         )}
 
+        {/* Community Builder (referral reward) */}
+        {p.communityBuilder && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 14, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", marginBottom: 22, marginLeft: p.currentStreak > 0 ? 8 : 0 }}>
+            <span style={{ fontSize: 16 }}>🏆</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>Community Builder</span>
+          </div>
+        )}
+
         {p.isPrivate ? (
           <div style={{ textAlign: "center", padding: "40px 20px", background: "#111", borderRadius: 18, border: "1px solid rgba(255,255,255,0.06)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#555" }}>lock</span>

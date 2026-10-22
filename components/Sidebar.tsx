@@ -18,6 +18,7 @@ const primaryLinks = [
   { href: "/live", icon: "live_tv", label: "Live Studio" },
   { href: "/challenges", icon: "link", label: "Challenges" },
   { href: "/explore", icon: "explore", label: "Explore" },
+  { href: "/invite", icon: "group_add", label: "Invite Friends", accent: true },
 ];
 
 const secondaryLinks = [

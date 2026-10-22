@@ -94,8 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               photoURL: u.photoURL || "",
               email: u.email || "",
             };
-            setDoc(doc(db, "users", u.uid), profile, { merge: true }).catch(() => {});
+            // Referral capture: if this user arrived via an invite link (?ref=<uid> saved at
+            // login), record who referred them on their OWN doc. First account creation only.
+            let referredBy = "";
+            try { const r = localStorage.getItem("felcin_ref") || ""; if (r && r !== u.uid) referredBy = r; } catch {}
+            setDoc(doc(db, "users", u.uid), referredBy ? { ...profile, referredBy } : profile, { merge: true }).catch(() => {});
             setDoc(doc(db, "users", u.uid, "public", "profile"), profile, { merge: true }).catch(() => {});
+            if (referredBy) { try { localStorage.removeItem("felcin_ref"); } catch {} }
           }
         } catch {
           if (mounted) setBanned(false);

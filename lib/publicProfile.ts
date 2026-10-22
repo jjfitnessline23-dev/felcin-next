@@ -53,6 +53,7 @@ export interface PublicProfile {
   currentStreak: number;
   longestStreak: number;
   isPrivate: boolean;
+  communityBuilder: boolean;
   posts: PublicProfilePost[];
 }
 
@@ -107,6 +108,7 @@ async function fetchUncached(uid: string): Promise<PublicProfile | null> {
       currentStreak: Number(pub.currentStreak ?? 0),
       longestStreak: Number(pub.longestStreak ?? 0),
       isPrivate,
+      communityBuilder: !!root.communityBuilder,
       posts,
     };
   } catch {

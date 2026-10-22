@@ -24,6 +24,7 @@ interface UserProfile {
   badge?: string;
   currentStreak?: number;
   longestStreak?: number;
+  communityBuilder?: boolean;
 }
 interface Post {
   id: string;
@@ -242,10 +243,8 @@ export default function UserProfilePage() {
         setDoc(myBlockRef, { blockedAt: serverTimestamp() }),
         setDoc(theirBlockedByRef, { blockedAt: serverTimestamp() }),
       ]).catch(() => {});
-      await addDoc(collection(db, "reports"), {
-        type: "block", blockedUid: uid, blockerId: user.uid,
-        createdAt: serverTimestamp(), status: "pending",
-      }).catch(() => {});
+      // NOTE: blocking is a private user action — it must NOT create a moderation report.
+      // (Previously wrote a type:"block" doc into `reports`, cluttering the admin queue. Removed.)
       setBlocked(true);
     }
     setBlocking(false);
@@ -409,8 +408,17 @@ export default function UserProfilePage() {
       </div>
 
       {/* ── PR Badges ── */}
-      {(prStats.distPR !== null || prStats.pacePR !== null || (profile?.currentStreak ?? 0) > 0) && (
+      {(prStats.distPR !== null || prStats.pacePR !== null || (profile?.currentStreak ?? 0) > 0 || profile?.communityBuilder) && (
         <div className="flex gap-2 px-4 pb-3 flex-wrap">
+          {profile?.communityBuilder && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)" }}>
+              <span style={{ fontSize: 15 }}>🏆</span>
+              <div>
+                <div style={{ fontSize: 10, color: "#555", fontWeight: 700 }}>COMMUNITY</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#22c55e" }}>Community Builder</div>
+              </div>
+            </div>
+          )}
           {(profile?.currentStreak ?? 0) > 0 && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(255,122,26,0.08)", border: "1px solid rgba(255,122,26,0.22)" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#ff7a1a", fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>

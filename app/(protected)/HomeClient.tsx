@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
 import AdCard, { Ad } from "@/components/AdCard";
+import InviteBanner from "@/components/InviteBanner";
 import { PostCardSkeleton } from "@/components/SkeletonCard";
 import Link from "next/link";
 import StoriesStrip from "@/components/StoriesStrip";
@@ -387,6 +388,9 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
         </div>
       </div>
 
+      {/* Mobile invite prompt (hidden on desktop, which has the sidebar link) */}
+      <div className="px-4"><InviteBanner /></div>
+
       {/* ── Greeting Banner ── */}
       <div className="relative mx-4 mb-4 rounded-3xl overflow-hidden"
         style={{ background: "linear-gradient(135deg,#0c0618 0%,#130a24 50%,#0c0618 100%)", border: "1px solid rgba(167,139,250,0.18)", minHeight: 100 }}>
@@ -563,9 +567,10 @@ export default function HomeClient({ initialPosts = [] }: { initialPosts?: Post[
                 <p className="text-sm" style={{ color: "#888" }}>Be the first to share something or explore creators.</p>
               </div>
               {[
-                { href: "/explore",    icon: "explore",    title: "Discover creators", sub: "Find fitness creators to follow" },
-                { href: "/challenges", icon: "link",       title: "Join a challenge",   sub: "Compete and stay accountable" },
-                { href: "/creator",    icon: "add_circle", title: "Share your first post", sub: "Be the first creator on Felcin" },
+                { href: "/creator?mode=reel", icon: "movie",      title: "Share your first Reel", sub: "A 15–30s clip is the fastest way to get seen" },
+                { href: "/explore",           icon: "explore",    title: "Discover creators",     sub: "Find fitness creators to follow" },
+                { href: "/invite",            icon: "group_add",  title: "Invite your friends",   sub: "Felcin's better with your crew" },
+                { href: "/challenges",        icon: "link",       title: "Join a challenge",      sub: "Compete and stay accountable" },
               ].map((l) => (
                 <Link key={l.href} href={l.href} className="flex items-center gap-3 px-4 py-3.5 rounded-2xl no-underline"
                   style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
