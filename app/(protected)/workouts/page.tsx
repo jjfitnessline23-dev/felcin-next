@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, increment, updateDoc, doc, getDoc } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { makeActivityCard } from "@/lib/activityCard";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import ExerciseDemo from "@/components/ExerciseDemo";
@@ -95,6 +98,8 @@ export default function WorkoutsPage() {
   const [restSecs, setRestSecs] = useState(0);
   const [restActive, setRestActive] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [workoutShare, setWorkoutShare] = useState<{ count: number; durationMins: number } | null>(null);
+  const [sharingWorkout, setSharingWorkout] = useState(false);
   const [focusedSet, setFocusedSet] = useState<{ ei: number; si: number } | null>(null);
 
   const [searchOpen, setSearchOpen] = useState<number | null>(null);
@@ -344,11 +349,59 @@ export default function WorkoutsPage() {
         }
         setPrs(np);
         setLogs((p) => [{ id: ref.id, exercises, notes: (session.notes || "").trim() || undefined, durationMins }, ...p]);
+        // Offer to share the finished workout to the feed (content supply).
+        setWorkoutShare({ count: named.length, durationMins });
       }
       saveSession(null); setElapsed(0); setRestSecs(0); setRestActive(false);
     } catch {}
     setSaving(false);
   }
+
+  // Turn the finished workout into a feed post.
+  const shareWorkoutToFeed = async () => {
+    if (!user || !workoutShare || sharingWorkout) return;
+    setSharingWorkout(true);
+    try {
+      const { count, durationMins } = workoutShare;
+      const caption = `💪 Just finished a workout — ${count} exercise${count === 1 ? "" : "s"} · ${durationMins} min on Felcin #felcin`;
+
+      // Visual card; fall back to text on failure.
+      let mediaUrl = ""; let contentType = "text"; let mimeType = "";
+      try {
+        const blob = await makeActivityCard({
+          kind: "workout",
+          headline: "WORKOUT",
+          stats: [
+            { label: "Exercises", value: String(count) },
+            { label: "Duration", value: `${durationMins} min` },
+          ],
+          userName: user.displayName || "",
+        });
+        if (blob) {
+          const sref = storageRef(storage, `uploads/media/${user.uid}/workout-${Date.now()}.png`);
+          await uploadBytes(sref, blob, { contentType: "image/png" });
+          mediaUrl = await getDownloadURL(sref);
+          contentType = "image"; mimeType = "image/png";
+        }
+      } catch { /* fall back to text */ }
+
+      await addDoc(collection(db, "posts"), {
+        authorId: user.uid,
+        authorName: user.displayName || "Felcin athlete",
+        authorPhoto: user.photoURL || "",
+        caption, text: caption, mediaUrl,
+        contentType, mimeType,
+        likes: 0, comments: 0, status: "published",
+        isStory: false, isReel: false, viewCount: 0, tags: ["workout"],
+        createdAt: serverTimestamp(),
+      });
+      setWorkoutShare(null);
+    } catch (e) {
+      console.error("shareWorkout:", e);
+    } finally {
+      setSharingWorkout(false);
+    }
+  };
 
   function applyTemplate(key: SplitKey) { setPlanKey(key); setPlanDays(key === "custom" ? planDays.slice() : SPLITS[key].days.slice()); }
   function setPlanDay(di: number, val: string) { setPlanDays(planDays.map((d, i) => i === di ? val : d)); setPlanKey("custom"); }
@@ -400,6 +453,24 @@ export default function WorkoutsPage() {
   return (
     <div className="max-w-xl mx-auto overflow-x-hidden" style={{ paddingBottom: session ? "calc(env(safe-area-inset-bottom,0px) + 140px)" : "96px" }}>
       <PageHeader title="Workout Log" />
+
+      {/* Post-workout: offer to share it to the feed */}
+      {workoutShare && (
+        <div className="mx-4 mt-3" style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.28)", borderRadius: 14, padding: "11px 12px" }}>
+          <span style={{ fontSize: 20 }}>💪</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f2f2f2" }}>Nice work — {workoutShare.count} exercise{workoutShare.count === 1 ? "" : "s"} · {workoutShare.durationMins} min</div>
+            <div style={{ fontSize: 12, color: "#a7b8b0" }}>
+              Share it, or <Link href="/creator?mode=reel" style={{ color: "var(--fx-accent,#22c55e)", textDecoration: "none", fontWeight: 700 }}>make a Reel 🎬</Link>
+            </div>
+          </div>
+          <button onClick={shareWorkoutToFeed} disabled={sharingWorkout}
+            style={{ flexShrink: 0, background: "var(--fx-accent, #22c55e)", color: "#04140a", fontWeight: 700, fontSize: 13, padding: "8px 14px", borderRadius: 999, border: "none", cursor: sharingWorkout ? "default" : "pointer" }}>
+            {sharingWorkout ? "Sharing…" : "Share"}
+          </button>
+          <button onClick={() => setWorkoutShare(null)} aria-label="Dismiss" style={{ flexShrink: 0, background: "transparent", border: "none", color: "#6e817a", fontSize: 20, lineHeight: 1, cursor: "pointer" }}>×</button>
+        </div>
+      )}
 
       {/* Hero */}
       <div className="relative mx-4 mt-2 mb-4 rounded-3xl overflow-hidden"

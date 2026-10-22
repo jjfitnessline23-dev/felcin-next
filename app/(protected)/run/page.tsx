@@ -4,7 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import FelcinLogo from "@/components/FelcinLogo";
 import { useAuth } from "@/lib/auth";
-import { db, auth, OWNER_UIDS } from "@/lib/firebase";
+import { db, auth, storage, OWNER_UIDS } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { makeActivityCard } from "@/lib/activityCard";
+import Link from "next/link";
 import { collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, doc, setDoc, updateDoc, deleteDoc } from "@/lib/db";
 import { snapToRoads } from "@/lib/mapMatch";
 import { Capacitor } from "@capacitor/core";
@@ -130,6 +133,8 @@ export default function RunPage() {
   const [lastSaved, setLastSaved] = useState<{ isDistancePR: boolean; isPacePR: boolean } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [sharingFeed, setSharingFeed] = useState(false);
+  const [sharedToFeed, setSharedToFeed] = useState(false);
   const savingRef = useRef(false);
   const [expandedRun, setExpandedRun] = useState<RunRoute | null>(null);
   const [matchedCoords, setMatchedCoords] = useState<{ lat: number; lng: number }[] | null>(null);
@@ -523,7 +528,7 @@ export default function RunPage() {
     } catch { }
   };
 
-  const startCountdown = () => { setLastSaved(null); setCountdown(3); setPhase("countdown"); };
+  const startCountdown = () => { setLastSaved(null); setSharedToFeed(false); setCountdown(3); setPhase("countdown"); };
   const pauseRun = () => { pauseStartRef.current = Date.now(); setPhase("paused"); };
   const resumeRun = () => { pausedMsRef.current += Date.now() - pauseStartRef.current; setPhase("running"); };
   const stopRun = async () => {
@@ -580,6 +585,60 @@ export default function RunPage() {
     } finally {
       savingRef.current = false;
       setIsSaving(false);
+    }
+  };
+
+  // Turn the finished activity into a feed post — converts the app's core activity into
+  // content (the real growth lever: content supply). Creates a simple stat post.
+  const shareToFeed = async () => {
+    if (!user || sharingFeed || sharedToFeed || distance <= 0) return;
+    setSharingFeed(true);
+    try {
+      const km = distance / 1000;
+      const distStr = useMiles ? `${(km * KM_TO_MI).toFixed(2)} mi` : `${km.toFixed(2)} km`;
+      const emoji = isCycle ? "🚴" : "🏃";
+      const verb = isCycle ? "rode" : "ran";
+      const paceTxt = isCycle ? `${paceDisplay} ${paceUnit.toLowerCase()}` : `${paceDisplay}/${useMiles ? "mi" : "km"} pace`;
+      const pr = lastSaved?.isDistancePR ? " · 🏆 distance PR!" : lastSaved?.isPacePR ? ` · 🏆 ${isCycle ? "speed" : "pace"} PR!` : "";
+      const caption = `${emoji} Just ${verb} ${distStr} in ${formatTime(elapsed)} · ${paceTxt}${pr}  #felcin`;
+
+      // Build + upload a visual activity card (with the route map); fall back to text on any failure.
+      let mediaUrl = ""; let contentType = "text"; let mimeType = "";
+      try {
+        const blob = await makeActivityCard({
+          kind: isCycle ? "cycle" : "run",
+          headline: `${distDisplay} ${distUnit.toLowerCase()}`,
+          stats: [
+            { label: "Time", value: formatTime(elapsed) },
+            { label: paceUnit, value: String(paceDisplay) },
+          ],
+          badge: lastSaved?.isDistancePR ? "DISTANCE PR" : lastSaved?.isPacePR ? (isCycle ? "SPEED PR" : "PACE PR") : undefined,
+          coords: coords.map((c) => ({ lat: c.lat, lng: c.lng })),
+          userName: user.displayName || "",
+        });
+        if (blob) {
+          const sref = storageRef(storage, `uploads/media/${user.uid}/activity-${Date.now()}.png`);
+          await uploadBytes(sref, blob, { contentType: "image/png" });
+          mediaUrl = await getDownloadURL(sref);
+          contentType = "image"; mimeType = "image/png";
+        }
+      } catch { /* fall back to text */ }
+
+      await addDoc(collection(db, "posts"), {
+        authorId: user.uid,
+        authorName: user.displayName || "Felcin athlete",
+        authorPhoto: user.photoURL || "",
+        caption, text: caption, mediaUrl,
+        contentType, mimeType,
+        likes: 0, comments: 0, status: "published",
+        isStory: false, isReel: false, viewCount: 0, tags: [isCycle ? "cycling" : "running"],
+        createdAt: serverTimestamp(),
+      });
+      setSharedToFeed(true);
+    } catch (e) {
+      console.error("shareToFeed:", e);
+    } finally {
+      setSharingFeed(false);
     }
   };
 
@@ -830,6 +889,16 @@ export default function RunPage() {
                 <span style={{ fontSize: 11, color: "#7f3a3a", paddingLeft: 24, wordBreak: "break-all" }}>{saveError}</span>
               </div>
             )}
+            {/* Share this activity to the feed — turns the run into content (growth: content supply). */}
+            <button onClick={shareToFeed} disabled={sharingFeed || sharedToFeed}
+              style={{ width: "100%", padding: "13px 0", borderRadius: 14, border: "1px solid rgba(34,197,94,0.3)", background: sharedToFeed ? "rgba(34,197,94,0.08)" : "rgba(34,197,94,0.14)", color: "var(--fx-accent,#22c55e)", fontSize: 14, fontWeight: 800, cursor: (sharingFeed || sharedToFeed) ? "default" : "pointer", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}>{sharedToFeed ? "check_circle" : "campaign"}</span>
+              {sharedToFeed ? "Shared to your feed ✓" : sharingFeed ? "Sharing…" : `Share ${ACTIVITY_LABEL} to feed`}
+            </button>
+            {/* Nudge the highest-reach format */}
+            <Link href="/creator?mode=reel" style={{ display: "block", textAlign: "center", color: "#a7b8b0", fontSize: 12.5, fontWeight: 600, textDecoration: "none", marginBottom: 12 }}>
+              🎬 Or make a Reel of it — short video gets the most reach
+            </Link>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={discardRun} disabled={isSaving} style={{ flex: 1, padding: "14px 0", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", background: "transparent", color: "#555", fontSize: 14, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer" }}>Discard</button>
               <button onClick={saveRun} disabled={isSaving} style={{ flex: 2, padding: "14px 0", borderRadius: 14, border: "none", background: isSaving ? "#1a3d27" : ACCENT, color: isSaving ? "#555" : "#fff", fontSize: 15, fontWeight: 800, cursor: isSaving ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
