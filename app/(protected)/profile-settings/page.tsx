@@ -195,7 +195,7 @@ export default function ProfileSettingsPage() {
           </div>
         </button>
         <input ref={fileRef} type="file" accept="image/*" className="hidden"
-          onChange={(e) => { if (e.target.files?.[0]) handlePhoto(e.target.files[0]); }} />
+          onChange={(e) => { if (e.target.files?.[0]) handlePhoto(e.target.files[0]); e.target.value = ""; }} />
         <p className="mt-2.5 text-sm font-medium" style={{ color: uploading ? "#444" : "#aaa" }}>
           {uploading ? "Uploading…" : "Tap to change photo"}
         </p>

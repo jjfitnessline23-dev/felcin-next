@@ -376,7 +376,7 @@ export default function PodcastsPage() {
               className="w-full px-4 py-3 rounded-xl outline-none text-sm mb-3 resize-none"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#f2f2f2" }} />
             <input ref={fileInputRef} type="file" accept="audio/*" className="hidden"
-              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+              onChange={(e) => { setUploadFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
             <button onClick={() => fileInputRef.current?.click()}
               className="w-full py-4 rounded-xl text-sm mb-4 flex flex-col items-center justify-center gap-2"
               style={{ background: "rgba(124,58,237,0.08)", border: `2px dashed ${uploadFile ? "rgba(124,58,237,0.6)" : "rgba(124,58,237,0.25)"}`, color: uploadFile ? "#a78bfa" : "#555" }}>

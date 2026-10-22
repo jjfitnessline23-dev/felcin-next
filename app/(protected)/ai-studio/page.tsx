@@ -49,11 +49,13 @@ export default function AIStudioPage() {
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file after a block/cancel
     if (!f) return;
     setFile(f);
     setResult(null);
     setError(null);
-    setPreview(URL.createObjectURL(f));
+    setUploadedUrl(null); // new file → force re-moderation + re-upload (don't reuse the prior URL)
+    setPreview((prev) => { if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev); return URL.createObjectURL(f); });
   };
 
   const generate = async () => {

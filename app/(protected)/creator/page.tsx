@@ -41,6 +41,11 @@ async function uploadFile(file: File, uid: string, onProgress: (pct: number) => 
   });
 }
 
+// Time-box an upload so a stalled request can never hang the composer forever.
+function withUploadTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("upload timeout")), ms))]);
+}
+
 // True ONLY when the native media-picker plugin is actually compiled into the app
 // binary. On web, or on an older native build that predates the plugin, this is
 // false and we use the normal file input — calling a missing native plugin can
@@ -53,7 +58,8 @@ export default function CreatorPage() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialMode = (searchParams.get("mode") as Mode) || "post";
+  // Reel-first: short video is the highest-reach format, so default to it.
+  const initialMode = (searchParams.get("mode") as Mode) || "reel";
   const [mode, setMode] = useState<Mode>(initialMode);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -126,16 +132,30 @@ export default function CreatorPage() {
     // Cloudinary is unreachable, so posting never breaks.
     setBgUploading(true); setBgPct(0);
     const promise = (async () => {
+      let cloudErr = "";
       try {
-        const { url } = await uploadToCloudinary(f, () => user.getIdToken(), (pct) => setBgPct(pct));
+        const { url } = await withUploadTimeout(uploadToCloudinary(f, () => user.getIdToken(), (pct) => setBgPct(pct)), 65000);
         return url;
-      } catch {
-        return uploadFile(f, user.uid, (pct) => setBgPct(pct));
+      } catch (e) {
+        cloudErr = e instanceof Error ? e.message : String(e);
+      }
+      // Cloudinary failed or stalled — fall back to Firebase Storage (also time-boxed).
+      try {
+        return await withUploadTimeout(uploadFile(f, user.uid, (pct) => setBgPct(pct)), 90000);
+      } catch (fe) {
+        const fbErr = fe instanceof Error ? fe.message : String(fe);
+        // Surface BOTH failure reasons so we can pinpoint the root cause.
+        throw new Error(`cloud: ${cloudErr || "ok"} | storage: ${fbErr}`);
       }
     })();
     uploadPromiseRef.current = promise;
     promise.then((url) => { setUploadedUrl(url); setBgUploading(false); })
-           .catch(() => { setBgUploading(false); uploadPromiseRef.current = null; });
+           .catch((err: unknown) => {
+             setBgUploading(false);
+             uploadPromiseRef.current = null;
+             const detail = err instanceof Error ? err.message : "";
+             setStatus({ msg: `Couldn't upload that file. (${detail || "unknown error"})`, type: "error" });
+           });
   }, [previewUrl, user]);
 
   // Opens the media picker. On the native app, jumps STRAIGHT to the photo+video
@@ -144,24 +164,39 @@ export default function CreatorPage() {
   // falls back to the normal file input, so this is safe to ship before the app rebuild.
   const openMediaPicker = useCallback(async () => {
     if (!nativePickerAvailable()) { fileRef.current?.click(); return; }
+
+    // The native app loads the REMOTE site (server.url = felcin.com), so the WebView
+    // origin is https. That makes Capacitor.convertFileSrc() file URLs cross-origin,
+    // so fetch()ing the picked file fails — and the old catch below reopened the
+    // picker, which looked like the photo library reopening by itself after you hit
+    // the checkmark. Read the bytes INLINE via readData instead (a data: URL is
+    // same-origin-safe), and only fall back to the OS file input when the PICKER
+    // itself can't open — never after a successful pick.
+    let picked: { data?: string; blob?: Blob; name: string; mimeType: string } | undefined;
     try {
       const { FilePicker } = await import("@capawesome/capacitor-file-picker");
-      const res = await FilePicker.pickMedia({ readData: false });
-      const picked = res.files?.[0];
-      if (!picked) return; // user cancelled
-      let f: File | null = null;
-      if (picked.blob) {
-        f = new File([picked.blob], picked.name, { type: picked.mimeType });
-      } else if (picked.path) {
-        const src = Capacitor.convertFileSrc(picked.path);
-        const blob = await (await fetch(src)).blob();
-        f = new File([blob], picked.name, { type: picked.mimeType || blob.type });
-      }
-      if (f) handleFile(f);
+      const res = await FilePicker.pickMedia({ readData: true });
+      picked = res.files?.[0];
     } catch {
-      // Plugin unavailable (old binary) or error → fall back to the OS file menu.
-      fileRef.current?.click();
+      fileRef.current?.click(); // plugin missing (old binary) or picker failed to open
+      return;
     }
+    if (!picked) return; // user cancelled — do NOT reopen
+
+    let f: File | null = null;
+    try {
+      if (picked.data) {
+        const resp = await fetch(`data:${picked.mimeType};base64,${picked.data}`);
+        f = new File([await resp.blob()], picked.name, { type: picked.mimeType });
+      } else if (picked.blob) {
+        f = new File([picked.blob], picked.name, { type: picked.mimeType });
+      }
+    } catch {
+      f = null;
+    }
+
+    if (f) handleFile(f);
+    else setStatus({ msg: "Couldn't read that photo. Please try another.", type: "error" });
   }, [handleFile]);
   // Keep a ref in sync (assigned during render) so the mount effect can call the
   // latest picker without adding it as a dependency.
@@ -204,7 +239,7 @@ export default function CreatorPage() {
           mediaUrl = await uploadPromiseRef.current;
         } else {
           setStatus({ msg: "Uploading…", type: "info" });
-          mediaUrl = await uploadFile(file, user.uid, (pct) => { setUploadPct(pct); setStatus({ msg: `Uploading ${pct}%…`, type: "info" }); });
+          mediaUrl = await withUploadTimeout(uploadFile(file, user.uid, (pct) => { setUploadPct(pct); setStatus({ msg: `Uploading ${pct}%…`, type: "info" }); }), 90000);
         }
       }
       setStatus({ msg: "Saving…", type: "info" });
@@ -256,7 +291,7 @@ export default function CreatorPage() {
   if (!ready) return (
     <div className="fixed inset-0" style={{ background: "#090909" }}>
       <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
-        onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+        onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
     </div>
   );
 
@@ -269,13 +304,13 @@ export default function CreatorPage() {
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
 
-        {/* Mode tabs */}
+        {/* Mode tabs — reel first (highest-reach format) */}
         <div className="flex p-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
-          {(["post", "reel", "story"] as Mode[]).map((m) => (
+          {(["reel", "post", "story"] as Mode[]).map((m) => (
             <button key={m} onClick={() => setMode(m)}
               className="px-4 py-1.5 text-xs font-semibold border-none cursor-pointer capitalize rounded-full transition-all"
               style={{ background: mode === m ? "#fff" : "transparent", color: mode === m ? "#000" : "#666" }}>
-              {m}
+              {m === "reel" ? "🎬 Reel" : m}
             </button>
           ))}
         </div>
@@ -286,6 +321,13 @@ export default function CreatorPage() {
           Share
         </button>
       </div>
+
+      {/* Reel-first nudge */}
+      {mode === "reel" && (
+        <div className="mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", color: "#a7f3d0" }}>
+          🎬 Reels get the most reach. A quick 15–30s clip — a set, a form tip, your progress — goes way further than a photo.
+        </div>
+      )}
 
       {/* Status banner */}
       {status && (
@@ -304,7 +346,7 @@ export default function CreatorPage() {
           <label className="flex flex-col items-center justify-center gap-5 w-full h-full cursor-pointer" style={{ minHeight: 300 }}
             onClick={(e) => { if (nativePickerAvailable()) { e.preventDefault(); openMediaPicker(); } }}>
             <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
-              onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+              onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
               style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.1)" }}>
               <span className="material-symbols-outlined" style={{ fontSize: 32, color: "#fff" }}>add_a_photo</span>
@@ -343,7 +385,7 @@ export default function CreatorPage() {
               style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
               onClick={(e) => { if (nativePickerAvailable()) { e.preventDefault(); openMediaPicker(); } }}>
               <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden"
-                onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+                onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
               Change
             </label>
           </>

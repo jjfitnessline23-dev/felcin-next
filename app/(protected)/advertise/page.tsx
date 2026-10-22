@@ -242,7 +242,7 @@ export default function AdvertisePage() {
               )}
             </button>
           )}
-          <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+          <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
 
           {/* AI Copy Generator */}
           <button onClick={() => setShowAiPanel(!showAiPanel)}

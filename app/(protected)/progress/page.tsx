@@ -85,6 +85,7 @@ export default function ProgressPage() {
   /* File pick */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file after a block/cancel
     if (!file) return;
     setUploadFile(file);
     const reader = new FileReader();
