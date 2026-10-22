@@ -33,6 +33,8 @@ export async function uploadToCloudinary(
   const result = await new Promise<Record<string, any>>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", endpoint);
+    xhr.timeout = 60000; // never let a stalled upload hang forever — fail over to Firebase
+    xhr.ontimeout = () => reject(new Error("cloudinary timeout"));
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
