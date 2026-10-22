@@ -138,7 +138,14 @@ export async function POST(req: NextRequest) {
 
   const db = app.firestore();
   const anthropic = new Anthropic({ apiKey });
-  const results = { scanned: 0, violations: 0, bans: { "7d": 0, "30d": 0, permanent: 0 }, errors: 0 };
+  const results = { scanned: 0, violations: 0, bans: { "7d": 0, "30d": 0, permanent: 0 }, errors: 0, blockReportsPurged: 0 };
+
+  // Purge "block" reports: blocking is a private user action and should never sit in the
+  // moderation queue. (The client no longer creates these; this clears any legacy/straggler docs.)
+  try {
+    const blockReports = await db.collection("reports").where("type", "==", "block").limit(500).get();
+    for (const d of blockReports.docs) { await d.ref.delete().catch(() => {}); results.blockReportsPurged++; }
+  } catch { /* non-fatal */ }
 
   // Fetch recent unmoderated posts and reels (last 48h)
   const since = admin.firestore.Timestamp.fromDate(new Date(Date.now() - 48 * 60 * 60 * 1000));

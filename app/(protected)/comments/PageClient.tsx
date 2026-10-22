@@ -444,10 +444,9 @@ export default function PageClient() {
       setDoc(doc(db, "users", user.uid, "blocked", post.authorId), { blockedAt: serverTimestamp() }),
       setDoc(doc(db, "users", post.authorId, "blockedBy", user.uid), { blockedAt: serverTimestamp() }),
     ]).catch(() => {});
-    await addDoc(collection(db, "reports"), {
-      type: "block", blockedUid: post.authorId, blockerId: user.uid,
-      postId, createdAt: serverTimestamp(), status: "pending",
-    }).catch(() => {});
+    // NOTE: blocking is a private user action — it must NOT create a moderation report.
+    // (This previously wrote a type:"block" doc into `reports`, flooding the admin queue
+    // with empty, non-actionable entries. Removed.)
     router.replace("/");
   };
 
