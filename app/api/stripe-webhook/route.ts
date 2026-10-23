@@ -200,9 +200,13 @@ export async function POST(req: NextRequest) {
       console.error("Webhook signature failed:", e.message);
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
+  } else if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    // In prod the secret MUST be set — never process unsigned (forgeable) events.
+    console.error("STRIPE_WEBHOOK_SECRET not set in production — rejecting webhook");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   } else {
-    // No secret set — still process (dev mode) but log a warning
-    console.warn("STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
+    // Local dev only — process unsigned events but log a warning.
+    console.warn("STRIPE_WEBHOOK_SECRET not set — skipping signature verification (dev)");
     try { event = JSON.parse(body); }
     catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
   }

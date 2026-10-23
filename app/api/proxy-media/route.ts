@@ -7,7 +7,17 @@ export async function GET(req: NextRequest) {
 
   if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
 
-  if (!url.includes("firebasestorage.googleapis.com") && !url.includes("storage.googleapis.com")) {
+  // Only proxy Felcin's own Storage buckets — not all of storage.googleapis.com
+  // (which would make this an open fetch proxy for every public GCS object).
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return NextResponse.json({ error: "Invalid url" }, { status: 400 }); }
+  const FELCIN_BUCKETS = ["felcin.firebasestorage.app", "felcin.appspot.com"];
+  const allowed =
+    (parsed.hostname === "firebasestorage.googleapis.com" &&
+      FELCIN_BUCKETS.some((b) => parsed.pathname.includes(`/b/${b}/`))) ||
+    (parsed.hostname === "storage.googleapis.com" &&
+      FELCIN_BUCKETS.some((b) => parsed.pathname.startsWith(`/${b}/`)));
+  if (!allowed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

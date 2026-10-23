@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
   const stripe = new Stripe((process.env.STRIPE_SECRET_KEY ?? "").replace(/^﻿/, "").trim(), { httpClient: Stripe.createFetchHttpClient() });
   const db = a.firestore();
   const month = prevMonth();
+  // Dry-run: compute who would be paid and how much, WITHOUT transferring money or
+  // marking anything paid. Trigger with ?dryRun=1. Safe to run anytime.
+  const dryRun = req.nextUrl.searchParams.get("dryRun") === "1";
 
   // Query creators with enough followers — limit to 1000 to avoid full collection scan
   const usersSnap = await db.collection("users").where("followersCount", ">=", MIN_FOLLOWERS).limit(1000).get();
@@ -99,6 +102,11 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    if (dryRun) {
+      results.push({ uid, status: "would_pay", payout: payoutCents });
+      continue;
+    }
+
     try {
       // Transfer from platform balance to creator's Express account
       const transfer = await stripe.transfers.create({
@@ -127,5 +135,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ month, processed: results.length, results });
+  const payable = results.filter((r) => r.status === "paid" || r.status === "would_pay");
+  const totalCents = payable.reduce((sum, r) => sum + (r.payout ?? 0), 0);
+  return NextResponse.json({
+    month,
+    dryRun,
+    processed: results.length,
+    payableCount: payable.length,
+    totalUsd: (totalCents / 100).toFixed(2),
+    results,
+  });
 }
