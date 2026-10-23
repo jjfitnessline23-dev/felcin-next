@@ -96,6 +96,12 @@ async function handlePayment(meta: Record<string, string>, amount: number, sessi
     const tier = meta.tier ?? "standard";
     await activateSubscription(meta.buyerUid, meta.creatorUid, tier, sessionId);
     await recordPayment("subscription", meta, amount, sessionId);
+    // Write the creator's earnings ledger entry SERVER-SIDE (idempotent via sessionId).
+    // Previously this was done client-side, so a closed tab/flaky network lost the row
+    // even though Stripe transferred the money. Creator share = total − 30% platform fee.
+    await writeEarning(meta.creatorUid, sessionId, {
+      type: "subscription", fromUid: meta.buyerUid, tier, amountUsd: amount - Math.round(amount * 0.30),
+    });
     const [email, creatorSnap] = await Promise.all([
       getUserEmail(meta.buyerUid),
       getAdminApp()?.firestore().collection("users").doc(meta.creatorUid).get(),
@@ -145,6 +151,18 @@ async function handlePayment(meta: Record<string, string>, amount: number, sessi
   // ── Gift ──
   if (meta.giftType || meta.recipientUid) {
     await recordPayment("gift", meta, amount, sessionId);
+    // Write the recipient creator's earnings ledger SERVER-SIDE (idempotent via sessionId).
+    // gift-checkout sets the recipient as `hostId` and the share as `creatorShareUsd`.
+    const giftRecipient = meta.recipientUid || meta.hostId;
+    if (giftRecipient) {
+      await writeEarning(giftRecipient, sessionId, {
+        type: "gift",
+        fromUid: meta.fromUid ?? meta.senderUid,
+        giftType: meta.giftType,
+        giftEmoji: meta.giftEmoji,
+        amountUsd: meta.creatorShareUsd ? parseInt(meta.creatorShareUsd, 10) : amount - Math.round(amount * 0.30),
+      });
+    }
     const fromUid = meta.fromUid ?? meta.senderUid;
     const [email, recipientSnap] = await Promise.all([
       fromUid ? getUserEmail(fromUid) : Promise.resolve(null),

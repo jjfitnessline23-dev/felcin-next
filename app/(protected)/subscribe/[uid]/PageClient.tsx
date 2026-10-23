@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { doc, getDoc, setDoc, addDoc, collection, Timestamp } from "@/lib/db";
+import { doc, getDoc, setDoc, Timestamp } from "@/lib/db";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
@@ -57,10 +57,7 @@ export default function SubscribePage() {
           creatorUid: data.creatorUid, tier: data.tier, expiresAt, amountCents: data.amountCents,
           purchasedAt: Timestamp.now(),
         }, { merge: true }).catch(() => {});
-        await addDoc(collection(db, "users", data.creatorUid, "earnings"), {
-          type: "subscription", fromUid: user.uid, tier: data.tier,
-          amountUsd: Math.round(data.amountCents * 0.7), timestamp: Timestamp.now(),
-        }).catch(() => {});
+        // Earnings are written server-side by the Stripe webhook now (reliable + unforgeable).
         setSuccess(true);
       }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,10 +174,7 @@ export default function SubscribePage() {
                 creatorUid, tier: activeTier, expiresAt,
                 amountCents: subPayment.amount, purchasedAt: new Date(), paymentIntentId,
               }, { merge: true });
-              await addDoc(collection(db, "users", creatorUid, "earnings"), {
-                type: "subscription", fromUid: user.uid, tier: activeTier,
-                amountUsd: Math.round(subPayment.amount * 0.7), timestamp: new Date(),
-              });
+              // Earnings are written server-side by the Stripe webhook now (reliable + unforgeable).
               setSuccess(true);
             } catch {}
           }}

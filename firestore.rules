@@ -147,12 +147,10 @@ service cloud.firestore {
       // Earnings — read by creator/admin; validated client writes (tips, subs) + admin
       match /earnings/{docId} {
         allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
-        allow create: if isAuth()
-                      && request.resource.data.fromUid == request.auth.uid
-                      && request.resource.data.amountUsd is number
-                      && request.resource.data.amountUsd > 0
-                      && request.resource.data.amountUsd <= 100000;
-        allow update, delete: if isAdmin();
+        // Server-authoritative: earnings are written only by the Stripe webhook / verify
+        // routes / payout cron via the Admin SDK (which bypasses rules). Clients must NOT
+        // be able to forge earnings, so no client create/update/delete.
+        allow write: if false;
       }
 
       // Monthly view tracking — server-authoritative (written by the record-view

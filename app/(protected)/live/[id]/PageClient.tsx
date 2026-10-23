@@ -246,13 +246,7 @@ export default function StreamViewerPage() {
           priceUsd: data.priceUsd, creatorShareUsd: data.creatorShareUsd,
           sessionId: data.sessionId, timestamp: serverTimestamp(),
         });
-        if (data.hostId && data.creatorShareUsd > 0) {
-          await addDoc(collection(db, "users", data.hostId, "earnings"), {
-            type: "gift", fromUid: user.uid, giftType: data.giftType,
-            giftEmoji: data.giftEmoji, streamId, amountUsd: data.creatorShareUsd,
-            sessionId: data.sessionId, timestamp: serverTimestamp(),
-          });
-        }
+        // Gift earnings are written server-side by the Stripe webhook now (reliable + unforgeable).
         showToast(`${data.giftEmoji} Gift sent!`);
         triggerFly(data.giftEmoji, data.giftType);
       }).catch(() => {});
