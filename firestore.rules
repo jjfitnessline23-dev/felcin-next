@@ -153,6 +153,18 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // PPV media URLs — the real media URL for a paid post is kept here (off the public
+      // post doc) so the paywall can't be bypassed by reading the doc. Readable ONLY by the
+      // author or a user who has actually unlocked that post; written by the author.
+      match /ppvMedia/{postId} {
+        allow read: if isAuth() && (
+          request.auth.uid == userId ||
+          exists(/databases/$(database)/documents/posts/$(postId)/ppvUnlocks/$(request.auth.uid)) ||
+          exists(/databases/$(database)/documents/reels/$(postId)/ppvUnlocks/$(request.auth.uid))
+        );
+        allow write: if isAuth() && request.auth.uid == userId;
+      }
+
       // Monthly view tracking — server-authoritative (written by the record-view
       // route via the Admin SDK). Users must NOT write their own view counts: they
       // feed the creator-fund payout math. Read-only for the owner/admin.

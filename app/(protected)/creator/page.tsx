@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { Capacitor } from "@capacitor/core";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, addDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
+import { collection, addDoc, setDoc, serverTimestamp, Timestamp, getDocs, getDoc, doc, limit, query } from "@/lib/db";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -259,8 +259,16 @@ export default function CreatorPage() {
           authorPhoto = d.photoURL || authorPhoto;
         }
       } catch {}
-      await addDoc(collection(db, col), {
-        authorId: user.uid, authorName, authorPhoto, caption, text: caption, mediaUrl,
+      const ppvCents = ppvPrice !== "" && Number(ppvPrice) > 0 ? Math.round(Number(ppvPrice) * 100) : null;
+      // PPV media must NOT sit on the publicly-readable post doc, or anyone could read the
+      // doc and bypass the paywall. Blank it here and write the real URL into a gated
+      // subcollection (users/{uid}/ppvMedia/{postId}) that only the author or an unlocked
+      // buyer can read (see firestore.rules).
+      const gatePpvMedia = !!ppvCents && !!mediaUrl;
+      const postRef = await addDoc(collection(db, col), {
+        authorId: user.uid, authorName, authorPhoto, caption, text: caption,
+        mediaUrl: gatePpvMedia ? "" : mediaUrl,
+        lockedMedia: gatePpvMedia,
         contentType: mode === "story" ? "story" : mode === "reel" ? "reel" : contentType,
         mimeType, likes: 0, comments: 0,
         status: scheduledAt ? "scheduled" : "published",
@@ -270,13 +278,18 @@ export default function CreatorPage() {
         scheduledAt: scheduledAt ? Timestamp.fromDate(scheduledAt) : null,
         expiresAt: mode === "story" ? Timestamp.fromDate(new Date(Date.now() + 24 * 3600 * 1000)) : null,
         maxViews: mode === "post" && maxViews !== "" ? Number(maxViews) : null,
-        ppvPrice: ppvPrice !== "" && Number(ppvPrice) > 0 ? Math.round(Number(ppvPrice) * 100) : null,
+        ppvPrice: ppvCents,
         viewCount: 0, tags,
         collabUid: mode === "post" && collabUser ? collabUser.uid : null,
         collabName: mode === "post" && collabUser ? collabUser.displayName : null,
         collabPhoto: mode === "post" && collabUser ? collabUser.photoURL : null,
         createdAt: serverTimestamp(),
       });
+      if (gatePpvMedia) {
+        await setDoc(doc(db, "users", user.uid, "ppvMedia", postRef.id), {
+          mediaUrl, contentType, mimeType, createdAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       setStatus({ msg: scheduledAt ? "Scheduled!" : mode === "story" ? "Story shared!" : mode === "reel" ? "Reel shared!" : "Posted!", type: "success" });
       setTimeout(() => router.push(mode === "story" ? "/stories" : "/"), 900);
     } catch (err: unknown) {

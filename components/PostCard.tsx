@@ -37,6 +37,7 @@ interface Post {
   repostOf?: string | null;
   repostOriginalAuthorName?: string | null;
   ppvPrice?: number | null;
+  lockedMedia?: boolean;
   mediaUrlDownload?: string | null;
   thumbnailUrl?: string;
 }
@@ -145,6 +146,23 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
 
   const isLocked = !ppvUnlocked && !!post.ppvPrice && post.authorId !== user?.uid;
 
+  // PPV media is kept OFF the public post doc. The real URL lives in a gated subcollection
+  // (users/{author}/ppvMedia/{postId}) that Firestore rules let only the author or an
+  // unlocked buyer read — so a locked viewer never receives the URL anywhere in the client.
+  const [ppvMediaUrl, setPpvMediaUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!post.ppvPrice || !post.authorId || (post.authorId !== user?.uid && !ppvUnlocked)) { setPpvMediaUrl(null); return; }
+    getDoc(doc(db, "users", post.authorId, "ppvMedia", post.id))
+      .then((s) => setPpvMediaUrl(s.exists() ? ((s.data().mediaUrl as string) || null) : null))
+      .catch(() => setPpvMediaUrl(null));
+  }, [post.ppvPrice, post.authorId, post.id, user?.uid, ppvUnlocked]);
+  // Non-PPV posts use post.mediaUrl directly; PPV posts use the gated URL (empty while locked,
+  // with a legacy fallback to post.mediaUrl for not-yet-migrated posts).
+  const effectiveMediaUrl = post.ppvPrice
+    ? (isLocked ? "" : (ppvMediaUrl || post.mediaUrl || ""))
+    : (post.mediaUrl || "");
+  const hasMedia = !!(effectiveMediaUrl || isLocked || post.lockedMedia || post.mediaUrl);
+
   const buyPPV = async () => {
     if (!user || ppvBuying || !post.ppvPrice) return;
     setPpvBuying(true);
@@ -174,18 +192,18 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const canDelete = user && (user.uid === post.authorId || isOwner);
 
   const handleDownload = async () => {
-    if (!post.mediaUrl) return;
+    if (!effectiveMediaUrl) return;
     setDotMenu(false);
 
-    const isVid = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
+    const isVid = resolveMediaType(post.contentType, post.mimeType, effectiveMediaUrl) === "video";
     const ext = isVid ? "mp4" : "jpg";
     const filename = `felcin-${post.id}.${ext}`;
-    const proxyBase = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
+    const proxyBase = `/api/proxy-media?url=${encodeURIComponent(effectiveMediaUrl)}`;
     const proxyDl = `${proxyBase}&filename=${encodeURIComponent(filename)}&dl=1`;
 
     if (isVid) {
       const vidFilename = `felcin-${post.id}.mp4`;
-      const videoSrc = post.mediaUrlDownload || post.mediaUrl!;
+      const videoSrc = post.mediaUrlDownload || effectiveMediaUrl;
       const isMobile = navigator.maxTouchPoints > 0;
 
       // ── Desktop: direct browser download — no blob buffering, native progress bar ──
@@ -293,7 +311,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !post.mediaUrl) return;
+    if (!v || !effectiveMediaUrl) return;
     v.muted = true;
     v.setAttribute("muted", "");
 
@@ -324,7 +342,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     loadObs.observe(v);
     playObs.observe(v);
     return () => { loadObs.disconnect(); playObs.disconnect(); v.pause(); };
-  }, [post.mediaUrl]);
+  }, [effectiveMediaUrl]);
 
   const mediaType = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl);
   const caption = post.caption || post.text || "";
@@ -444,12 +462,12 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     const postUrl = `${window.location.origin}/comments?postId=${post.id}`;
     const shareTitle = caption || "Check this out on Felcin";
 
-    if (post.mediaUrl && navigator.share) {
-      const isVidPost = resolveMediaType(post.contentType, post.mimeType, post.mediaUrl) === "video";
+    if (effectiveMediaUrl && navigator.share) {
+      const isVidPost = resolveMediaType(post.contentType, post.mimeType, effectiveMediaUrl) === "video";
 
       if (!isVidPost) {
         // Images — watermark then share (fast, stays within iOS gesture window)
-        const proxyBase = `/api/proxy-media?url=${encodeURIComponent(post.mediaUrl)}`;
+        const proxyBase = `/api/proxy-media?url=${encodeURIComponent(effectiveMediaUrl)}`;
         try {
           const res = await fetch(proxyBase);
           if (!res.ok) throw new Error();
@@ -549,7 +567,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         repostOf: post.id,
         repostOriginalAuthorId: post.authorId,
         repostOriginalAuthorName: post.authorName || "User",
-        mediaUrl: post.mediaUrl || null,
+        mediaUrl: post.ppvPrice ? null : (post.mediaUrl || null), // never copy paid PPV media into a repost
         caption: post.caption || post.text || null,
         contentType: post.contentType || null,
         createdAt: serverTimestamp(),
@@ -698,11 +716,11 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
       </div>
 
       {/* Media */}
-      {post.mediaUrl && (
+      {hasMedia && (
         <div className="relative" style={{ background: "#111", overflow: "hidden" }}>
           {isLocked ? (
             <div className="relative w-full flex flex-col items-center justify-center gap-3" style={{ aspectRatio: "1/1", background: "#111" }}>
-              {post.mediaUrl && <img src={post.mediaUrl} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" style={{ filter: "blur(20px) brightness(0.3)" }} />}
+              {/* Locked: no media URL is sent to the client at all (true paywall). */}
               <div className="relative flex flex-col items-center gap-3 px-6 text-center">
                 <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)" }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 28, color: "#fbbf24", fontVariationSettings: "'FILL' 1" }}>lock</span>
@@ -724,7 +742,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
             <div className="relative w-full" style={{ aspectRatio: "1/1" }}>
               <video
                 ref={videoRef}
-                src={post.mediaUrl}
+                src={effectiveMediaUrl}
                 poster={post.thumbnailUrl || undefined}
                 muted loop playsInline preload="none"
                 className="w-full h-full object-cover cursor-pointer"
@@ -749,7 +767,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           ) : (
             <div className="w-full cursor-pointer relative" onClick={() => openLightbox(false)}
               style={{ background: imgLoaded ? "transparent" : "linear-gradient(110deg,#141414 30%,#1c1c1c 50%,#141414 70%)", backgroundSize: "200% 100%", animation: imgLoaded ? "none" : "shimmer 1.4s linear infinite", minHeight: imgLoaded ? undefined : 220 }}>
-              <img src={post.mediaUrl} alt={post.caption || `Post by ${displayName}`}
+              <img src={effectiveMediaUrl} alt={post.caption || `Post by ${displayName}`}
                 className="w-full h-auto block"
                 loading="lazy" decoding="async"
                 onLoad={() => setImgLoaded(true)}
@@ -844,7 +862,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
           {[
             { icon: "ios_share", label: "Share post", action: () => { handleShare(); setDotMenu(false); }, danger: false },
             { icon: "link", label: "Copy link", action: copyLink, danger: false },
-            ...(post.mediaUrl && (isOwner || user?.uid === post.authorId) ? [
+            ...(effectiveMediaUrl && (isOwner || user?.uid === post.authorId) ? [
               { icon: "download", label: "Download media", action: handleDownload, danger: false },
             ] : []),
             ...(!canDelete && user?.uid !== post.authorId ? [
@@ -874,14 +892,14 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     {[
       { open: imgLightbox, close: () => { setImgLightbox(false); setLbComments([]); }, isVideo: false },
       { open: videoLightbox, close: () => { setVideoLightbox(false); setLbComments([]); }, isVideo: true },
-    ].map(({ open, close, isVideo }, idx) => open && mounted && post.mediaUrl && createPortal(
+    ].map(({ open, close, isVideo }, idx) => open && mounted && effectiveMediaUrl && createPortal(
       <div key={idx} className="fixed inset-0" style={{ background: "#000", zIndex: 99999 }}>
 
         {/* Full-screen media */}
         {isVideo
-          ? <video ref={lbVideoRef} src={post.mediaUrl} autoPlay loop playsInline
+          ? <video ref={lbVideoRef} src={effectiveMediaUrl} autoPlay loop playsInline
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-          : <img src={post.mediaUrl} alt={post.caption || `Post by ${displayName}`}
+          : <img src={effectiveMediaUrl} alt={post.caption || `Post by ${displayName}`}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         }
 
