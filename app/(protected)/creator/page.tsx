@@ -244,7 +244,7 @@ export default function CreatorPage() {
       }
       setStatus({ msg: "Saving…", type: "info" });
       const col = mode === "reel" ? "reels" : "posts";
-      const scheduledAt = scheduled && schedTime ? new Date(schedTime) : null;
+      const scheduledAt = scheduled && schedTime && mode !== "story" ? new Date(schedTime) : null;
       const tags = [...new Set((caption.match(/#([a-zA-Z0-9_]+)/g) || []).map((t) => t.slice(1).toLowerCase()))];
       // Denormalize author name+photo onto the post so the feed never has to do
       // a second lookup per author (kills the N+1 read). Prefer the public profile
@@ -425,6 +425,9 @@ export default function CreatorPage() {
             style={{ background: "transparent", border: "none", color: "#f2f2f2", fontSize: 16 }} />
           <div className="text-right px-4 pb-2 text-xs" style={{ color: "#333" }}>{caption.length}/2,200</div>
 
+          {/* Scheduling is not offered for stories — they're ephemeral (expire 24h
+              after creation), so a scheduled story would expire before it published. */}
+          {mode !== "story" && (
           <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#444" }}>schedule</span>
             <label className="text-sm font-medium flex-1 cursor-pointer" style={{ color: "#888" }}>Schedule post</label>
@@ -439,6 +442,7 @@ export default function CreatorPage() {
                 style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "#f2f2f2", colorScheme: "dark" }} />
             )}
           </div>
+          )}
 
           {mode === "post" && (
             <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>

@@ -122,6 +122,12 @@ async function applyViolation(
   return banApplied;
 }
 
+// Vercel Cron invokes the path with GET, so GET must be handled or the job 405s
+// and silently never runs. Delegate to the POST handler.
+export async function GET(req: NextRequest) {
+  return POST(req);
+}
+
 export async function POST(req: NextRequest) {
   // Verify Vercel cron secret
   const authHeader = req.headers.get("authorization");

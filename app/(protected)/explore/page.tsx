@@ -120,7 +120,12 @@ export default function ExplorePage() {
         } else {
           const tag = q.replace(/^#/, "").toLowerCase();
           const snap = await getDocs(query(collection(db, "posts"), where("tags", "array-contains", tag), orderBy("createdAt", "desc"), limit(30)));
-          setSearchPosts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PostResult, "id">) })));
+          setSearchPosts(snap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<PostResult, "id">) }))
+            .filter((p) => {
+              const x = p as { mediaUrl?: string; isStory?: boolean; status?: string; maxViews?: number | null; viewCount?: number };
+              return x.mediaUrl && !x.isStory && x.status !== "scheduled" && (x.maxViews == null || (x.viewCount ?? 0) < x.maxViews);
+            }));
         }
       } catch {}
       setSearchLoading(false);

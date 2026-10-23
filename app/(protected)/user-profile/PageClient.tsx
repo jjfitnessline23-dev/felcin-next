@@ -175,7 +175,7 @@ export default function UserProfilePage() {
       [...authorSnap.docs, ...collabSnap.docs].forEach((d) => {
         if (!seen.has(d.id)) { seen.add(d.id); all.push({ id: d.id, ...(d.data() as Omit<Post, "id">) }); }
       });
-      setPosts(all.filter((p) => p.mediaUrl && !p.isStory).sort((a, b) => ((b as any).createdAt?.seconds ?? 0) - ((a as any).createdAt?.seconds ?? 0)));
+      setPosts(all.filter((p) => p.mediaUrl && !p.isStory && (p as { status?: string }).status !== "scheduled").sort((a, b) => ((b as any).createdAt?.seconds ?? 0) - ((a as any).createdAt?.seconds ?? 0)));
     }).catch(() => {});
 
     // Fetch this creator's reels (own collection — they never showed on the profile before)
@@ -183,7 +183,7 @@ export default function UserProfilePage() {
       .then((snap) => {
         const rs = snap.docs
           .map((d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) }))
-          .filter((r) => (r as { mediaUrl?: string }).mediaUrl && !(r as { isRepost?: boolean }).isRepost)
+          .filter((r) => (r as { mediaUrl?: string }).mediaUrl && !(r as { isRepost?: boolean }).isRepost && (r as { status?: string }).status !== "scheduled")
           .sort((a, b) => (((b as Record<string, { seconds?: number }>).createdAt?.seconds) ?? 0) - (((a as Record<string, { seconds?: number }>).createdAt?.seconds) ?? 0))
           .map((r) => ({ id: r.id, mediaUrl: (r as { mediaUrl?: string }).mediaUrl, caption: (r as { caption?: string }).caption, thumbnailUrl: (r as { thumbnailUrl?: string }).thumbnailUrl }));
         setReels(rs);

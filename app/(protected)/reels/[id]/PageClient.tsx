@@ -47,7 +47,8 @@ export default function ReelDetailPage() {
   // Fetch the reel + the author's current profile.
   useEffect(() => {
     getDoc(doc(db, "reels", reelId)).then((snap) => {
-      if (snap.exists()) {
+      // Treat a still-scheduled reel as not-found so it isn't viewable before publish.
+      if (snap.exists() && (snap.data() as { status?: string }).status !== "scheduled") {
         const data = { id: snap.id, ...(snap.data() as Omit<Reel, "id">) };
         setReel(data);
         setLikeCount(typeof data.likes === "number" ? data.likes : 0);

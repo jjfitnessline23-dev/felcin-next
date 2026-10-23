@@ -37,7 +37,10 @@ async function publishDue(): Promise<{ body: Record<string, unknown>; status: nu
       if (schedAt && schedAt.toMillis() > now.toMillis()) continue;
       await d.ref.update({
         status: "published",
-        createdAt: schedAt ?? now, // re-date to the intended publish time
+        // Re-date to the PUBLISH moment (now), not the scheduled time — a scheduled
+        // time in the past would bury the post below the feed's first page and it
+        // would never be seen. scheduledAt is kept for the record.
+        createdAt: now,
         publishedAt: now,
       }).catch(() => {});
       if (col === "posts") posts++; else reels++;

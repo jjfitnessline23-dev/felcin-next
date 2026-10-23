@@ -96,7 +96,16 @@ service cloud.firestore {
     match /users/{userId} {
       // FIX: require auth to read — prevents unauthenticated access to emails
       allow read: if isAuth();
-      allow create, update: if isAuth() && request.auth.uid == userId;
+      allow create: if isAuth() && request.auth.uid == userId;
+      // Owner may update their own profile, but NOT the server-authoritative fields
+      // (ban state + the follower/view counters that gate creator-fund payouts).
+      // Those are written only by the Admin SDK (follow/record-view/moderation routes).
+      allow update: if isAuth() && (
+        isAdmin() ||
+        (request.auth.uid == userId
+         && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['banned','banType','banUntil','followersCount','followingCount','totalViews','violations']))
+      );
       allow delete: if isAuth() && (request.auth.uid == userId || isAdmin());
 
       // Public profile — readable by all authenticated users
@@ -146,10 +155,12 @@ service cloud.firestore {
         allow update, delete: if isAdmin();
       }
 
-      // Monthly view tracking — only the owner or admin can write
+      // Monthly view tracking — server-authoritative (written by the record-view
+      // route via the Admin SDK). Users must NOT write their own view counts: they
+      // feed the creator-fund payout math. Read-only for the owner/admin.
       match /monthlyViews/{month} {
         allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
-        allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow write: if isAdmin();
       }
 
       // Private subcollections — owner-only read/write

@@ -79,6 +79,7 @@ export default function StoriesStrip() {
         .map((d) => ({ id: d.id, ...(d.data() as Omit<Story, "id">) }))
         .filter((s) => {
           if (!(s as unknown as Record<string, unknown>)["isStory"]) return false;
+          if ((s as unknown as Record<string, unknown>)["status"] === "scheduled") return false;
           if (!s.expiresAt) return true;
           return s.expiresAt.seconds * 1000 > now;
         });

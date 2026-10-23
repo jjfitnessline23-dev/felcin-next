@@ -25,17 +25,30 @@ function prevMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// Vercel Cron invokes the path with GET (Authorization: Bearer $CRON_SECRET), so GET
+// must be handled or the monthly payout job 405s and never runs. Delegate to POST.
+export async function GET(req: NextRequest) {
+  return POST(req);
+}
+
 export async function POST(req: NextRequest) {
-  // Payout secret is REQUIRED — endpoint is closed if env var is missing
-  const secret = process.env.PAYOUT_SECRET;
-  if (!secret) {
-    console.error("PAYOUT_SECRET not configured — endpoint disabled");
+  // Accept EITHER the manual PAYOUT_SECRET or Vercel Cron's CRON_SECRET. Endpoint is
+  // closed if neither is configured. (Payout is idempotent per month via monthlyViews.paid.)
+  const payoutSecret = process.env.PAYOUT_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
+  if (!payoutSecret && !cronSecret) {
+    console.error("Neither PAYOUT_SECRET nor CRON_SECRET configured — endpoint disabled");
     return NextResponse.json({ error: "Endpoint not configured" }, { status: 503 });
   }
   const auth = req.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  // Timing-safe comparison prevents brute-force timing attacks
-  if (auth.length !== expected.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(expected))) {
+  // Timing-safe comparison against each configured secret.
+  const ok = [payoutSecret, cronSecret]
+    .filter((s): s is string => !!s)
+    .map((s) => `Bearer ${s}`)
+    .some((expected) =>
+      auth.length === expected.length && timingSafeEqual(Buffer.from(auth), Buffer.from(expected))
+    );
+  if (!ok) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -85,7 +85,7 @@ export default function ReelsPage() {
 
   useEffect(() => {
     getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), limit(REEL_PAGE))).then(async (snap) => {
-      const raw: Reel[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })).filter((r) => r.mediaUrl);
+      const raw: Reel[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })).filter((r) => r.mediaUrl && (r as { status?: string }).status !== "scheduled");
       const enriched = await enrichReels(raw);
       setReels(enriched);
       setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
@@ -103,7 +103,7 @@ export default function ReelsPage() {
     loadingMoreRef.current = true;
     try {
       const snap = await getDocs(query(collection(db, "reels"), orderBy("createdAt", "desc"), startAfter(lastDoc), limit(REEL_PAGE)));
-      const raw: Reel[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })).filter((r) => r.mediaUrl);
+      const raw: Reel[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reel, "id">) })).filter((r) => r.mediaUrl && (r as { status?: string }).status !== "scheduled");
       const enriched = await enrichReels(raw);
       setReels((prev) => { const ids = new Set(prev.map((r) => r.id)); return [...prev, ...enriched.filter((r) => !ids.has(r.id))]; });
       setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
