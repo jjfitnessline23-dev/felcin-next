@@ -5,7 +5,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div style={{ background: "#090909", minHeight: "100dvh", color: "#f2f2f2", fontFamily: "var(--font-manrope, system-ui, sans-serif)", display: "flex", flexDirection: "column" }}>
-      <nav style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <nav style={{ padding: "calc(env(safe-area-inset-top, 0px) + 14px) 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,var(--fx-accent),var(--fx-accent-dk))", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ color: "#fff", fontWeight: 900, fontSize: 13 }}>F</span></div>
           <span style={{ fontWeight: 800, fontSize: 17 }}>Felcin</span>

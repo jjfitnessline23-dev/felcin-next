@@ -19,7 +19,7 @@ export interface FeatureUpsellProps {
 export default function FeatureUpsell({ icon, color, label, title, body, points, showPricing }: FeatureUpsellProps) {
   return (
     <div style={{ background: "#090909", minHeight: "100dvh", fontFamily: "var(--font-manrope, system-ui, sans-serif)", color: "#f2f2f2" }}>
-      <nav style={{ position: "sticky", top: 0, zIndex: 50, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", background: "rgba(9,9,9,0.85)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <nav style={{ position: "sticky", top: 0, zIndex: 50, padding: "calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", background: "rgba(9,9,9,0.85)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,var(--fx-accent),var(--fx-accent-dk))", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ color: "#fff", fontWeight: 900, fontSize: 13 }}>F</span></div>
           <span style={{ color: "#f2f2f2", fontWeight: 800, fontSize: 17 }}>Felcin</span>

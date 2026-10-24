@@ -22,7 +22,7 @@ export default function MarketingHome() {
   return (
     <div style={{ background: "#090909", minHeight: "100dvh", fontFamily: "var(--font-manrope, system-ui, sans-serif)" }}>
       {/* Nav */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", background: "rgba(9,9,9,0.85)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, padding: "calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", background: "rgba(9,9,9,0.85)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,var(--fx-accent),var(--fx-accent-dk))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: "#fff", fontWeight: 900, fontSize: 14 }}>F</span>
@@ -37,7 +37,7 @@ export default function MarketingHome() {
       </nav>
 
       {/* Hero */}
-      <section style={{ padding: "120px 20px 56px", textAlign: "center", background: "linear-gradient(180deg, rgba(var(--fx-accent-rgb),0.08) 0%, transparent 60%)", position: "relative", overflow: "hidden" }}>
+      <section style={{ padding: "calc(env(safe-area-inset-top, 0px) + 88px) 20px 44px", textAlign: "center", background: "linear-gradient(180deg, rgba(var(--fx-accent-rgb),0.08) 0%, transparent 60%)", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 600, height: 400, background: "radial-gradient(ellipse, rgba(var(--fx-accent-rgb),0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
         <div style={{ position: "relative", maxWidth: 600, margin: "0 auto" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 50, background: "rgba(var(--fx-accent-rgb),0.1)", border: "1px solid rgba(var(--fx-accent-rgb),0.25)", marginBottom: 24 }}>
