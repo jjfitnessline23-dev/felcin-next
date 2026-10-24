@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const uid = await verifyToken(req.headers.get("authorization") ?? body?.token);
   if (!uid) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   if (!await rateLimit(`ad:${uid}`, 5, 60_000)) {
-    return NextResponse.json({ error: "Too many requests â€” slow down" }, { status: 429 });
+    return NextResponse.json({ error: "Too many requests — slow down" }, { status: 429 });
   }
 
   const session = await stripe.checkout.sessions.create({
@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
         currency: "usd",
         unit_amount: tierData.price,
         product_data: {
-          name: `Felcin Ad â€” ${tierData.label} (${tierData.impressions.toLocaleString()} impressions)`,
-          description: `${tierData.days} days Â· ${tierData.impressions.toLocaleString()} guaranteed impressions`,
+          name: `Felcin Ad — ${tierData.label} (${tierData.impressions.toLocaleString()} impressions)`,
+          description: `${tierData.days} days · ${tierData.impressions.toLocaleString()} guaranteed impressions`,
         },
       },
       quantity: 1,

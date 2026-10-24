@@ -61,7 +61,7 @@ export default function SupportPage() {
         </div>
 
         <p style={{ color: "#555", fontSize: 13, marginTop: 40 }}>
-          Â© {new Date().getFullYear()} Felcin. All rights reserved. Â·{" "}
+          © {new Date().getFullYear()} Felcin. All rights reserved. ·{" "}
           <a href="/privacy" style={{ color: "#666", textDecoration: "none" }}>Privacy Policy</a>
         </p>
       </div>

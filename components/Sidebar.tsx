@@ -182,27 +182,34 @@ export default function Sidebar() {
         <a href="/guidelines" target="_blank" className="text-xs" style={{ color: "#2a2a2a", textDecoration: "none" }}>Guidelines</a>
       </div>
 
-      {/* Profile footer */}
+      {/* Profile footer — signed-in: profile + sign out. Guest: log in / sign up. */}
       <div className="p-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center gap-2 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
-          <Link href="/profile" className="flex items-center gap-2.5 flex-1 min-w-0">
-            {photoURL ? (
-              <img src={photoURL} alt="" width={34} height={34} className="rounded-full object-cover shrink-0" style={{ width: 34, height: 34 }} />
-            ) : (
-              <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ width: 34, height: 34, background: "#222", color: "#888" }}>
-                {initial}
+        {user ? (
+          <div className="flex items-center gap-2 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
+            <Link href="/profile" className="flex items-center gap-2.5 flex-1 min-w-0">
+              {photoURL ? (
+                <img src={photoURL} alt="" width={34} height={34} className="rounded-full object-cover shrink-0" style={{ width: 34, height: 34 }} />
+              ) : (
+                <div className="rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ width: 34, height: 34, background: "#222", color: "#888" }}>
+                  {initial}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{displayName}</div>
+                <div className="text-xs" style={{ color: "#444" }}>View profile</div>
               </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold truncate" style={{ color: "#f2f2f2" }}>{displayName}</div>
-              <div className="text-xs" style={{ color: "#444" }}>View profile</div>
-            </div>
-          </Link>
-          <button onClick={handleSignOut} title="Sign out"
-            className="icon-btn btn-glass shrink-0" style={{ width: 30, height: 30, borderRadius: "50%" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>logout</span>
-          </button>
-        </div>
+            </Link>
+            <button onClick={handleSignOut} title="Sign out"
+              className="icon-btn btn-glass shrink-0" style={{ width: 30, height: 30, borderRadius: "50%" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17, color: "#666" }}>logout</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Link href="/login" className="text-center text-sm font-bold rounded-xl" style={{ padding: "11px 0", background: "var(--fx-accent)", color: "#000", textDecoration: "none" }}>Create free account</Link>
+            <Link href="/login" className="text-center text-sm font-semibold rounded-xl" style={{ padding: "10px 0", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#ddd", textDecoration: "none" }}>Log in</Link>
+          </div>
+        )}
       </div>
     </aside>
   );

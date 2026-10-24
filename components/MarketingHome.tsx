@@ -31,6 +31,7 @@ export default function MarketingHome() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Link href="/explore" style={{ padding: "8px 14px", borderRadius: 20, color: "#bbb", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Browse</Link>
+          <Link href="/pricing" style={{ padding: "8px 14px", borderRadius: 20, color: "#bbb", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Pricing</Link>
           <Link href="/login" style={{ padding: "8px 18px", borderRadius: 20, background: "var(--fx-accent)", color: "#000", fontSize: 13, fontWeight: 800, textDecoration: "none" }}>Sign in</Link>
         </div>
       </nav>
@@ -123,8 +124,11 @@ export default function MarketingHome() {
           </div>
           <div style={{ padding: "20px 18px", borderRadius: 18, background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}>
             <p style={{ fontSize: 14, fontWeight: 800, color: "#fbbf24", margin: "0 0 6px" }}>Creator badges</p>
-            <p style={{ fontSize: 13, color: "#777", margin: 0, lineHeight: 1.55 }}>A monthly subscription for creators who want to monetize their audience.</p>
+            <p style={{ fontSize: 13, color: "#777", margin: 0, lineHeight: 1.55 }}>One-time profile badges from $1.99, plus creator subscriptions and Premium.</p>
           </div>
+        </div>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <Link href="/pricing" style={{ color: "var(--fx-accent)", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>See full pricing →</Link>
         </div>
       </section>
 
@@ -144,7 +148,8 @@ export default function MarketingHome() {
         <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
           {[
             { href: "/about", label: "About" },
-            { href: "/support", label: "Help" },
+            { href: "/pricing", label: "Pricing" },
+            { href: "/help", label: "Help" },
             { href: "/terms", label: "Terms" },
             { href: "/privacy", label: "Privacy" },
             { href: "/guidelines", label: "Community Guidelines" },

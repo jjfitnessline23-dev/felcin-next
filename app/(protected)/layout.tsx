@@ -131,7 +131,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#090909" }}>
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-4" style={{ background: "#090909" }}>
+        <span style={{ fontWeight: 900, fontSize: 26, letterSpacing: "-0.5px", background: "linear-gradient(135deg,var(--fx-accent),var(--fx-accent-2))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Felcin</span>
         <div className="spinner" />
       </div>
     );
