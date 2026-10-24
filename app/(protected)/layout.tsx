@@ -15,6 +15,7 @@ import ChristmasTheme from "@/components/ChristmasTheme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import MarketingHome from "@/components/MarketingHome";
 
 // Pages that must never be the first thing painted on a cold app open
 const COLD_START_RESET = ["/creator", "/stories", "/live/", "/run"];
@@ -138,6 +139,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   // A logged-out visitor on a public browse surface renders the app as a guest.
   const guest = !user && isPublicBrowse(pathname);
+  // Logged-out home: show the marketing homepage (full-bleed, no app chrome) with a
+  // "Browse the feed" CTA. Signed-in users fall through to the real feed below.
+  if (guest && pathname === "/") {
+    return <MarketingHome />;
+  }
   // On a private page while logged-out/banned/unverified, the redirect above is firing —
   // paint a blank dark screen until it completes.
   if (!guest && (!user || banned || !canAccessApp(user))) {
