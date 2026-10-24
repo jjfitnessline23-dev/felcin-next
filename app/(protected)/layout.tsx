@@ -16,6 +16,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { deriveNameFromEmail } from "@/lib/nameUtils";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import MarketingHome from "@/components/MarketingHome";
+import FeatureUpsell, { type FeatureUpsellProps } from "@/components/FeatureUpsell";
 
 // Pages that must never be the first thing painted on a cold app open
 const COLD_START_RESET = ["/creator", "/stories", "/live/", "/run"];
@@ -26,6 +27,18 @@ const COLD_START_RESET = ["/creator", "/stories", "/live/", "/run"];
 const PUBLIC_BROWSE = ["/explore", "/reels", "/search", "/tag", "/comments", "/user-profile", "/stories"];
 function isPublicBrowse(path: string) {
   return path === "/" || PUBLIC_BROWSE.some((p) => path === p || path.startsWith(p + "/"));
+}
+
+// Gated features show a logged-out visitor an explainer + signup CTA instead of
+// silently bouncing them to /login.
+const FEATURE_GATES: Record<string, FeatureUpsellProps> = {
+  "/ghost": { icon: "sprint", color: "#f97316", label: "Ghost Workouts", title: "Train with the ghost.", body: "Pick a creator's pre-recorded session and train alongside it in real time — same exercises, same pace, same timer. No guessing what's next, no training alone.", points: ["Follow the session rep by rep", "Keep your streak alive automatically", "New Ghost Workouts from creators you follow"] },
+  "/challenges": { icon: "emoji_events", color: "#fbbf24", label: "Challenges", title: "Compete. Beat your PRs.", body: "Join community fitness challenges, climb the leaderboard, and push each other to new personal records.", points: ["Community distance, streak & workout challenges", "Live leaderboards", "Earn bragging rights and PRs"] },
+  "/badges": { icon: "verified", color: "#22d3ee", label: "Badges", title: "Earn your badges.", body: "Show verification and creator badges on your profile, and unlock the tools to monetize your audience.", points: ["Profile badges that make you stand out", "Creator monetization tools", "Tips, subscriptions & premium content"], showPricing: true },
+  "/settings": { icon: "workspace_premium", color: "#fbbf24", label: "Premium", title: "Go Premium.", body: "Unlock premium Ghost Workouts and premium features across Felcin — $9.99/month or $79.99/year.", points: ["Premium Ghost Workouts from top creators", "Premium features across the platform", "Cancel anytime"], showPricing: true },
+};
+function featureGate(path: string): FeatureUpsellProps | null {
+  return FEATURE_GATES[path] ?? null;
 }
 
 // Synchronous cold-start check — runs during render, before any paint
@@ -54,9 +67,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      // Logged-out: allow read-only browsing of the public surfaces; private/action
-      // pages still bounce to sign-in.
-      if (!isPublicBrowse(pathname)) router.replace("/login");
+      // Logged-out: allow read-only browsing of public surfaces and show feature
+      // explainers on gated routes; everything else bounces to sign-in.
+      if (!isPublicBrowse(pathname) && !featureGate(pathname)) router.replace("/login");
       return;
     }
     if (banned) {
@@ -138,6 +151,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // Logged-out feature explainer (Ghost/Challenges/Badges/Premium) — full-bleed upsell
+  // instead of a silent bounce to /login.
+  const gate = !user ? featureGate(pathname) : null;
+  if (gate) {
+    return <FeatureUpsell {...gate} />;
+  }
   // A logged-out visitor on a public browse surface renders the app as a guest.
   const guest = !user && isPublicBrowse(pathname);
   // Logged-out home: show the marketing homepage (full-bleed, no app chrome) with a
