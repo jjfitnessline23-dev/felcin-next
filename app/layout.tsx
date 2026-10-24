@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import SplashAnimation from "@/components/SplashAnimation";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -185,6 +186,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           {children}
         </AuthProvider>
+        <SplashAnimation />
       </body>
     </html>
   );
