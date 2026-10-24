@@ -374,7 +374,7 @@ setError(
           <a href="/terms" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Terms</a>
           <a href="/privacy" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Privacy</a>
           <a href="/guidelines" target="_blank" className="text-xs" style={{ color: "#444", textDecoration: "none" }}>Guidelines</a>
-          <span className="text-xs" style={{ color: "#2a2a2a" }}>© {new Date().getFullYear()} Felcin</span>
+          <span className="text-xs" style={{ color: "#2a2a2a" }}>{`© ${new Date().getFullYear()} Felcin`}</span>
         </div>
       </div>
     </div>

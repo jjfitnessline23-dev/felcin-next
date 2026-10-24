@@ -144,13 +144,26 @@ export async function POST(req: NextRequest) {
 
   const db = app.firestore();
   const anthropic = new Anthropic({ apiKey });
-  const results = { scanned: 0, violations: 0, bans: { "7d": 0, "30d": 0, permanent: 0 }, errors: 0, blockReportsPurged: 0 };
+  const results = { scanned: 0, violations: 0, bans: { "7d": 0, "30d": 0, permanent: 0 }, errors: 0, blockReportsPurged: 0, spamPurged: 0 };
 
   // Purge "block" reports: blocking is a private user action and should never sit in the
   // moderation queue. (The client no longer creates these; this clears any legacy/straggler docs.)
   try {
     const blockReports = await db.collection("reports").where("type", "==", "block").limit(500).get();
     for (const d of blockReports.docs) { await d.ref.delete().catch(() => {}); results.blockReportsPurged++; }
+  } catch { /* non-fatal */ }
+
+  // Auto-purge known off-topic spam by hashtag (runs hourly via Admin SDK). Keeps the
+  // public feed fitness-only for logged-out visitors, and removes items regardless of age
+  // (the main scan below only looks at the last 48h). Add tags to SPAM_TAGS as needed.
+  const SPAM_TAGS = ["drivoagent"];
+  try {
+    for (const col of ["posts", "reels"] as const) {
+      for (const tag of SPAM_TAGS) {
+        const spam = await db.collection(col).where("tags", "array-contains", tag).limit(300).get();
+        for (const d of spam.docs) { await d.ref.delete().catch(() => {}); results.spamPurged++; }
+      }
+    }
   } catch { /* non-fatal */ }
 
   // Fetch recent unmoderated posts and reels (last 48h)

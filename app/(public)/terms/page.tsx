@@ -61,13 +61,14 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#f1f1f1", marginBottom: 10 }}>6. Badge Subscriptions & Payments</h2>
-            <p style={{ marginBottom: 10 }}>Creator badges are billed monthly. By subscribing, you authorize recurring charges to your payment method. All payments are processed securely by Stripe.</p>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#f1f1f1", marginBottom: 10 }}>6. Payments & Subscriptions</h2>
+            <p style={{ marginBottom: 10 }}>All payments are processed securely by Stripe. Profile badges, tips, pay-per-view content, and gifts are one-time purchases — your payment method is charged once. Felcin Premium and creator subscriptions are recurring subscriptions that renew automatically until you cancel.</p>
             <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
-              <li>Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date</li>
-              <li>Refunds are not issued for partial billing periods</li>
-              <li>Prices are subject to change with 30 days' notice</li>
-              <li>Badges and perks are for the account holder only and non-transferable</li>
+              <li>One-time purchases (badges, tips, pay-per-view, gifts) are charged a single time and are final</li>
+              <li>Recurring subscriptions (Premium and creator subscriptions) auto-renew unless cancelled before the renewal date; you can cancel anytime in Settings</li>
+              <li>Prices are shown at checkout and may change over time</li>
+              <li>Purchases are for the account holder only and non-transferable</li>
+              <li>For billing questions, contact <a href="mailto:support@felcin.com" style={{ color: "#aaa" }}>support@felcin.com</a></li>
             </ul>
           </section>
 
