@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   doc, updateDoc, increment, arrayUnion, arrayRemove,
   getDoc, setDoc, deleteDoc, serverTimestamp, addDoc, collection,
@@ -164,7 +165,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const hasMedia = !!(effectiveMediaUrl || isLocked || post.lockedMedia || post.mediaUrl);
 
   const buyPPV = async () => {
-    if (!user || ppvBuying || !post.ppvPrice) return;
+    if (!user) { requireLogin(); return; }
+    if (ppvBuying || !post.ppvPrice) return;
     setPpvBuying(true);
     try {
       const token = await user.getIdToken();
@@ -188,6 +190,9 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const [boosting, setBoosting] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  const router = useRouter();
+  // Logged-out visitors can browse, but any write action sends them to sign-in.
+  const requireLogin = () => { router.push("/login"); };
   const isOwner = user && OWNER_UIDS.includes(user.uid);
   const canDelete = user && (user.uid === post.authorId || isOwner);
 
@@ -383,7 +388,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   };
 
   const sendLbComment = async () => {
-    if (!lbText.trim() || !user || lbSending) return;
+    if (!user) { requireLogin(); return; }
+    if (!lbText.trim() || lbSending) return;
     setLbSending(true);
     const t = lbText.trim();
     const col = post.contentType === "reel" ? "reels" : "posts";
@@ -404,7 +410,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   };
 
   const handleLike = async () => {
-    if (!user || liking) return;
+    if (!user) { requireLogin(); return; }
+    if (liking) return;
     setLiking(true);
     const newLiked = !liked;
     setLiked(newLiked);
@@ -439,7 +446,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   };
 
   const handleBookmark = async () => {
-    if (!user || bookmarking) return;
+    if (!user) { requireLogin(); return; }
+    if (bookmarking) return;
     setBookmarking(true);
     const ref = doc(db, "users", user.uid, "bookmarks", post.id);
     const newBookmarked = !bookmarked;
@@ -556,7 +564,8 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   };
 
   const handleRepost = async () => {
-    if (!user || reposting || reposted || post.isRepost) return;
+    if (!user) { requireLogin(); return; }
+    if (reposting || reposted || post.isRepost) return;
     setReposting(true);
     try {
       await addDoc(collection(db, "posts"), {

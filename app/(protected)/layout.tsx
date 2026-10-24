@@ -19,6 +19,14 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 // Pages that must never be the first thing painted on a cold app open
 const COLD_START_RESET = ["/creator", "/stories", "/live/", "/run"];
 
+// Felcin has no separate public marketing page, so the app itself is the landing: a
+// logged-out visitor may BROWSE these surfaces read-only. Everything else (creator,
+// settings, earnings, chats, onboarding, etc.) still requires sign-in.
+const PUBLIC_BROWSE = ["/explore", "/reels", "/search", "/tag", "/comments", "/user-profile", "/stories"];
+function isPublicBrowse(path: string) {
+  return path === "/" || PUBLIC_BROWSE.some((p) => path === p || path.startsWith(p + "/"));
+}
+
 // Synchronous cold-start check — runs during render, before any paint
 function useColdStartGuard(pathname: string) {
   if (typeof window === "undefined") return false;
@@ -45,7 +53,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/login");
+      // Logged-out: allow read-only browsing of the public surfaces; private/action
+      // pages still bounce to sign-in.
+      if (!isPublicBrowse(pathname)) router.replace("/login");
       return;
     }
     if (banned) {
@@ -126,10 +136,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     );
   }
 
-  // Not authenticated — redirect is already firing in the useEffect above.
-  // Show a plain dark screen instead of the spinner so the user doesn't see
-  // a stuck spinner while the router.replace('/login') navigation completes.
-  if (!user || banned || !canAccessApp(user)) {
+  // A logged-out visitor on a public browse surface renders the app as a guest.
+  const guest = !user && isPublicBrowse(pathname);
+  // On a private page while logged-out/banned/unverified, the redirect above is firing —
+  // paint a blank dark screen until it completes.
+  if (!guest && (!user || banned || !canAccessApp(user))) {
     return <div className="fixed inset-0" style={{ background: "#090909" }} />;
   }
 
