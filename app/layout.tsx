@@ -3,6 +3,7 @@ import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import SplashAnimation from "@/components/SplashAnimation";
+import ViewTracker from "@/components/ViewTracker";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -183,10 +184,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ` }} />
       </head>
       <body className={`${manrope.variable} antialiased`} style={{ fontFamily: "var(--font-manrope), system-ui, sans-serif" }}>
+        {/* SEO: structured data for rich results */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "Felcin",
+            applicationCategory: "HealthApplication",
+            operatingSystem: "iOS, Android, Web",
+            url: "https://www.felcin.com",
+            description: "Felcin is the fitness social app where you log workouts, follow athletes, and train alongside creators in real time.",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            publisher: { "@type": "Organization", name: "Felcin", url: "https://www.felcin.com", logo: "https://www.felcin.com/logo512.png" },
+          }) }}
+        />
         <AuthProvider>
           {children}
         </AuthProvider>
         <SplashAnimation />
+        <ViewTracker />
       </body>
     </html>
   );
