@@ -393,10 +393,12 @@ export default function AdminPortalPage() {
 
   // Auto-load workouts once admin is confirmed
   useEffect(() => {
-    if (workoutsLoaded || loadingWorkouts) return;
+    // Lazy: only load the heavy workoutLogs collection-group query when the tab is open,
+    // so the admin panel doesn't freeze on open loading hundreds of docs up front.
+    if (tab !== "workouts" || workoutsLoaded || loadingWorkouts) return;
     if (!user || !OWNER_UIDS.includes(user.uid)) return;
     loadWorkouts();
-  }, [!!user, workoutsLoaded]); // eslint-disable-line
+  }, [tab, !!user, workoutsLoaded]); // eslint-disable-line
 
   const loadRuns = () => {
     if (loadingRuns) return;
@@ -422,10 +424,12 @@ export default function AdminPortalPage() {
   };
 
   useEffect(() => {
-    if (runsLoaded || loadingRuns) return;
+    // Lazy: only load the heavy runningRoutes collection-group (500 docs WITH GPS
+    // coordinate arrays) when the Runs tab is open — this was freezing the whole panel.
+    if (tab !== "runs" || runsLoaded || loadingRuns) return;
     if (!user || !OWNER_UIDS.includes(user.uid)) return;
     loadRuns();
-  }, [!!user, runsLoaded]); // eslint-disable-line
+  }, [tab, !!user, runsLoaded]); // eslint-disable-line
 
   const loadStripeStats = async () => {
     if (loadingStats) return;

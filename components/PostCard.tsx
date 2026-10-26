@@ -124,6 +124,9 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
   const { user } = useAuth();
   const [liked, setLiked] = useState(Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || ""));
   const [likeCount, setLikeCount] = useState(typeof post.likes === "number" ? post.likes : 0);
+  // Tracks a just-made like/unlike so a stale in-flight refresh can't revert it, while
+  // still letting fresh server data re-seed state (fixes "likes disappear after refresh").
+  const pendingLikeRef = useRef<boolean | null>(null);
   const [imgBroken, setImgBroken] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [videoMuted, setVideoMuted] = useState(true);
@@ -299,14 +302,21 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     }
   };
 
-  // Initialize like state when this card first shows a given post. Deliberately keyed
-  // on post.id (not post.likedBy/likes) so a stale feed refresh of the SAME post can't
-  // overwrite a like the user just made — the previous cause of "likes disappearing".
+  // Seed like state from server data whenever the post changes — initial load AND when a
+  // fresh fetch replaces a stale cached post, so a like persists across a page refresh.
+  // If the user just toggled a like the server hasn't reflected yet, keep their optimistic
+  // value so a stale in-flight fetch can't revert it; once the server catches up, trust it.
   useEffect(() => {
-    setLiked(Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || ""));
-    setLikeCount(typeof post.likes === "number" ? post.likes : 0);
+    const serverLiked = Array.isArray(post.likedBy) && post.likedBy.includes(user?.uid || "");
+    if (pendingLikeRef.current !== null && pendingLikeRef.current !== serverLiked) {
+      setLiked(pendingLikeRef.current);
+    } else {
+      pendingLikeRef.current = null;
+      setLiked(serverLiked);
+      setLikeCount(typeof post.likes === "number" ? post.likes : 0);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post.id, user?.uid]);
+  }, [post.id, user?.uid, post.likedBy, post.likes]);
 
   useEffect(() => {
     if (!user) return;
@@ -414,6 +424,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
     if (liking) return;
     setLiking(true);
     const newLiked = !liked;
+    pendingLikeRef.current = newLiked;
     setLiked(newLiked);
     setLikeCount((c) => c + (newLiked ? 1 : -1));
     try {
@@ -439,6 +450,7 @@ export default function PostCard({ post, onBlock, boostEnabled = true }: { post:
         sendNotification({ recipientUid: post.authorId, type: "like", senderName: user.displayName || "Someone", senderId: user.uid, postId: post.id, isReel: post.contentType === "reel" });
       }
     } catch {
+      pendingLikeRef.current = null;
       setLiked(!newLiked);
       setLikeCount((c) => c + (newLiked ? -1 : 1));
     }
