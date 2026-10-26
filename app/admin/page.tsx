@@ -262,6 +262,8 @@ export default function AdminPortalPage() {
   const [togglingAdvertise, setTogglingAdvertise] = useState(false);
   const [aiStudioEnabled, setAiStudioEnabled] = useState<boolean | null>(null);
   const [togglingAiStudio, setTogglingAiStudio] = useState(false);
+  const [iosBuyEnabled, setIosBuyEnabled] = useState<boolean | null>(null);
+  const [togglingIosBuy, setTogglingIosBuy] = useState(false);
   const [forceHalloween, setForceHalloween] = useState<boolean | null>(null);
   const [togglingHalloween, setTogglingHalloween] = useState(false);
   const [forceChristmas, setForceChristmas] = useState<boolean | null>(null);
@@ -332,6 +334,7 @@ export default function AdminPortalPage() {
         setAdsEnabled(data.adsEnabled ?? true);
         setAdvertiseEnabled(data.advertiseEnabled ?? true);
         setAiStudioEnabled(data.aiStudioEnabled ?? false);
+        setIosBuyEnabled(data.iosPurchasesEnabled ?? true);
         setForceHalloween(data.forceHalloween ?? false);
         setForceChristmas(data.forceChristmas ?? false);
       })
@@ -585,6 +588,7 @@ export default function AdminPortalPage() {
   const toggleAds       = () => doToggle("adsEnabled",       adsEnabled,       setTogglingAds,       setAdsEnabled);
   const toggleAdvertise = () => doToggle("advertiseEnabled", advertiseEnabled, setTogglingAdvertise, setAdvertiseEnabled);
   const toggleAiStudio  = () => doToggle("aiStudioEnabled",  aiStudioEnabled,  setTogglingAiStudio,  setAiStudioEnabled);
+  const toggleIosBuy    = () => doToggle("iosPurchasesEnabled", iosBuyEnabled,  setTogglingIosBuy,    setIosBuyEnabled);
   // Mutually exclusive seasonal themes: turning one on turns the other off.
   const toggleHalloween = () => {
     if (!forceHalloween && forceChristmas) doToggle("forceChristmas", true, setTogglingChristmas, setForceChristmas);
@@ -1466,6 +1470,35 @@ export default function AdminPortalPage() {
                   style={{ background: badgesEnabled ? "#a78bfa" : "#2a2a2a" }} />
                 <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
                   style={{ transform: badgesEnabled ? "translateX(20px)" : "translateX(0)" }} />
+              </button>
+            </div>
+
+            {/* iOS in-app purchases kill-switch (Apple 3.1.1 insurance) */}
+            <div className="flex items-center gap-4 p-5 rounded-2xl"
+              style={{ background: "#131313", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: iosBuyEnabled ? "rgba(59,130,246,0.12)" : "rgba(239,68,68,0.1)", border: `1px solid ${iosBuyEnabled ? "rgba(59,130,246,0.25)" : "rgba(239,68,68,0.25)"}` }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: iosBuyEnabled ? "#60a5fa" : "#f87171", fontVariationSettings: "'FILL' 1" }}>
+                  phone_iphone
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>iOS App Purchases</p>
+                <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                  {iosBuyEnabled
+                    ? "Badges & Premium buyable inside the iOS app (web + Android unaffected)"
+                    : "OFF — iOS app hides buying (Apple 3.1.1 safe); web still sells. No resubmit needed."}
+                </p>
+              </div>
+              <button
+                onClick={toggleIosBuy}
+                disabled={togglingIosBuy || iosBuyEnabled === null}
+                className="relative inline-block shrink-0 cursor-pointer border-none bg-transparent"
+                style={{ width: 44, height: 24 }}>
+                <span className="absolute inset-0 rounded-full transition-colors duration-200"
+                  style={{ background: iosBuyEnabled ? "#60a5fa" : "#2a2a2a" }} />
+                <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200"
+                  style={{ transform: iosBuyEnabled ? "translateX(20px)" : "translateX(0)" }} />
               </button>
             </div>
 

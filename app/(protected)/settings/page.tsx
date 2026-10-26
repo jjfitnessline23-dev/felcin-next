@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import { usePurchasesAllowed } from "@/hooks/usePurchasesAllowed";
 import { isHalloweenActive, setHalloweenPref, isAutoHalloweenWindow } from "@/components/HalloweenTheme";
 import { isChristmasActive, setChristmasPref, isAutoChristmasWindow } from "@/components/ChristmasTheme";
 
@@ -91,6 +92,7 @@ export default function SettingsPage() {
   const [premiumLoading, setPremiumLoading] = useState(false);
   const [premiumCancelling, setPremiumCancelling] = useState(false);
   const [premiumMsg, setPremiumMsg] = useState<string | null>(null);
+  const purchasesAllowed = usePurchasesAllowed();
 
   useEffect(() => {
     if (!user) return;
@@ -287,18 +289,23 @@ export default function SettingsPage() {
               {isPremium && <span className="ml-auto text-xs font-bold px-2 py-1 rounded-full" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>Active</span>}
             </div>
             {!isPremium ? (
-              <div className="flex gap-2">
-                <button onClick={() => startPremium("monthly")} disabled={premiumLoading}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
-                  style={{ background: "rgba(255,255,255,0.07)", color: "#f2f2f2" }}>
-                  {premiumLoading ? "Opening…" : "$9.99 / mo"}
-                </button>
-                <button onClick={() => startPremium("yearly")} disabled={premiumLoading}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
-                  style={{ background: "#fbbf24", color: "#000" }}>
-                  {premiumLoading ? "Opening…" : "$79.99 / yr"}
-                </button>
-              </div>
+              purchasesAllowed === false ? (
+                // iOS build with the purchases kill-switch off (Apple 3.1.1) — hide buying.
+                <p className="text-xs" style={{ color: "#555" }}>Premium isn&apos;t available in the app.</p>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={() => startPremium("monthly")} disabled={premiumLoading}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
+                    style={{ background: "rgba(255,255,255,0.07)", color: "#f2f2f2" }}>
+                    {premiumLoading ? "Opening…" : "$9.99 / mo"}
+                  </button>
+                  <button onClick={() => startPremium("yearly")} disabled={premiumLoading}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
+                    style={{ background: "#fbbf24", color: "#000" }}>
+                    {premiumLoading ? "Opening…" : "$79.99 / yr"}
+                  </button>
+                </div>
+              )
             ) : (
               <button onClick={cancelPremium} disabled={premiumCancelling}
                 className="w-full py-2 rounded-xl text-xs font-semibold border-none cursor-pointer"

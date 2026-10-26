@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { auth } from "@/lib/firebase";
+import { usePurchasesAllowed } from "@/hooks/usePurchasesAllowed";
 
 const BADGES = [
   {
@@ -156,6 +157,7 @@ export default function BadgesPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [buying, setBuying] = useState<string | null>(null);
   const [currentBadge, setCurrentBadge] = useState<string | null>(null);
+  const purchasesAllowed = usePurchasesAllowed();
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
@@ -357,26 +359,35 @@ export default function BadgesPage() {
                 </ul>
 
                 {/* Monthly subscription via hosted Stripe Checkout (same webview on
-                    web + native, so the session is preserved on return). */}
-                <button
-                  onClick={() => !isActive && purchaseBadge(badge.id)}
-                  disabled={!!buying || isActive}
-                  className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
-                  style={{
-                    background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
-                    color: isActive ? "var(--fx-accent)" : buying === badge.id ? "#555" : "#fff",
-                    border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none",
-                    boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
-                    cursor: isActive ? "default" : "pointer",
-                  }}>
-                  {isActive ? (
-                    <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
-                  ) : buying === badge.id ? (
-                    <><div className="spinner" style={{ width: 16, height: 16 }} /> Opening checkout…</>
-                  ) : (
-                    <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
-                  )}
-                </button>
+                    web + native, so the session is preserved on return). On an iOS
+                    build with the purchases kill-switch off, hide buying entirely
+                    (Apple 3.1.1) — the Active state + cancel still show. */}
+                {purchasesAllowed === false && !isActive ? (
+                  <div className="w-full py-3 rounded-2xl text-xs font-medium text-center"
+                    style={{ background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    Badge subscriptions aren&apos;t available in the app.
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => !isActive && purchaseBadge(badge.id)}
+                    disabled={!!buying || isActive}
+                    className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
+                    style={{
+                      background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
+                      color: isActive ? "var(--fx-accent)" : buying === badge.id ? "#555" : "#fff",
+                      border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none",
+                      boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
+                      cursor: isActive ? "default" : "pointer",
+                    }}>
+                    {isActive ? (
+                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
+                    ) : buying === badge.id ? (
+                      <><div className="spinner" style={{ width: 16, height: 16 }} /> Opening checkout…</>
+                    ) : (
+                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
+                    )}
+                  </button>
+                )}
                 {isActive && (
                   <button
                     onClick={cancelBadge}
