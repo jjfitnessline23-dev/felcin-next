@@ -264,6 +264,8 @@ export default function AdminPortalPage() {
   const [togglingAiStudio, setTogglingAiStudio] = useState(false);
   const [iosBuyEnabled, setIosBuyEnabled] = useState<boolean | null>(null);
   const [togglingIosBuy, setTogglingIosBuy] = useState(false);
+  const [followBackfillRunning, setFollowBackfillRunning] = useState(false);
+  const [followBackfillMsg, setFollowBackfillMsg] = useState<string | null>(null);
   const [forceHalloween, setForceHalloween] = useState<boolean | null>(null);
   const [togglingHalloween, setTogglingHalloween] = useState(false);
   const [forceChristmas, setForceChristmas] = useState<boolean | null>(null);
@@ -589,6 +591,24 @@ export default function AdminPortalPage() {
   const toggleAdvertise = () => doToggle("advertiseEnabled", advertiseEnabled, setTogglingAdvertise, setAdvertiseEnabled);
   const toggleAiStudio  = () => doToggle("aiStudioEnabled",  aiStudioEnabled,  setTogglingAiStudio,  setAiStudioEnabled);
   const toggleIosBuy    = () => doToggle("iosPurchasesEnabled", iosBuyEnabled,  setTogglingIosBuy,    setIosBuyEnabled);
+
+  // Recompute every user's followersCount/followingCount from the actual subcollections.
+  // Needed once because old client-side counter writes were denied by rules, leaving
+  // existing creators at 0 followers — which gates the entire creator fund (PPV + payouts).
+  const runFollowBackfill = async () => {
+    if (followBackfillRunning) return;
+    setFollowBackfillRunning(true);
+    setFollowBackfillMsg(null);
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      const res = await fetch("/api/admin/backfill-follow-counts", { method: "POST", headers: { authorization: `Bearer ${token ?? ""}` } });
+      const d = await res.json().catch(() => ({}));
+      setFollowBackfillMsg(res.ok ? `✅ Done — ${d.updated}/${d.usersScanned} users recomputed` : (d.error || "Failed — try again"));
+    } catch (e: any) {
+      setFollowBackfillMsg(e?.message || "Failed — try again");
+    }
+    setFollowBackfillRunning(false);
+  };
   // Mutually exclusive seasonal themes: turning one on turns the other off.
   const toggleHalloween = () => {
     if (!forceHalloween && forceChristmas) doToggle("forceChristmas", true, setTogglingChristmas, setForceChristmas);
@@ -1691,6 +1711,32 @@ export default function AdminPortalPage() {
             </div>
             {backfillMsg && (
               <p className="text-xs px-1" style={{ color: backfillMsg.startsWith("✅") ? "#34d399" : "#f87171" }}>{backfillMsg}</p>
+            )}
+
+            {/* ── Recompute follower counts (creator-fund gate) ── */}
+            <div className="flex items-center gap-4 p-5 rounded-2xl mt-3"
+              style={{ background: "#131313", border: "1px solid rgba(96,165,250,0.18)" }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: "#60a5fa", fontVariationSettings: "'FILL' 1" }}>groups</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#f2f2f2" }}>Recompute follower counts</p>
+                <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                  Fixes older accounts stuck at 0 followers so creators can reach the fund threshold. Run once; safe to re-run anytime.
+                </p>
+              </div>
+              <button
+                onClick={runFollowBackfill}
+                disabled={followBackfillRunning}
+                className="shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold border-none cursor-pointer flex items-center gap-1.5"
+                style={{ background: followBackfillRunning ? "rgba(255,255,255,0.05)" : "rgba(96,165,250,0.15)", color: followBackfillRunning ? "#555" : "#60a5fa", border: "1px solid rgba(96,165,250,0.2)" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{followBackfillRunning ? "hourglass_empty" : "sync"}</span>
+                {followBackfillRunning ? "Running…" : "Run"}
+              </button>
+            </div>
+            {followBackfillMsg && (
+              <p className="text-xs px-1" style={{ color: followBackfillMsg.startsWith("✅") ? "#34d399" : "#f87171" }}>{followBackfillMsg}</p>
             )}
 
             {/* ── Set your display name (applies everywhere: posts, comments, podcasts) ── */}

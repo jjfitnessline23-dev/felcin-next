@@ -6,21 +6,29 @@
  * accounts have a stale/zero followersCount even though their follower relationships exist.
  * Without this, existing creators can never reach the 10K-follower creator-fund gate.
  *
- * Secured with the same PAYOUT_SECRET as the payout cron. Call once after deploy:
+ * Auth: EITHER the PAYOUT_SECRET bearer (the payout cron / curl) OR a signed-in owner's
+ * Firebase ID token (the admin-panel button) — so the owner can run it in one tap
+ * without handling the secret. Call once after deploy:
  *   curl -X POST https://felcin.com/api/admin/backfill-follow-counts \
  *        -H "authorization: Bearer $PAYOUT_SECRET"
  */
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { getAdminApp } from "@/lib/firebaseAdmin";
+import { getAdminApp, verifyToken } from "@/lib/firebaseAdmin";
+
+const OWNER_UIDS = ["GnpVhd5SRMQGxm0lExe5Ycd6btf2", "FoQAHsSnbdeHayMSl85wR5EliYm1"];
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.PAYOUT_SECRET;
-  if (!secret) return NextResponse.json({ error: "Endpoint not configured" }, { status: 503 });
   const auth = req.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  if (auth.length !== expected.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(expected))) {
+  const secret = process.env.PAYOUT_SECRET;
+  const secretOk = !!secret
+    && auth.length === `Bearer ${secret}`.length
+    && timingSafeEqual(Buffer.from(auth), Buffer.from(`Bearer ${secret}`));
+  // Owner ID token also allowed (admin-panel one-tap).
+  const callerUid = secretOk ? null : await verifyToken(auth);
+  const ownerOk = !!callerUid && OWNER_UIDS.includes(callerUid);
+  if (!secretOk && !ownerOk) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
