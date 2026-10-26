@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
-import StripeCheckoutModal from "@/components/StripeCheckoutModal";
 import { isHalloweenActive, setHalloweenPref, isAutoHalloweenWindow } from "@/components/HalloweenTheme";
 import { isChristmasActive, setChristmasPref, isAutoChristmasWindow } from "@/components/ChristmasTheme";
 
@@ -90,13 +89,33 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [premiumLoading, setPremiumLoading] = useState(false);
-  const [premiumSecret, setPremiumSecret] = useState<string | null>(null);
+  const [premiumCancelling, setPremiumCancelling] = useState(false);
+  const [premiumMsg, setPremiumMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
     getDoc(doc(db, "users", user.uid, "settings", "premium")).then((snap) => {
       if (snap.exists() && snap.data()?.active) setIsPremium(true);
     }).catch(() => {});
+  }, [user]);
+
+  // Returning from hosted Stripe Checkout: ?premium_session_id → verify + grant.
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get("premium_session_id");
+    if (!sid) return;
+    (async () => {
+      const token = await auth.currentUser?.getIdToken();
+      fetch(`/api/premium-verify?session_id=${sid}`, { headers: { authorization: `Bearer ${token ?? ""}` } })
+        .then((r) => r.json())
+        .then((d) => { if (d.ok) { setIsPremium(true); setPremiumMsg("Premium activated — welcome!"); } })
+        .catch(() => {})
+        .finally(() => {
+          // Strip the param so a refresh doesn't re-verify.
+          window.history.replaceState({}, "", window.location.pathname);
+        });
+    })();
   }, [user]);
 
   const startPremium = async (plan: "monthly" | "yearly") => {
@@ -106,9 +125,27 @@ export default function SettingsPage() {
       const token = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/premium-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, token }) });
       const data = await res.json();
-      if (data.clientSecret) setPremiumSecret(data.clientSecret);
-    } catch {}
+      if (data.url) { window.location.href = data.url; return; }
+      setPremiumMsg(data.error || "Couldn't start checkout — please try again");
+    } catch {
+      setPremiumMsg("Couldn't start checkout — please try again");
+    }
     setPremiumLoading(false);
+  };
+
+  const cancelPremium = async () => {
+    if (!user || premiumCancelling) return;
+    if (!window.confirm("Cancel Felcin Premium? It stays active until the end of the current billing period.")) return;
+    setPremiumCancelling(true);
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      const res = await fetch("/api/premium-cancel", { method: "POST", headers: { authorization: `Bearer ${token ?? ""}` } });
+      const data = await res.json().catch(() => ({}));
+      setPremiumMsg(res.ok ? "Premium cancelled — active until period end." : (data.error || "Could not cancel — try again"));
+    } catch {
+      setPremiumMsg("Could not cancel — try again");
+    }
+    setPremiumCancelling(false);
   };
 
   // Privacy
@@ -249,20 +286,27 @@ export default function SettingsPage() {
               </div>
               {isPremium && <span className="ml-auto text-xs font-bold px-2 py-1 rounded-full" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>Active</span>}
             </div>
-            {!isPremium && (
+            {!isPremium ? (
               <div className="flex gap-2">
                 <button onClick={() => startPremium("monthly")} disabled={premiumLoading}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
                   style={{ background: "rgba(255,255,255,0.07)", color: "#f2f2f2" }}>
-                  $9.99 / mo
+                  {premiumLoading ? "Opening…" : "$9.99 / mo"}
                 </button>
                 <button onClick={() => startPremium("yearly")} disabled={premiumLoading}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold border-none cursor-pointer"
                   style={{ background: "#fbbf24", color: "#000" }}>
-                  $79.99 / yr
+                  {premiumLoading ? "Opening…" : "$79.99 / yr"}
                 </button>
               </div>
+            ) : (
+              <button onClick={cancelPremium} disabled={premiumCancelling}
+                className="w-full py-2 rounded-xl text-xs font-semibold border-none cursor-pointer"
+                style={{ background: "transparent", color: "#666" }}>
+                {premiumCancelling ? "Cancelling…" : "Cancel Premium"}
+              </button>
             )}
+            {premiumMsg && <p className="text-xs mt-3 text-center" style={{ color: "#888" }}>{premiumMsg}</p>}
           </div>
         </div>
 
@@ -373,21 +417,6 @@ export default function SettingsPage() {
 
         <p className="text-xs text-center pb-6 mt-2" style={{ color: "#2a2a2a" }}>{`© ${new Date().getFullYear()} Felcin`}</p>
       </div>
-
-      {premiumSecret && (
-        <StripeCheckoutModal
-          fetchClientSecret={async () => premiumSecret}
-          onClose={() => setPremiumSecret(null)}
-          onComplete={() => {
-            const sessionId = premiumSecret.split("_secret_")[0];
-            setPremiumSecret(null);
-            fetch(`/api/premium-verify?session_id=${sessionId}`)
-              .then((r) => r.json())
-              .then((d) => { if (d.ok) setIsPremium(true); })
-              .catch(() => {});
-          }}
-        />
-      )}
     </div>
   );
 }

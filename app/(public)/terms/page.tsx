@@ -62,10 +62,10 @@ export default function TermsPage() {
 
           <section>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: "#f1f1f1", marginBottom: 10 }}>6. Payments & Subscriptions</h2>
-            <p style={{ marginBottom: 10 }}>All payments are processed securely by Stripe. Profile badges, tips, pay-per-view content, and gifts are one-time purchases — your payment method is charged once. Felcin Premium and creator subscriptions are recurring subscriptions that renew automatically until you cancel.</p>
+            <p style={{ marginBottom: 10 }}>All payments are processed securely by Stripe. Profile badges, Felcin Premium, and creator subscriptions are recurring subscriptions that renew automatically each period until you cancel. Tips, pay-per-view content, and gifts are one-time purchases — your payment method is charged once.</p>
             <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
-              <li>One-time purchases (badges, tips, pay-per-view, gifts) are charged a single time and are final</li>
-              <li>Recurring subscriptions (Premium and creator subscriptions) auto-renew unless cancelled before the renewal date; you can cancel anytime in Settings</li>
+              <li>Recurring subscriptions (profile badges, Premium, and creator subscriptions) auto-renew unless cancelled before the renewal date; you can cancel anytime in Settings or on the Badges page, and access continues until the end of the paid period</li>
+              <li>One-time purchases (tips, pay-per-view, gifts) are charged a single time and are final</li>
               <li>Prices are shown at checkout and may change over time</li>
               <li>Purchases are for the account holder only and non-transferable</li>
               <li>For billing questions, contact <a href="mailto:support@felcin.com" style={{ color: "#aaa" }}>support@felcin.com</a></li>

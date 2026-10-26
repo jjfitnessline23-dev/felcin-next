@@ -6,7 +6,6 @@ import { db, OWNER_UIDS } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
-import BadgePaymentModal from "@/components/BadgePaymentModal";
 import { auth } from "@/lib/firebase";
 
 const BADGES = [
@@ -157,19 +156,6 @@ export default function BadgesPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [buying, setBuying] = useState<string | null>(null);
   const [currentBadge, setCurrentBadge] = useState<string | null>(null);
-  const [paymentModal, setPaymentModal] = useState<{ clientSecret: string; badgeId: string; label: string; amount: number } | null>(null);
-  const [isNative, setIsNative] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-
-  useEffect(() => {
-    const cap = (window as any).Capacitor;
-    if (cap?.isNativePlatform?.()) {
-      setIsNative(true);
-      // Only iOS needs the external browser (Apple IAP compliance).
-      // Android can use the same in-app Stripe modal as the web.
-      setIsIOS(cap.getPlatform?.() === "ios");
-    }
-  }, []);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
@@ -205,7 +191,11 @@ export default function BadgesPage() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) { showToast("Please log in to continue"); setBuying(null); return; }
       const token = await firebaseUser.getIdToken(true);
-      const res = await fetch("/api/badge-payment-intent", {
+      // Monthly badge subscription via hosted Stripe Checkout. We navigate the
+      // current webview to Stripe and back (success_url returns to /badges with a
+      // session id), which keeps the signed-in session on both web and the native
+      // app shell — no separate browser, no re-login.
+      const res = await fetch("/api/badge-subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json", "authorization": `Bearer ${token}` },
         body: JSON.stringify({ badgeId }),
@@ -218,15 +208,31 @@ export default function BadgesPage() {
         setBuying(null);
         return;
       }
-      if (data.clientSecret) {
-        setPaymentModal({ clientSecret: data.clientSecret, badgeId, label: data.badgeLabel, amount: data.amount });
-      } else {
-        showToast(data.error || "Something went wrong");
+      if (data.url) {
+        window.location.href = data.url;
+        return; // leaving the page; keep the spinner until navigation
       }
+      showToast(data.error || "Something went wrong");
     } catch (e: any) {
       showToast(e?.message || "Something went wrong — please try again");
     }
     setBuying(null);
+  };
+
+  const [cancelling, setCancelling] = useState(false);
+  const cancelBadge = async () => {
+    if (!user || cancelling) return;
+    if (!window.confirm("Cancel your badge subscription? Your badge stays active until the end of the current billing period.")) return;
+    setCancelling(true);
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      const res = await fetch("/api/badge-cancel", { method: "POST", headers: { authorization: `Bearer ${token ?? ""}` } });
+      const data = await res.json().catch(() => ({}));
+      showToast(res.ok ? "Badge subscription cancelled — active until period end." : (data.error || "Could not cancel — try again"));
+    } catch {
+      showToast("Could not cancel — try again");
+    }
+    setCancelling(false);
   };
 
   const isOwner = user && OWNER_UIDS.includes(user.uid);
@@ -350,47 +356,34 @@ export default function BadgesPage() {
                   ))}
                 </ul>
 
-                {isNative && isIOS ? (
-                  // iOS: open browser sheet (Apple IAP compliance)
-                  <div
-                    className="w-full py-3 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
-                    style={{ background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : badge.grad, color: isActive ? "var(--fx-accent)" : "#fff", border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none", boxShadow: isActive ? "none" : `0 0 20px ${badge.glow}` }}
-                    onClick={async () => {
-                      if (isActive) return;
-                      try {
-                        const { Browser } = await import("@capacitor/browser");
-                        await Browser.open({ url: "https://felcin.com/badges", presentationStyle: "popover" });
-                      } catch {
-                        (window as any).open("https://felcin.com/badges", "_system");
-                      }
-                    }}
-                  >
-                    {isActive ? (
-                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
-                    ) : (
-                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
-                    )}
-                  </div>
-                ) : (
-                  // Web + Android: in-app Stripe payment modal
+                {/* Monthly subscription via hosted Stripe Checkout (same webview on
+                    web + native, so the session is preserved on return). */}
+                <button
+                  onClick={() => !isActive && purchaseBadge(badge.id)}
+                  disabled={!!buying || isActive}
+                  className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
+                  style={{
+                    background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
+                    color: isActive ? "var(--fx-accent)" : buying === badge.id ? "#555" : "#fff",
+                    border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none",
+                    boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
+                    cursor: isActive ? "default" : "pointer",
+                  }}>
+                  {isActive ? (
+                    <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
+                  ) : buying === badge.id ? (
+                    <><div className="spinner" style={{ width: 16, height: 16 }} /> Opening checkout…</>
+                  ) : (
+                    <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
+                  )}
+                </button>
+                {isActive && (
                   <button
-                    onClick={() => !isActive && purchaseBadge(badge.id)}
-                    disabled={!!buying || isActive}
-                    className="w-full py-3 rounded-2xl font-bold text-sm border-none cursor-pointer flex items-center justify-center gap-2"
-                    style={{
-                      background: isActive ? "rgba(var(--fx-accent-rgb),0.1)" : buying === badge.id ? "rgba(255,255,255,0.05)" : badge.grad,
-                      color: isActive ? "var(--fx-accent)" : buying === badge.id ? "#555" : "#fff",
-                      border: isActive ? "1px solid rgba(var(--fx-accent-rgb),0.25)" : "none",
-                      boxShadow: isActive || buying === badge.id ? "none" : `0 0 20px ${badge.glow}`,
-                      cursor: isActive ? "default" : "pointer",
-                    }}>
-                    {isActive ? (
-                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span> Currently Active</>
-                    ) : buying === badge.id ? (
-                      <><div className="spinner" style={{ width: 16, height: 16 }} /> Opening checkout…</>
-                    ) : (
-                      <><span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span> Get {badge.name}</>
-                    )}
+                    onClick={cancelBadge}
+                    disabled={cancelling}
+                    className="w-full mt-2 py-2 rounded-xl text-xs font-semibold border-none cursor-pointer"
+                    style={{ background: "transparent", color: "#666" }}>
+                    {cancelling ? "Cancelling…" : "Cancel subscription"}
                   </button>
                 )}
               </div>
@@ -399,27 +392,6 @@ export default function BadgesPage() {
         })}
       </div>
 
-      {paymentModal && (
-        <BadgePaymentModal
-          clientSecret={paymentModal.clientSecret}
-          badgeLabel={paymentModal.label}
-          amountCents={paymentModal.amount}
-          onClose={() => setPaymentModal(null)}
-          onSuccess={async (paymentIntentId) => {
-            const activatedBadgeId = paymentModal.badgeId;
-            setPaymentModal(null);
-            const token = await auth.currentUser?.getIdToken();
-            fetch("/api/badge-intent-verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", authorization: `Bearer ${token ?? ""}` },
-              body: JSON.stringify({ paymentIntentId }),
-            })
-              .then((r) => r.json())
-              .then((d) => { if (d.ok) { setCurrentBadge(activatedBadgeId); showToast("Badge activated on your profile!"); } })
-              .catch(() => {});
-          }}
-        />
-      )}
     </div>
   );
 }

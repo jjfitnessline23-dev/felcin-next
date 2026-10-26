@@ -12,14 +12,19 @@ export async function GET(req: NextRequest) {
   if (!sessionId) return NextResponse.json({ error: "Missing session_id" }, { status: 400 });
 
   const session = await stripe.checkout.sessions.retrieve(sessionId);
-  if (session.payment_status !== "paid") return NextResponse.json({ ok: false }, { status: 402 });
+  // Subscription Checkout sessions report payment_status "paid" + status "complete"
+  // once the first invoice is settled.
+  if (session.payment_status !== "paid" && session.status !== "complete") return NextResponse.json({ ok: false }, { status: 402 });
 
   const { uid, badgeId, badgeLabel } = session.metadata ?? {};
   if (uid && uid !== callerUid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const app = getAdminApp();
   if (app && uid && badgeId) {
     const db = app.firestore();
-    await db.collection("users").doc(uid).set({ badge: badgeId, badgeLabel }, { merge: true });
+    // Store the subscription id so the daily reconcile cron can remove the badge
+    // when the subscription is cancelled or goes unpaid.
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+    await db.collection("users").doc(uid).set({ badge: badgeId, badgeLabel, badgeActive: true, badgeSubscriptionId: subscriptionId, badgeCancelAtPeriodEnd: false }, { merge: true });
     await db.collection("users").doc(uid).collection("public").doc("profile").set({ badge: badgeId, badgeLabel }, { merge: true });
   }
 

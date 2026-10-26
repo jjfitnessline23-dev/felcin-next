@@ -28,8 +28,11 @@ export async function GET(req: NextRequest) {
       const expiresAt = plan === "yearly"
         ? new Date(Date.now() + 365 * 24 * 3600 * 1000)
         : new Date(Date.now() + 31 * 24 * 3600 * 1000);
-      await premiumRef.set({ active: true, plan, sessionId, expiresAt, grantedAt: admin.firestore.FieldValue.serverTimestamp() });
-      await db.collection("users").doc(uid).set({ premium: true }, { merge: true });
+      // Store the Stripe subscription id so the daily reconcile cron can end
+      // Premium when the subscription is cancelled or goes unpaid.
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+      await premiumRef.set({ active: true, plan, sessionId, subscriptionId, cancelAtPeriodEnd: false, expiresAt, grantedAt: admin.firestore.FieldValue.serverTimestamp() });
+      await db.collection("users").doc(uid).set({ premium: true, premiumSubscriptionId: subscriptionId }, { merge: true });
       await db.collection("users").doc(uid).collection("public").doc("profile").set({ premium: true }, { merge: true });
     }
   }

@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 // Prices below mirror the live Stripe checkout amounts defined server-side
 // (subscribe/badge/premium checkout routes). Keep them in sync if those change.
 const BADGES = [
-  { label: "Bronze", price: "$1.99", emoji: "🥉" },
-  { label: "Silver", price: "$4.99", emoji: "🥈" },
-  { label: "Gold", price: "$9.99", emoji: "🥇" },
-  { label: "Diamond", price: "$19.99", emoji: "💎" },
+  { label: "Verified", price: "$2.99", emoji: "✅" },
+  { label: "Creator", price: "$4.99", emoji: "🎨" },
+  { label: "Pro Creator", price: "$12.99", emoji: "⭐" },
+  { label: "Elite", price: "$49.99", emoji: "💎" },
 ];
 
 function Card({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
@@ -75,12 +75,12 @@ export default function PricingPage() {
         {/* Profile badges */}
         <Card>
           <p style={{ fontSize: 15, fontWeight: 800, margin: "0 0 4px" }}>Profile badges</p>
-          <p style={{ fontSize: 13, color: "#777", margin: "0 0 16px", lineHeight: 1.5 }}>One-time badges that show on your profile. A fun way to stand out and support the platform.</p>
+          <p style={{ fontSize: 13, color: "#777", margin: "0 0 16px", lineHeight: 1.5 }}>Monthly badges that show on your profile — from $2.99/mo. Stand out, unlock perks, and cancel anytime in Settings. Eight tiers available in the app.</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }} className="badge-grid">
             {BADGES.map((b) => (
               <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, background: "#141414", border: "1px solid rgba(255,255,255,0.05)" }}>
                 <span style={{ fontSize: 20 }}>{b.emoji}</span>
-                <div><div style={{ fontSize: 13, fontWeight: 700 }}>{b.label}</div><div style={{ fontSize: 13, color: "var(--fx-accent)", fontWeight: 800 }}>{b.price}</div></div>
+                <div><div style={{ fontSize: 13, fontWeight: 700 }}>{b.label}</div><div style={{ fontSize: 13, color: "var(--fx-accent)", fontWeight: 800 }}>{b.price}<span style={{ fontSize: 11, color: "#666", fontWeight: 600 }}> /mo</span></div></div>
               </div>
             ))}
           </div>
