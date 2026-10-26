@@ -120,7 +120,7 @@ export default function TermsPage() {
           <a href="/privacy" style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>Privacy Policy</a>
           <a href="/guidelines" style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>Community Guidelines</a>
           <a href="/support" style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>Support</a>
-          <span style={{ color: "#333", fontSize: 13 }}>© {new Date().getFullYear()} Felcin</span>
+          <span style={{ color: "#333", fontSize: 13 }}>{`© ${new Date().getFullYear()} Felcin`}</span>
         </div>
       </div>
     </div>

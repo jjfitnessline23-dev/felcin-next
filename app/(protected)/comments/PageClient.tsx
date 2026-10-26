@@ -166,6 +166,7 @@ export default function PageClient() {
   const [reportDone, setReportDone] = useState(false);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(false);
   const [postDeleted, setPostDeleted] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [imgLightbox, setImgLightbox] = useState(false);
   const [prevPostId, setPrevPostId] = useState<string | null>(null);
   const [nextPostId, setNextPostId] = useState<string | null>(null);
@@ -178,11 +179,13 @@ export default function PageClient() {
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!postId) return;
+    if (!postId) { setNotFound(true); return; }
     const postRef = doc(db, col, postId);
     getDoc(postRef).then(async (snap) => {
-      if (!snap.exists()) { router.replace("/"); return; }
+      // Missing / deleted / content-less post → show a clear not-found state (no comment box).
+      if (!snap.exists()) { setNotFound(true); return; }
       const p = snap.data() as Post;
+      if (!p.mediaUrl && !p.caption && !p.text) { setNotFound(true); return; }
       setPost(p);
       setLikeCount(typeof p.likes === "number" ? p.likes : 0);
       setShareCount(typeof p.shareCount === "number" ? p.shareCount : 0);
@@ -451,6 +454,17 @@ export default function PageClient() {
   };
 
   if (postDeleted) return null;
+
+  if (notFound) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center px-6" style={{ minHeight: "100dvh", background: "#090909", color: "#f2f2f2" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 44, color: "#444" }}>search_off</span>
+        <p className="mt-3 text-lg font-bold">Post not found</p>
+        <p className="mt-1 text-sm" style={{ color: "#777" }}>This post may have been deleted, or the link is broken.</p>
+        <button onClick={() => router.replace("/")} className="mt-5 px-6 py-2.5 rounded-full text-sm font-bold border-none cursor-pointer" style={{ background: "var(--fx-accent)", color: "#000" }}>Back to feed</button>
+      </div>
+    );
+  }
 
   const mediaType = resolveMediaType(post?.contentType, post?.mimeType, post?.mediaUrl);
   const displayName = authorData?.name || post?.authorName || "User";

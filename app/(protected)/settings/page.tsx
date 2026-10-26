@@ -371,7 +371,7 @@ export default function SettingsPage() {
           <Row icon="delete_forever" label="Delete Account" sub="Permanently remove your account" danger href="/profile-settings#delete" />
         </Section>
 
-        <p className="text-xs text-center pb-6 mt-2" style={{ color: "#2a2a2a" }}>Felcin © {new Date().getFullYear()}</p>
+        <p className="text-xs text-center pb-6 mt-2" style={{ color: "#2a2a2a" }}>{`© ${new Date().getFullYear()} Felcin`}</p>
       </div>
 
       {premiumSecret && (

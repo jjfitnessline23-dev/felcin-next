@@ -113,7 +113,7 @@ export default function PrivacyPage() {
           <a href="/terms" style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>Terms of Service</a>
           <a href="/support" style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>Support</a>
           <a href="/guidelines" style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>Community Guidelines</a>
-          <span style={{ color: "#333", fontSize: 13 }}>© {new Date().getFullYear()} Felcin</span>
+          <span style={{ color: "#333", fontSize: 13 }}>{`© ${new Date().getFullYear()} Felcin`}</span>
         </div>
       </div>
     </div>
