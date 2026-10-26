@@ -6,12 +6,15 @@
  * Register this URL in Stripe Dashboard → Webhooks:
  *   https://felcin.com/api/stripe-webhook
  * Events to listen for:
- *   checkout.session.completed
- *   payment_intent.succeeded
+ *   checkout.session.completed      (activate badge/premium/sub purchases)
+ *   payment_intent.succeeded        (activate embedded card-sheet purchases)
+ *   customer.subscription.updated   (status change → end perks if no longer active)
+ *   customer.subscription.deleted   (cancellation finalized → remove perks)
  */
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import admin from "firebase-admin";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import {
   getUserEmail, sendEmail,
@@ -32,7 +35,7 @@ async function activateBadge(uid: string, badgeId: string, badgeLabel: string) {
   if (!app || !uid || !badgeId) return;
   const db = app.firestore();
   await Promise.all([
-    db.collection("users").doc(uid).set({ badge: badgeId, badgeLabel }, { merge: true }),
+    db.collection("users").doc(uid).set({ badge: badgeId, badgeLabel, badgeActive: true }, { merge: true }),
     db.collection("users").doc(uid).collection("public").doc("profile").set({ badge: badgeId, badgeLabel }, { merge: true }),
   ]);
 }
@@ -194,7 +197,63 @@ async function handlePayment(meta: Record<string, string>, amount: number, sessi
 }
 
 async function handleSession(session: Stripe.Checkout.Session) {
-  await handlePayment((session.metadata ?? {}) as Record<string, string>, session.amount_total ?? 0, session.id, "session");
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  const subId = typeof session.subscription === "string" ? session.subscription : null;
+
+  // Monthly badge / Premium subscriptions (badge-subscribe / premium-checkout):
+  // persist the subscription id so the lifecycle events + reconcile cron can manage
+  // it, and activate Premium here as a backstop if the redirect-verify never ran.
+  if (subId && meta.uid) {
+    const app = getAdminApp();
+    if (app) {
+      const db = app.firestore();
+      if (meta.badgeId) {
+        await db.collection("users").doc(meta.uid).set(
+          { badgeActive: true, badgeSubscriptionId: subId, badgeCancelAtPeriodEnd: false }, { merge: true });
+      } else if (meta.plan) { // Premium
+        await Promise.all([
+          db.collection("users").doc(meta.uid).collection("settings").doc("premium").set(
+            { active: true, plan: meta.plan, subscriptionId: subId, cancelAtPeriodEnd: false, grantedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
+          db.collection("users").doc(meta.uid).set({ premium: true, premiumSubscriptionId: subId }, { merge: true }),
+          db.collection("users").doc(meta.uid).collection("public").doc("profile").set({ premium: true }, { merge: true }),
+        ]);
+        const email = await getUserEmail(meta.uid);
+        if (email) await sendEmail(email, "Felcin Premium activated", premiumConfirmationEmail(meta.plan, (session.amount_total ?? 0) / 100));
+      }
+    }
+  }
+
+  await handlePayment(meta, session.amount_total ?? 0, session.id, "session");
+}
+
+// Subscription lifecycle: a badge/Premium subscription changed state. When it's no
+// longer active (cancelled at period end, unpaid after retries, etc.) we remove the
+// perk immediately — the reconcile cron is the daily backstop; this is the instant path.
+const ACTIVE_SUB_STATES = new Set(["active", "trialing", "past_due"]); // past_due = Stripe still retrying → keep perks
+
+async function handleSubscriptionChange(sub: Stripe.Subscription) {
+  const meta = (sub.metadata ?? {}) as Record<string, string>;
+  const uid = meta.uid;
+  if (!uid) return; // not one of ours (no metadata)
+  if (ACTIVE_SUB_STATES.has(sub.status)) return; // still entitled
+
+  const app = getAdminApp();
+  if (!app) return;
+  const db = app.firestore();
+  const del = admin.firestore.FieldValue.delete();
+
+  if (meta.kind === "badge" || meta.badgeId) {
+    await Promise.all([
+      db.collection("users").doc(uid).set({ badge: del, badgeLabel: del, badgeActive: false }, { merge: true }),
+      db.collection("users").doc(uid).collection("public").doc("profile").set({ badge: del, badgeLabel: del }, { merge: true }),
+    ]);
+  } else if (meta.kind === "premium" || meta.plan) {
+    await Promise.all([
+      db.collection("users").doc(uid).collection("settings").doc("premium").set({ active: false }, { merge: true }),
+      db.collection("users").doc(uid).set({ premium: false }, { merge: true }),
+      db.collection("users").doc(uid).collection("public").doc("profile").set({ premium: false }, { merge: true }),
+    ]);
+  }
 }
 
 async function handlePaymentIntent(pi: Stripe.PaymentIntent) {
@@ -240,6 +299,11 @@ export async function POST(req: NextRequest) {
     const pi = event.data.object as Stripe.PaymentIntent;
     await handlePaymentIntent(pi).catch((e) =>
       console.error("Webhook PI handler error:", e.message)
+    );
+  } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    const sub = event.data.object as Stripe.Subscription;
+    await handleSubscriptionChange(sub).catch((e) =>
+      console.error("Webhook subscription handler error:", e.message)
     );
   }
 
